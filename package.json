@@ -15,7 +15,7 @@
   "dependencies": {
     "@expo-google-fonts/sora": "^0.4.1",
     "@expo/vector-icons": "^14.1.0",
-    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-native-async-storage/async-storage": "2.1.2",
     "@react-native-community/datetimepicker": "8.4.1",
     "@react-navigation/native": "^7.1.6",
     "@tanstack/react-query": "^5.81.5",
@@ -56,6 +56,13 @@
     "react-test-renderer": "19.0.0",
     "tailwindcss": "^4.1.11",
     "typescript": "~5.8.3"
+  },
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "listUnknownPackages": false
+      }
+    }
   },
   "private": true
 }
