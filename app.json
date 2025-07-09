@@ -17,7 +17,10 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.dreemlab.monzi",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Monzi uses the camera to capture identity documents and selfies for account verification and KYC compliance. This ensures the security and authenticity of your financial account.",
+        "NSPhotoLibraryUsageDescription": "Monzi needs access to your photo library to allow you to select and upload identity documents for account verification.",
+        "NSFaceIDUsageDescription": "Monzi uses Face ID to provide secure and convenient access to your financial account."
       }
     },
     "android": {
