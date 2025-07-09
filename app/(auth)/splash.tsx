@@ -9,11 +9,15 @@ import {
   StatusBar,
 } from 'react-native';
 import { router } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { useTheme } from '@/providers/ThemeProvider';
 import { BiometricService, AuthStorageService } from '@/services';
 import { fontFamilies } from '@/constants/fonts';
 
-export default function SplashScreen() {
+// Keep the splash screen visible while we fetch resources
+SplashScreen.preventAutoHideAsync();
+
+export default function SplashScreenComponent() {
   const { colors } = useTheme();
   const fadeAnim = new Animated.Value(0);
   const scaleAnim = new Animated.Value(0.8);
@@ -27,6 +31,9 @@ export default function SplashScreen() {
   }, []);
 
   const initializeApp = async () => {
+    // Hide the native splash screen and show our custom one
+    await SplashScreen.hideAsync();
+    
     // Start logo animations
     Animated.parallel([
       Animated.timing(fadeAnim, {
