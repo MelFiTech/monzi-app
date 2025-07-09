@@ -162,8 +162,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logo: {
-    width: 120,
-    height: 40,
+    width: 160,
+    height: 80,
   },
   fallbackContainer: {
     position: 'absolute',

@@ -15,7 +15,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.dreemlab.monzi"
+      "bundleIdentifier": "com.dreemlab.monzi",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -35,6 +38,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "467a0d00-c4c0-4dbc-9b77-bfcc3cc5e1c4"
+      }
     }
   }
 }
