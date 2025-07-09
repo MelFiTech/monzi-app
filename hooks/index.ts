@@ -14,4 +14,7 @@ export * from './useBiometricService';
 export * from './useAuthService';
 
 // KYC Service Hooks
-export * from './useKYCService'; 
+export * from './useKYCService';
+
+// Wallet Service Hooks
+export * from './useWalletService'; 

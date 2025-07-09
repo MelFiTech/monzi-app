@@ -6,6 +6,7 @@ export { default as BiometricService } from './BiometricService';
 export { default as AuthService } from './AuthService';
 export { default as AuthStorageService } from './AuthStorageService';
 export { default as KYCService } from './KYCService';
+export { default as WalletService } from './WalletService';
 export type { Message, UserData, AuthFlowStep } from './ChatService';
 export type { ExtractedBankData } from './GeminiService';
 export type { BiometricResult } from './BiometricService';
@@ -27,4 +28,14 @@ export type {
   AccountResolutionResponse, 
   AccountResolutionError,
   AccountResolutionResult 
-} from './AccountService'; 
+} from './AccountService';
+export type {
+  WalletDetails,
+  WalletBalance,
+  Transaction,
+  TransactionParticipant,
+  TransactionHistoryParams,
+  SetPinRequest,
+  SetPinResponse,
+  WalletError
+} from './WalletService'; 

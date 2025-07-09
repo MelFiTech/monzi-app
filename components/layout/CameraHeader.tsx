@@ -11,8 +11,10 @@ import { router } from 'expo-router';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { fontFamilies } from '@/constants/fonts';
+import { useWalletBalance, useWalletDetails } from '@/hooks';
 import { ArrowLeft, User, Copy, Check } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Clipboard from 'expo-clipboard';
 import Toast from '@/components/common/Toast';
 
 interface CameraHeaderProps {
@@ -27,14 +29,24 @@ export function CameraHeader({
   title = "Snap & Go", 
   showBackButton = false, 
   onBackPress,
-  walletBalance = "N256,311.12",
-  accountInfo = "Polaris • 0260835212"
+  walletBalance: propWalletBalance,
+  accountInfo: propAccountInfo
 }: CameraHeaderProps) {
   const { colors } = useTheme();
   const { logout, user } = useAuth();
   const [copied, setCopied] = useState(false);
   const [isBalanceHidden, setIsBalanceHidden] = useState(false);
   const [showToast, setShowToast] = useState(false);
+
+  // Fetch wallet data
+  const { data: balanceData } = useWalletBalance();
+  const { data: walletDetails } = useWalletDetails();
+
+  // Use API data if available, otherwise fall back to props or defaults
+  const walletBalance = balanceData?.formattedBalance || propWalletBalance || "₦0.00";
+  const accountInfo = walletDetails 
+    ? `${walletDetails.providerAccountName} • ${walletDetails.virtualAccountNumber}`
+    : propAccountInfo || "Loading...";
 
   const handleAddPress = () => {
     router.push('/amount');
@@ -53,12 +65,26 @@ export function CameraHeader({
     }
   };
 
-  const handleCopyAccount = () => {
-    setShowToast(true);
-    setCopied(true);
-    setTimeout(() => {
-      setCopied(false);
-    }, 2000);
+  const handleCopyAccount = async () => {
+    try {
+      const accountNumber = walletDetails?.virtualAccountNumber || '';
+      if (accountNumber) {
+        Clipboard.setString(accountNumber);
+        setShowToast(true);
+        setCopied(true);
+        setTimeout(() => {
+          setCopied(false);
+        }, 2000);
+      }
+    } catch (error) {
+      console.warn('Failed to copy account number:', error);
+      // Show toast anyway for feedback
+      setShowToast(true);
+      setCopied(true);
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    }
   };
 
   const toggleBalanceVisibility = () => {
@@ -70,7 +96,7 @@ export function CameraHeader({
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
       <Toast
         visible={showToast}
-        message="Account number copied"
+        message={`${walletDetails?.virtualAccountNumber || 'Account number'} copied`}
         type="success"
         onHide={() => setShowToast(false)}
       />
@@ -84,7 +110,7 @@ export function CameraHeader({
         <View style={styles.leftSection}>
           {showBackButton ? (
             <TouchableOpacity style={styles.iconButton} onPress={handleBackPress}>
-              <ArrowLeft size={20} color={colors.white} strokeWidth={2} />
+              <ArrowLeft size={20} color="#FFFFFF" strokeWidth={2} />
             </TouchableOpacity>
           ) : (
             <TouchableOpacity style={styles.iconButton} onPress={handleProfilePress}>
@@ -128,7 +154,7 @@ export function CameraHeader({
             <Image 
               source={require('@/assets/icons/home/menu.png')}
               style={{width: 18, height: 10}}
-              tintColor={colors.white}
+              tintColor="#FFFFFF"
             />
           </TouchableOpacity>
         </View>
