@@ -1,0 +1,104 @@
+# EAS Ignore - Files to exclude from EAS builds
+
+# Documentation and guides
+*.md
+**/*.md
+
+# Test files and scripts
+test-*.js
+*.test.js
+*.test.ts
+*.test.tsx
+__tests__/
+**/__tests__/
+jest.config.js
+*.spec.js
+*.spec.ts
+
+# Development files
+.env.local
+.env.development
+.env.test
+.vscode/
+.idea/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# Backup files
+*.backup
+*.bak
+*.orig
+
+# IDE files
+*.swp
+*.swo
+*~
+
+# Local development
+.expo/
+.metro-health-check*
+
+# Git files
+.git/
+.gitignore
+
+# Yarn cache (if any)
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# Node modules (already handled by default but being explicit)
+node_modules/
+
+# Build outputs that shouldn't be in source
+dist/
+build/
+out/
+
+# Local configuration
+.env.example
+.env.template
+
+# Coverage reports
+coverage/
+*.lcov
+.nyc_output/
+
+# Storybook
+.storybook/
+storybook-static/
+
+# Android specific (if any)
+android/app/build/
+android/build/
+android/.gradle/
+
+# iOS specific (if any)
+ios/build/
+ios/Pods/
+ios/*.xcworkspace/xcuserdata/
+ios/*.xcodeproj/xcuserdata/
+
+# Expo specific
+.expo-shared/
+
+# Debugging
+flipper-rn-addons.podspec 
