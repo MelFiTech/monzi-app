@@ -6,7 +6,21 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/components/useColorScheme';
+import { useColorScheme } from '@/components/common/useColorScheme';
+import { QueryProvider } from '@/providers/QueryProvider';
+import { CustomThemeProvider } from '@/providers/ThemeProvider';
+import { AuthProvider } from '@/providers/AuthProvider';
+import {
+  Sora_300Light,
+  Sora_400Regular,
+  Sora_500Medium,
+  Sora_600SemiBold,
+  Sora_700Bold,
+  Sora_800ExtraBold,
+} from '@expo-google-fonts/sora';
+
+// Import NativeWind styles (temporarily disabled)
+// import '../global.css';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -14,8 +28,8 @@ export {
 } from 'expo-router';
 
 export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
+  // Start with index (auth state checker)
+  initialRouteName: 'index',
 };
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -23,6 +37,23 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
+    // Sora Google Fonts
+    Sora_300Light,
+    Sora_400Regular,
+    Sora_500Medium,
+    Sora_600SemiBold,
+    Sora_700Bold,
+    Sora_800ExtraBold,
+    
+    // Clash Display Local Fonts
+    'ClashDisplay-Extralight': require('../assets/fonts/ClashDisplay-Extralight.otf'),
+    'ClashDisplay-Light': require('../assets/fonts/ClashDisplay-Light.otf'),
+    'ClashDisplay-Regular': require('../assets/fonts/ClashDisplay-Regular.otf'),
+    'ClashDisplay-Medium': require('../assets/fonts/ClashDisplay-Medium.otf'),
+    'ClashDisplay-Semibold': require('../assets/fonts/ClashDisplay-Semibold.otf'),
+    'ClashDisplay-Bold': require('../assets/fonts/ClashDisplay-Bold.otf'),
+    
+    // Keep existing fonts
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     ...FontAwesome.font,
   });
@@ -49,11 +80,22 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
-    </ThemeProvider>
+    <AuthProvider>
+      <QueryProvider>
+        <CustomThemeProvider>
+          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <Stack>
+              <Stack.Screen name="index" options={{ headerShown: false }} />
+              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="amount" options={{ headerShown: false }} />
+              <Stack.Screen name="transfer" options={{ headerShown: false }} />
+              <Stack.Screen name="(kyc)" options={{ headerShown: false }} />
+            </Stack>
+          </ThemeProvider>
+        </CustomThemeProvider>
+      </QueryProvider>
+    </AuthProvider>
   );
 }
