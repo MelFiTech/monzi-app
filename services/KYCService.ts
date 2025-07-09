@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Config } from '../constants/config';
 
-// Base API URL - should be moved to environment config
-const API_BASE_URL = 'https://your-api-url.com/api';
+// Base API URL from centralized configuration
+const API_BASE_URL = Config.API.getBaseUrl();
 
 interface BVNVerificationRequest {
   bvn: string;

@@ -1,3 +1,5 @@
+import { Config } from '../constants/config';
+
 // Auth API Service with React Query integration
 export interface RegisterRequest {
   email: string;
@@ -97,8 +99,8 @@ class AuthService {
   private baseUrl: string;
 
   constructor() {
-    // Replace with your actual API base URL
-    this.baseUrl = process.env.EXPO_PUBLIC_API_URL || 'https://5a498535736b.ngrok-free.app';
+    // Use centralized configuration for API base URL
+    this.baseUrl = Config.API.getBaseUrl();
   }
 
   public static getInstance(): AuthService {

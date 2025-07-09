@@ -1,3 +1,5 @@
+import { Config } from '../constants/config';
+
 interface AccountResolutionRequest {
   account_number: string;
   bank_name: string;
@@ -21,7 +23,7 @@ interface AccountResolutionError {
 type AccountResolutionResult = AccountResolutionResponse | AccountResolutionError;
 
 class AccountService {
-  private static readonly BASE_URL = 'http://localhost:3000';
+  private static readonly BASE_URL = Config.API.getBaseUrl();
   private static readonly RESOLVE_ENDPOINT = '/accounts/resolve';
   private static readonly BANKS_ENDPOINT = '/accounts/banks';
 
@@ -120,7 +122,6 @@ class AccountService {
     try {
       const response = await fetch(`${this.BASE_URL}/health`, {
         method: 'GET',
-        timeout: 5000, // 5 second timeout
       });
       
       return response.ok;

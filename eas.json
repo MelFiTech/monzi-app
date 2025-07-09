@@ -16,6 +16,9 @@
       "node": "20.18.1",
       "cache": {
         "disabled": true
+      },
+      "env": {
+        "EXPO_PUBLIC_ENV": "production"
       }
     }
   },
