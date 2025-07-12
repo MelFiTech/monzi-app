@@ -130,17 +130,21 @@ export default function CaptureAnimation({
 
   if (!visible) return null;
 
-  const thumbnailTransform = {
-    scale: scaleAnim,
-    translateY: thumbnailPosition.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, -100], // Move up 100 pixels
-    }),
-    translateX: thumbnailPosition.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, 0], // Keep centered horizontally
-    }),
-  };
+  const thumbnailTransform = [
+    { scale: scaleAnim },
+    { 
+      translateY: thumbnailPosition.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, -100], // Move up 100 pixels
+      })
+    },
+    { 
+      translateX: thumbnailPosition.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 0], // Keep centered horizontally
+      })
+    }
+  ];
 
   const getStepIcon = (step: ProcessingStep) => {
     switch (step.status) {
@@ -173,7 +177,7 @@ export default function CaptureAnimation({
         <Animated.View 
           style={[
             styles.thumbnailContainer,
-            { transform: [thumbnailTransform] }
+            { transform: thumbnailTransform }
           ]}
         >
           <View style={styles.thumbnailFrame}>
