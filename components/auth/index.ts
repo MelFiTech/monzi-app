@@ -1,9 +1,5 @@
-export { AuthInput } from './AuthInput';
-export { AuthButton } from './AuthButton';
-export { AuthHeader } from './AuthHeader';
+export { default as AuthButton } from './AuthButton';
+export { default as AuthHeader } from './AuthHeader';
+export { default as AuthInput } from './AuthInput';
 export { default as RegisterAuthInput } from './Register-AuthInput';
-
-// Re-export as default for convenience
-export { default as AuthInputDefault } from './AuthInput';
-export { default as AuthButtonDefault } from './AuthButton';
-export { default as AuthHeaderDefault } from './AuthHeader'; 
+export { default as PhoneNumberInput } from './PhoneNumberInput'; 

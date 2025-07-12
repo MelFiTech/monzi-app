@@ -1,104 +1,89 @@
-# EAS Ignore - Files to exclude from EAS builds
+# EAS Ignore File
+# Files and directories listed here will be excluded from EAS builds
 
-# Documentation and guides
+# Documentation
 *.md
-**/*.md
+README*
+CHANGELOG*
+LICENSE*
+CONTRIBUTING*
+docs/
+documentation/
 
-# Test files and scripts
-test-*.js
-*.test.js
-*.test.ts
-*.test.tsx
-__tests__/
-**/__tests__/
-jest.config.js
-*.spec.js
-*.spec.ts
-
-# Development files
-.env.local
-.env.development
-.env.test
-.vscode/
-.idea/
+# Logs and temporary files
 *.log
+logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.pnpm-debug.log*
 
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+# Development and testing
+.env.local
+.env.development
+.env.test
+__tests__/
+**/__tests__/**
+**/*.test.*
+**/*.spec.*
+jest.config.*
+coverage/
+.nyc_output/
 
-# Temporary files
-*.tmp
-*.temp
-.tmp/
-.temp/
-
-# Backup files
-*.backup
-*.bak
-*.orig
-
-# IDE files
+# IDE and editor files
+.vscode/
+.idea/
 *.swp
 *.swo
 *~
+.DS_Store
+Thumbs.db
 
-# Local development
-.expo/
-.metro-health-check*
-
-# Git files
+# Git related
 .git/
 .gitignore
+.gitattributes
 
-# Yarn cache (if any)
-.yarn/cache/
-.yarn/unplugged/
-.yarn/build-state.yml
-.yarn/install-state.gz
-
-# Node modules (already handled by default but being explicit)
+# Node modules (already handled by EAS but good to be explicit)
 node_modules/
 
-# Build outputs that shouldn't be in source
+# Build artifacts and cache
+.expo/
+.next/
 dist/
 build/
-out/
+.cache/
+.tmp/
+.temp/
 
-# Local configuration
+# Platform specific
+.android/
+.ios/
+
+# Development tools
+.prettierrc*
+.eslintrc*
+.eslintignore
+.babelrc*
+babel.config.dev.js
+
+# Package manager artifacts
+package-lock.json
+yarn-error.log
+.pnpm-lock.yaml
+
+# Environment and config files not needed in builds
 .env.example
-.env.template
-
-# Coverage reports
-coverage/
-*.lcov
-.nyc_output/
+docker-compose.yml
+Dockerfile*
 
 # Storybook
 .storybook/
 storybook-static/
 
-# Android specific (if any)
-android/app/build/
-android/build/
-android/.gradle/
-
-# iOS specific (if any)
-ios/build/
-ios/Pods/
-ios/*.xcworkspace/xcuserdata/
-ios/*.xcodeproj/xcuserdata/
-
-# Expo specific
-.expo-shared/
-
-# Debugging
-flipper-rn-addons.podspec 
+# Miscellaneous
+*.tgz
+*.tar.gz
+.npmrc
+.yarnrc
+.editorconfig 

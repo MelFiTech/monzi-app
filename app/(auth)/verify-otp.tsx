@@ -5,17 +5,18 @@ import {
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
   TextInput,
   StatusBar,
   Image,
   Alert,
+  Keyboard,
+  Platform,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
 import { useVerifyOtp, useResendOtp } from '@/hooks';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function VerifyOTPScreen() {
   const { email, phone } = useLocalSearchParams<{ email: string; phone: string }>();
@@ -24,6 +25,8 @@ export default function VerifyOTPScreen() {
   
   const [otp, setOtp] = useState('');
   const [hasNavigated, setHasNavigated] = useState(false);
+  const [countdown, setCountdown] = useState(60);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const otpInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
@@ -33,18 +36,46 @@ export default function VerifyOTPScreen() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Countdown timer effect
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown(countdown - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [countdown]);
+
+  // Keyboard event listeners
+  useEffect(() => {
+    const keyboardWillShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (event) => {
+        setKeyboardHeight(event.endCoordinates.height);
+      }
+    );
+
+    const keyboardWillHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardWillShowListener.remove();
+      keyboardWillHideListener.remove();
+    };
+  }, []);
+
   function handleOtpChange(value: string) {
-    // Only allow digits
-    const digitsOnly = value.replace(/[^0-9]/g, '');
+    // Only allow digits and limit to 6
+    const digitsOnly = value.replace(/[^0-9]/g, '').slice(0, 6);
+    setOtp(digitsOnly);
     
-    // Limit to 6 digits
-    const truncatedValue = digitsOnly.slice(0, 6);
-    
-    setOtp(truncatedValue);
-    
-    // Auto verify when 6th digit is entered - but only once
-    if (truncatedValue.length === 6 && !verifyOtpMutation.isPending && !hasNavigated) {
-      handleVerify(truncatedValue);
+    // Auto verify when 6 digits are entered
+    if (digitsOnly.length === 6 && !verifyOtpMutation.isPending && !hasNavigated) {
+      handleVerify(digitsOnly);
     }
   }
 
@@ -61,6 +92,9 @@ export default function VerifyOTPScreen() {
       });
 
       if (result.success) {
+        // Set flag to indicate fresh registration completion
+        await AsyncStorage.setItem('fresh_registration', 'true');
+        
         // Navigate to main app
         router.push('/(tabs)');
       } else {
@@ -72,11 +106,6 @@ export default function VerifyOTPScreen() {
       console.error('OTP verification error:', error);
       Alert.alert('Error', error.message || 'Verification failed. Please try again.');
     }
-  }
-
-  function handleChangeEmail() {
-    if (verifyOtpMutation.isPending || hasNavigated) return;
-    router.back();
   }
 
   function handleClose() {
@@ -93,6 +122,7 @@ export default function VerifyOTPScreen() {
       });
 
       if (result.success) {
+        setCountdown(60); // Reset countdown
         Alert.alert('OTP Sent', 'A new verification code has been sent to your phone');
       } else {
         Alert.alert('Resend Failed', result.message || 'Failed to resend OTP');
@@ -107,87 +137,82 @@ export default function VerifyOTPScreen() {
     <SafeAreaView style={containerStyles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
       
-      <KeyboardAvoidingView
-        style={containerStyles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={20}
-      >
-        <View style={containerStyles.content}>
-          {/* Header */}
-          <View style={containerStyles.header}>
-            <TouchableOpacity onPress={handleClose} style={containerStyles.closeButton}>
-              <Image 
-                source={require('@/assets/icons/auth/arrow-left.png')}
-                style={{width: 24, height: 24, tintColor: '#FFFFFF'}}
-              />
-            </TouchableOpacity>
+      {/* Header */}
+      <View style={containerStyles.header}>
+        <TouchableOpacity onPress={handleClose} style={containerStyles.closeButton}>
+          <Image 
+            source={require('@/assets/icons/auth/arrow-left.png')}
+            style={{width: 24, height: 24, tintColor: '#FFFFFF'}}
+          />
+        </TouchableOpacity>
+      </View>
+
+      {/* Main Content */}
+      <View style={containerStyles.content}>
+        <Text style={textStyles.title}>
+          Enter code sent{'\n'}to your phone no.
+        </Text>
+
+        <View style={containerStyles.inputContainer}>
+          <View style={containerStyles.otpInputWrapper}>
+            <TextInput
+              ref={otpInputRef}
+              style={[
+                containerStyles.otpInput,
+                verifyOtpMutation.isPending && containerStyles.otpInputDisabled
+              ]}
+              placeholder="••••••"
+              placeholderTextColor="rgba(255, 255, 255, 0.4)"
+              value={otp}
+              onChangeText={handleOtpChange}
+              keyboardType="numeric"
+              maxLength={6}
+              editable={!verifyOtpMutation.isPending}
+              autoFocus={true}
+              returnKeyType="done"
+              onSubmitEditing={() => handleVerify()}
+              textAlign="center"
+              textContentType="oneTimeCode"
+              autoComplete="sms-otp"
+            />
           </View>
-
-          <View style={containerStyles.main}>
-            <Text style={textStyles.title}>
-              Enter Code
-            </Text>
-            <Text style={textStyles.subtitle}>
-              Sent to {phone || email || 'your phone'}
-            </Text>
-
-            <View style={containerStyles.inputContainer}>
-              <View style={containerStyles.otpInputWrapper}>
-                <TextInput
-                  ref={otpInputRef}
-                  style={[
-                    containerStyles.otpInput,
-                    verifyOtpMutation.isPending && containerStyles.otpInputDisabled
-                  ]}
-                  placeholder="••••••"
-                  placeholderTextColor="rgba(255, 255, 255, 0.4)"
-                  value={otp}
-                  onChangeText={handleOtpChange}
-                  keyboardType="numeric"
-                  maxLength={6}
-                  editable={!verifyOtpMutation.isPending}
-                  autoFocus={true}
-                  returnKeyType="done"
-                  onSubmitEditing={() => handleVerify()}
-                  textAlign="center"
-                />
-              </View>
-              
-              {verifyOtpMutation.isPending && (
-                <ActivityIndicator 
-                  style={containerStyles.loader}
-                  color="#FFE66C"
-                  size="small"
-                />
-              )}
-            </View>
-          </View>
-
-          <View style={containerStyles.footer}>
-            <TouchableOpacity 
-              onPress={handleChangeEmail} 
-              style={buttonStyles.changeEmail}
-              disabled={verifyOtpMutation.isPending}
-            >
-              <Text style={textStyles.changeEmailText}>
-                Wrong phone? <Text style={textStyles.link}>change</Text>
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              onPress={handleResendOtp} 
-              style={[buttonStyles.changeEmail, { marginTop: 16 }]}
-              disabled={resendOtpMutation.isPending}
-            >
-              <Text style={textStyles.changeEmailText}>
-                Didn't get code? <Text style={textStyles.link}>
-                  {resendOtpMutation.isPending ? 'Sending...' : 'resend'}
-                </Text>
-              </Text>
-            </TouchableOpacity>
-          </View>
+          
+          {verifyOtpMutation.isPending && (
+            <ActivityIndicator 
+              style={containerStyles.loader}
+              color="#FFE66C"
+              size="small"
+            />
+          )}
         </View>
-      </KeyboardAvoidingView>
+      </View>
+
+      {/* Footer */}
+      <View style={[
+        containerStyles.footer,
+        keyboardHeight > 0 && {
+          position: 'absolute',
+          bottom: keyboardHeight + -20,
+          left: 0,
+          right: 0,
+        }
+      ]}>
+        {countdown > 0 ? (
+          <Text style={textStyles.countdownText}>
+            Resend code in 00:{countdown.toString().padStart(2, '0')}
+          </Text>
+        ) : (
+          <TouchableOpacity 
+            onPress={handleResendOtp} 
+            style={buttonStyles.resendButton}
+            disabled={resendOtpMutation.isPending}
+          >
+            <Text style={textStyles.resendText}>
+              {resendOtpMutation.isPending ? 'Sending...' : 'Resend'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </SafeAreaView>
   );
 }
@@ -197,39 +222,32 @@ const containerStyles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
-  keyboardAvoid: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-  },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingTop: 16,
-    paddingBottom: 8,
-    paddingLeft: -20,
-    marginLeft: -10,
-    marginBottom: -20,
+    paddingBottom: 16,
+    paddingHorizontal: 24,
   },
   closeButton: {
     width: 40,
     height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+    marginLeft: -8,
   },
-  main: {
+  content: {
     flex: 1,
-    paddingTop: 40,
+    paddingHorizontal: 24,
+    paddingTop: 10,
   },
   inputContainer: {
-    position: 'relative',
-    marginTop: 40,
+    marginTop: 20,
+    alignItems: 'flex-start',
   },
   otpInputWrapper: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 16,
+    borderRadius: 35,
+    width: '100%',
+    maxWidth: 350,
   },
   otpInput: {
     fontSize: 24,
@@ -244,40 +262,41 @@ const containerStyles = StyleSheet.create({
   },
   loader: {
     marginTop: 24,
-    alignSelf: 'center',
+    alignSelf: 'flex-start',
   },
   footer: {
-    paddingBottom: 34,
+    paddingBottom: 40,
+    paddingHorizontal: 24,
+    alignItems: 'flex-start',
   },
 });
 
 const textStyles = StyleSheet.create({
   title: {
-    fontSize: fontSizes['2xl'],
+    fontSize: 32,
     fontFamily: fontFamilies.clashDisplay.bold,
-    lineHeight: fontSizes['2xl'] * 1.2,
-    marginBottom: 8,
-    color: '#FFFFFF',   
+    lineHeight: 32 * 1.2,
+    color: '#FFFFFF',
+    textAlign: 'left',
   },
-  subtitle: {
+  countdownText: {
     fontFamily: fontFamilies.sora.regular,
     fontSize: fontSizes.base,
-    marginBottom: 20,
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(255, 255, 255, 0.6)',
+    textAlign: 'left',
   },
-  changeEmailText: {
-    fontFamily: fontFamilies.sora.regular,
-    fontSize: fontSizes.base,
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  link: {
+  resendText: {
     fontFamily: fontFamilies.sora.semiBold,
+    fontSize: 16,
     color: '#FFE66C',
+    textAlign: 'left',
   },
 });
 
 const buttonStyles = StyleSheet.create({
-  changeEmail: {
-    marginBottom: -16,
+  resendButton: {
+    paddingVertical: 16,
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
   },
 }); 

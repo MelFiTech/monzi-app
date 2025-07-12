@@ -1,4 +1,4 @@
-export { ProfileCard } from './ProfileCard';
-export { default as ProfileCardDefault } from './ProfileCard'; 
-export { ProfileScreen } from './ProfileScreen';
-export { default as ProfileScreenDefault } from './ProfileScreen'; 
+export { default as ProfileCard } from './ProfileCard';
+export { default as ProfileScreen } from './ProfileScreen';
+export { default as ProfileMenuItem } from './ProfileMenuItem';
+export { default as ProfileHeader } from './ProfileHeader'; 

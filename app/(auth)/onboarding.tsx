@@ -16,6 +16,10 @@ export default function OnboardingScreen() {
 
   const handleLogin = () => {
     router.push('/(auth)/login');
+    //router.push('/(auth)/verify-otp');
+    //router.push('/test-push');
+    //router.push('/(kyc)/bvn');
+    //router.push('/transfer-success');
   };
 
   return (

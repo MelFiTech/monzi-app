@@ -5,16 +5,28 @@ import {
   View, 
   SafeAreaView, 
   Image,
+  TouchableOpacity,
 } from 'react-native';
 import { router } from 'expo-router';
-import Colors from '@/constants/colors';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
 import Button from '@/components/common/Button';
-import { AuthHeader } from '@/components/auth/AuthHeader';
+import { useAuth } from '@/hooks/useAuthService';
 
 export default function BiometricsScreen() {
+  const { logout } = useAuth();
+
   const handleTakeSelfie = () => {
     router.push('/(kyc)/camera');
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await logout.mutateAsync({ clearAllData: true });
+      router.replace('/(auth)/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      router.replace('/(auth)/login');
+    }
   };
 
   const instructions = [
@@ -26,8 +38,12 @@ export default function BiometricsScreen() {
   ];
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: Colors.dark.background }]}> 
-      <AuthHeader />
+    <SafeAreaView style={styles.container}> 
+      <View style={styles.headerContainer}>
+        <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
+          <Text style={styles.signOutText}>Sign out</Text>
+        </TouchableOpacity>
+      </View>
       <View style={styles.content}>
         <View style={styles.iconContainer}>
           <Image 
@@ -37,14 +53,14 @@ export default function BiometricsScreen() {
           />
         </View>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: Colors.dark.white }]}>Take a quick selfie</Text>
-          <Text style={[styles.subtitle, { color: Colors.dark.textSecondary }]}>Scan your face to verify your identity</Text>
+          <Text style={styles.title}>Take a quick selfie</Text>
+          <Text style={styles.subtitle}>Scan your face to verify your identity</Text>
         </View>
-        <View style={[styles.instructionsContainer, { backgroundColor: Colors.dark.surfaceVariant }]}> 
+        <View style={styles.instructionsContainer}> 
           {instructions.map((instruction, index) => (
             <View key={index} style={styles.instructionItem}>
-              <View style={[styles.bullet, { backgroundColor: Colors.dark.textTertiary }]} />
-              <Text style={[styles.instructionText, { color: Colors.dark.textSecondary }]}>{instruction}</Text>
+              <View style={styles.bullet} />
+              <Text style={styles.instructionText}>{instruction}</Text>
             </View>
           ))}
         </View>
@@ -54,8 +70,7 @@ export default function BiometricsScreen() {
           title="Take Selfie"
           variant="primary"
           size="lg"
-          style={{ backgroundColor: Colors.dark.primary, width: '100%' }}
-          textStyle={{ color: Colors.dark.black }}
+          fullWidth
           onPress={handleTakeSelfie}
         />
       </View>
@@ -66,6 +81,23 @@ export default function BiometricsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000000',
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 16,
+    paddingBottom: 24,
+    paddingHorizontal: 24,
+    justifyContent: 'flex-end',
+  },
+  signOutButton: {
+    padding: 8,
+  },
+  signOutText: {
+    fontSize: fontSizes.sm,
+    fontFamily: fontFamilies.sora.medium,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   content: {
     flex: 1,
@@ -90,18 +122,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 8,
     lineHeight: fontSizes['4xl'] * 1.2,
+    color: '#FFFFFF',
   },
   subtitle: {
     fontSize: fontSizes.base,
     fontFamily: fontFamilies.sora.regular,
     textAlign: 'center',
     lineHeight: fontSizes.base * 1.4,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   instructionsContainer: {
     paddingTop: 20,
     paddingBottom: 20,
     paddingHorizontal: 20,
     borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   instructionItem: {
     flexDirection: 'row',
@@ -114,16 +149,18 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     marginTop: 8,
     marginRight: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
   instructionText: {
     fontSize: fontSizes.base,
     fontFamily: fontFamilies.sora.regular,
     lineHeight: fontSizes.base * 1.4,
     flex: 1,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   footer: {
     paddingHorizontal: 24,
-    paddingBottom: 24,
-    paddingTop: 16,
+    paddingBottom: 34,
+    paddingTop: 20,
   },
 }); 

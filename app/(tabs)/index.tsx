@@ -17,14 +17,22 @@ import { useAuth } from '@/providers/AuthProvider';
 import { typography, fontFamilies, fontSizes } from '@/constants/fonts';
 import CameraButton from '@/components/camera/CameraButton';
 import { CameraHeader } from '@/components/layout';
-import { BankTransferModal, CircularLoader, VerificationModal, Toast } from '@/components/common';
-import { ExtractedBankData, CacheService } from '@/services';
-import { useExtractBankDataMutation, useDataValidation } from '@/hooks';
+import { BankTransferModal, CircularLoader, VerificationModal, Toast, SetPinModal } from '@/components/common';
+import { CaptureAnimation } from '@/components/camera';
+import { ExtractedBankData, CacheService, EnhancedExtractedBankData, ProcessingStep } from '@/services';
+import { useHybridVisionExtractBankDataMutation, useHybridVisionDataValidation } from '@/hooks';
+import { useEnhancedVisionExtractBankData } from '@/hooks/useEnhancedVisionService';
+import ToastService from '@/services/ToastService';
+import { useResolveAccountMutation } from '@/hooks/useAccountService';
+import { useKYCStatus } from '@/hooks/useKYCService';
+import { useWalletDetails, useWalletBalance, useWalletRecovery, usePinStatus } from '@/hooks/useWalletService';
+import type { KYCStatusResponse } from '@/services/KYCService';
 import { 
   ChevronUp,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import { WalletService } from '@/services';
 
 const { width, height } = Dimensions.get('window');
 
@@ -35,6 +43,35 @@ export default function CameraScreen() {
   const { colors } = useTheme();
   const { logout } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
+  
+  // Import authentication hook to check auth state
+  const { isAuthenticated, user } = useAuth();
+
+  // Debug authentication state
+  useEffect(() => {
+    console.log('🔐 Authentication Debug:', {
+      isAuthenticated,
+      hasUser: !!user,
+      userEmail: user?.email,
+      userId: user?.id
+    });
+  }, [isAuthenticated, user]);
+
+  // KYC Status with comprehensive logging
+  const { data: kycStatus, error: kycError, isLoading: kycLoading, isError: kycIsError } = useKYCStatus();
+  
+  // Debug KYC status fetch
+  useEffect(() => {
+    console.log('📋 KYC Status Fetch Debug:', {
+      isAuthenticated,
+      kycStatus,
+      kycError: kycError?.message,
+      kycLoading,
+      kycIsError,
+      hasKycData: !!kycStatus
+    });
+  }, [isAuthenticated, kycStatus, kycError, kycLoading, kycIsError]);
+
   const [flashMode, setFlashMode] = useState<FlashMode>('off');
   const [cameraType, setCameraType] = useState<CameraType>('back');
   const [isRecording, setIsRecording] = useState(false);
@@ -43,17 +80,220 @@ export default function CameraScreen() {
   const [zoom, setZoom] = useState(0);
   const [showBankModal, setShowBankModal] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [showSetPinModal, setShowSetPinModal] = useState(false);
   const [isPendingVerification, setIsPendingVerification] = useState(false);
+  const [isWalletActivationMode, setIsWalletActivationMode] = useState(false);
+  const [isFreshRegistration, setIsFreshRegistration] = useState(false);
   const [extractedData, setExtractedData] = useState<ExtractedBankData | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [capturedImageUri, setCapturedImageUri] = useState<string>('');
+  const [showCaptureAnimation, setShowCaptureAnimation] = useState(false);
+  const [processingSteps, setProcessingSteps] = useState<ProcessingStep[]>([]);
   const cameraRef = useRef<CameraView>(null);
   const flashAnimation = useRef(new Animated.Value(0)).current;
   const instructionAnimation = useRef(new Animated.Value(1)).current;
   const zoomAnimation = useRef(new Animated.Value(1)).current;
 
-  // React Query hooks
-  const extractBankDataMutation = useExtractBankDataMutation();
-  const { validateExtraction, formatAmount } = useDataValidation();
+  // React Query hooks - Enhanced Vision Service
+  const enhancedExtractBankDataMutation = useEnhancedVisionExtractBankData({
+    onProgress: (step: ProcessingStep) => {
+      console.log('🔄 Processing step:', step);
+      setProcessingSteps(prev => [...prev, step]);
+    },
+    onQuickPreview: (preview) => {
+      console.log('👀 Quick preview:', preview);
+      // Could show instant feedback here
+    }
+  });
+  const resolveAccountMutation = useResolveAccountMutation();
+  const { validateExtraction, formatAmount } = useHybridVisionDataValidation();
+  const { data: walletDetails, error: walletDetailsError, isLoading: walletDetailsLoading, isError: walletDetailsIsError } = useWalletDetails();
+  const { data: walletBalance, error: walletBalanceError, isLoading: walletBalanceLoading, isError: walletBalanceIsError } = useWalletBalance();
+  const { data: pinStatus } = usePinStatus();
+  const walletRecoveryMutation = useWalletRecovery();
+
+  // Debug wallet endpoints
+  useEffect(() => {
+    console.log('🔍 Wallet Endpoint Debug:', {
+      walletDetails: {
+        data: walletDetails,
+        error: walletDetailsError,
+        isLoading: walletDetailsLoading,
+        isError: walletDetailsIsError
+      },
+      walletBalance: {
+        data: walletBalance,
+        error: walletBalanceError,
+        isLoading: walletBalanceLoading,
+        isError: walletBalanceIsError
+      }
+    });
+
+    // WALLET ERROR HANDLER: If wallet errors indicate KYC needed, show verification modal immediately
+    const hasKycRequiredError = 
+      (walletDetailsError && walletDetailsError.message?.includes('complete KYC verification first')) ||
+      (walletBalanceError && walletBalanceError.message?.includes('complete KYC verification first'));
+
+    if (hasKycRequiredError && isAuthenticated && !isFreshRegistration) {
+      console.log('🚨 WALLET ERROR: KYC verification required - showing verification modal immediately');
+      
+      if (!showVerificationModal) {
+        console.log('📱 Triggering verification modal due to wallet KYC error');
+        setIsWalletActivationMode(false);
+        setIsPendingVerification(false);
+        setShowVerificationModal(true);
+      }
+    }
+  }, [walletDetails, walletDetailsError, walletDetailsLoading, walletDetailsIsError, walletBalance, walletBalanceError, walletBalanceLoading, walletBalanceIsError, isAuthenticated, isFreshRegistration, showVerificationModal]);
+
+  // COMPREHENSIVE FLOW SUMMARY for debugging
+  useEffect(() => {
+    console.log('🌊 COMPREHENSIVE FLOW SUMMARY:', {
+      // User State
+      isAuthenticated,
+      hasUser: !!user,
+      
+      // Registration State
+      isFreshRegistration,
+      
+      // KYC State
+      kycStatus: kycStatus ? (kycStatus as any)?.kycStatus : 'NO_DATA',
+      kycLoading,
+      kycIsError,
+      kycError: kycError?.message,
+      
+      // Modal State
+      showVerificationModal,
+      isPendingVerification,
+      isWalletActivationMode,
+      
+      // Flow Logic
+      'Flow Decision': 
+        isFreshRegistration ? 'FRESH_REGISTRATION_PRIORITY' :
+        kycIsError ? 'KYC_API_ERROR_FALLBACK' :
+        kycLoading ? 'WAITING_FOR_KYC' :
+        !kycStatus ? 'NO_KYC_DATA_FALLBACK' :
+        (kycStatus as any)?.kycStatus === 'APPROVED' ? 'APPROVED_USER' :
+        (kycStatus as any)?.kycStatus === 'VERIFIED' ? 'VERIFIED_USER' :
+        (kycStatus as any)?.kycStatus === 'IN_PROGRESS' ? 'IN_PROGRESS_USER' :
+        (kycStatus as any)?.kycStatus === 'UNDER_REVIEW' ? 'UNDER_REVIEW_USER' :
+        (kycStatus as any)?.kycStatus === 'REJECTED' ? 'REJECTED_USER' :
+        (kycStatus as any)?.kycStatus === 'PENDING' ? 'PENDING_USER' :
+        'UNKNOWN_STATUS'
+    });
+  }, [
+    isAuthenticated, user, isFreshRegistration, 
+    kycStatus, kycLoading, kycIsError, kycError,
+    showVerificationModal, isPendingVerification, isWalletActivationMode
+  ]);
+
+  // Debug wallet access conditions
+  useEffect(() => {
+    if (kycStatus) {
+      const statusData = kycStatus as any;
+      const isFullyVerified = ((statusData?.kycStatus === 'VERIFIED') || (statusData?.kycStatus === 'APPROVED')) && 
+                             statusData?.isVerified && 
+                             statusData?.bvnVerified && 
+                             statusData?.selfieVerified;
+      
+      console.log('🔐 Wallet Access Debug:', {
+        kycStatus: statusData?.kycStatus,
+        isVerified: statusData?.isVerified,
+        bvnVerified: statusData?.bvnVerified,
+        selfieVerified: statusData?.selfieVerified,
+        isFullyVerified,
+        shouldHaveWalletAccess: isFullyVerified
+      });
+    }
+  }, [kycStatus]);
+
+  // Manual wallet endpoint test function
+  const testWalletEndpoints = async () => {
+    try {
+      console.log('🧪 Testing wallet endpoints manually...');
+      
+      // First, test API configuration
+      const { Config } = await import('@/constants/config');
+      const baseUrl = Config.API.getBaseUrl();
+      console.log('🔧 API Configuration Test:', {
+        baseUrl,
+        environment: Config.getCurrentEnvironment(),
+        isDevelopment: Config.isDevelopment()
+      });
+      
+      // Test authentication token
+      console.log('🔑 Testing authentication token...');
+      try {
+        const { AuthStorageService } = await import('@/services');
+        const authStorageService = AuthStorageService.getInstance();
+        const authData = await authStorageService.getAuthData();
+        console.log('🔑 Auth Token Test:', {
+          hasAuthData: !!authData,
+          hasAccessToken: !!authData?.accessToken,
+          tokenLength: authData?.accessToken ? authData.accessToken.length : 0,
+          tokenPrefix: authData?.accessToken ? authData.accessToken.substring(0, 10) + '...' : 'none'
+        });
+      } catch (authError) {
+        console.error('🔑 Auth token check failed:', authError);
+      }
+      
+      // Test basic connectivity to API
+      console.log('🌐 Testing API connectivity...');
+      try {
+        const response = await fetch(`${baseUrl}/health`, { method: 'GET' });
+        console.log('🌐 API Health Check:', {
+          status: response.status,
+          ok: response.ok,
+          url: response.url
+        });
+      } catch (connectivityError) {
+        console.warn('🌐 API Health Check failed (might be normal):', connectivityError);
+      }
+      
+      const walletService = WalletService.getInstance();
+      
+      // Test wallet details
+      console.log('🧪 Testing wallet details endpoint...');
+      console.log('📡 Making request to:', `${baseUrl}/wallet/details`);
+      try {
+        const details = await walletService.getWalletDetails();
+        console.log('✅ Wallet details success:', details);
+      } catch (detailsError: any) {
+        console.error('❌ Wallet details error:', {
+          message: detailsError.message,
+          statusCode: detailsError.statusCode,
+          error: detailsError.error,
+          details: detailsError.details
+        });
+      }
+      
+      // Test wallet balance
+      console.log('🧪 Testing wallet balance endpoint...');
+      console.log('📡 Making request to:', `${baseUrl}/wallet/balance`);
+      try {
+        const balance = await walletService.getWalletBalance();
+        console.log('✅ Wallet balance success:', balance);
+      } catch (balanceError: any) {
+        console.error('❌ Wallet balance error:', {
+          message: balanceError.message,
+          statusCode: balanceError.statusCode,
+          error: balanceError.error,
+          details: balanceError.details
+        });
+      }
+      
+    } catch (error) {
+      console.error('🧪 Manual test error:', error);
+    }
+  };
+
+  // Test wallet endpoints when user is authenticated and KYC is loaded
+  useEffect(() => {
+    if (kycStatus && (kycStatus as any)?.kycStatus) {
+      console.log('🧪 Triggering wallet endpoint test for authenticated user...');
+      testWalletEndpoints();
+    }
+  }, [kycStatus]);
 
   useEffect(() => {
     // Request camera permissions on component mount
@@ -75,39 +315,263 @@ export default function CameraScreen() {
     return () => clearTimeout(timer);
   }, []);
 
+  // PRIORITY 0: Check for fresh registration and show modal immediately
   useEffect(() => {
-    // Check for pending verification modal or show initial verification modal
-    const checkVerificationStatus = async () => {
+    const checkFreshRegistration = async () => {
       try {
-        const showPendingModal = await AsyncStorage.getItem('show_pending_modal');
-        const userVerified = await AsyncStorage.getItem('user_verified');
+        const isFreshRegistration = await AsyncStorage.getItem('fresh_registration');
         
-        if (showPendingModal === 'true') {
-          // Clear the flag and show pending modal
-          await AsyncStorage.removeItem('show_pending_modal');
-          setIsPendingVerification(true);
+        if (isFreshRegistration === 'true') {
+          console.log('🆕 Fresh registration detected, showing verification modal immediately');
+          
+          // Clear the flag
+          await AsyncStorage.removeItem('fresh_registration');
+          
+          // Set state to remember this is a fresh registration
+          setIsFreshRegistration(true);
+          
+          // Show verification modal immediately without waiting for KYC status
+          setIsPendingVerification(false);
+          setIsWalletActivationMode(false);
           setShowVerificationModal(true);
-        } else if (userVerified !== 'true') {
-          // Show initial verification modal only if user is not verified
-          const timer = setTimeout(() => {
-            setIsPendingVerification(false);
-            setShowVerificationModal(true);
-          }, 500);
-          return () => clearTimeout(timer);
         }
       } catch (error) {
-        console.error('Error checking verification status:', error);
-        // Fallback to showing initial modal
-        const timer = setTimeout(() => {
-          setIsPendingVerification(false);
-          setShowVerificationModal(true);
-        }, 500);
-        return () => clearTimeout(timer);
+        console.error('Error checking fresh registration flag:', error);
       }
     };
 
-    checkVerificationStatus();
+    // Check for fresh registration flag immediately
+    checkFreshRegistration();
   }, []);
+
+  // PRIORITY 1: KYC Status Fallback - Always hit endpoint for all users
+  useEffect(() => {
+    if (!isAuthenticated) {
+      console.log('❌ User not authenticated, skipping KYC status fallback');
+      return;
+    }
+
+    // This useEffect serves as a fallback system for all users
+    console.log('🔄 KYC Status Fallback System Active - will use KYC data when available');
+    
+    if (kycStatus) {
+      const statusData = kycStatus as any;
+      console.log('📋 KYC Status Fallback Data:', {
+        kycStatus: statusData?.kycStatus,
+        isVerified: statusData?.isVerified,
+        bvnVerified: statusData?.bvnVerified,
+        selfieVerified: statusData?.selfieVerified,
+        isFreshRegistration
+      });
+
+      // Skip processing if fresh registration is already handling this
+      if (isFreshRegistration) {
+        console.log('🆕 Fresh registration already handled, KYC status will be used for future sessions');
+        return;
+      }
+
+      // Process KYC status for login users or when fresh registration is not active
+      const isFullyVerified = ((statusData?.kycStatus === 'VERIFIED') || (statusData?.kycStatus === 'APPROVED')) && 
+                             statusData?.isVerified && 
+                             statusData?.bvnVerified && 
+                             statusData?.selfieVerified;
+
+      if (!isFullyVerified) {
+        // User needs to complete or continue KYC verification
+        console.log('⚠️ User not fully verified based on KYC status, checking if modal should be shown');
+        
+        // Check if modal is already shown
+        if (!showVerificationModal) {
+          console.log('📱 Showing KYC verification modal based on status');
+          setIsWalletActivationMode(false);
+          setIsPendingVerification(statusData?.kycStatus === 'UNDER_REVIEW');
+          setShowVerificationModal(true);
+        }
+      } else {
+        console.log('✅ User is fully verified based on KYC status');
+      }
+    } else if (kycIsError && !kycLoading && !isFreshRegistration) {
+      // KYC API failed - show verification modal as fallback for non-fresh registration users
+      console.error('❌ KYC Status API failed, using fallback for login users:', kycError?.message);
+      
+      if (!showVerificationModal) {
+        console.log('🆘 Showing verification modal as KYC API fallback');
+        setIsWalletActivationMode(false);
+        setIsPendingVerification(false);
+        setShowVerificationModal(true);
+      }
+    } else if (!kycLoading && !kycStatus && !kycIsError && !isFreshRegistration) {
+      // KYC returned no data - treat as unverified user
+      console.log('⚠️ No KYC data returned, treating as unverified user');
+      
+      if (!showVerificationModal) {
+        console.log('📱 Showing verification modal for no KYC data scenario');
+        setIsWalletActivationMode(false);
+        setIsPendingVerification(false);
+        setShowVerificationModal(true);
+      }
+    }
+  }, [isAuthenticated, kycStatus, kycIsError, kycLoading, kycError, isFreshRegistration, showVerificationModal]);
+
+  useEffect(() => {
+    // LEGACY: AsyncStorage-based verification status (for special cases like pending modal)
+    // This is supplementary to the main KYC API fallback system above
+    
+    // For APPROVED users, never show verification modals
+    if (kycStatus && (kycStatus as any)?.kycStatus === 'APPROVED') {
+      console.log('✅ User is APPROVED, no verification modals needed');
+      return;
+    }
+
+    // Only check legacy verification flags for non-APPROVED users
+    if (kycStatus && (kycStatus as any)?.kycStatus !== 'APPROVED') {
+      const checkLegacyVerificationStatus = async () => {
+        try {
+          const showPendingModal = await AsyncStorage.getItem('show_pending_modal');
+          const userVerified = await AsyncStorage.getItem('user_verified');
+          
+          // Skip this logic if user just completed fresh registration (handled separately)
+          if (isFreshRegistration) {
+            console.log('🆕 Skipping legacy verification logic - fresh registration handled separately');
+            return;
+          }
+          
+          // Check for special pending modal flag (set by KYC processes)
+          if (showPendingModal === 'true') {
+            console.log('🔔 Legacy pending modal flag detected');
+            // Clear the flag and show pending modal
+            await AsyncStorage.removeItem('show_pending_modal');
+            setIsPendingVerification(true);
+            setShowVerificationModal(true);
+          } else if (userVerified !== 'true' && !showVerificationModal && !kycStatus) {
+            // Only show if no modal is shown and no KYC data (extreme fallback)
+            console.log('🆘 Legacy fallback: No KYC data and user not marked verified');
+            const timer = setTimeout(() => {
+              setIsPendingVerification(false);
+              setShowVerificationModal(true);
+            }, 1000); // Longer delay to let KYC API finish
+            return () => clearTimeout(timer);
+          }
+        } catch (error) {
+          console.error('Error checking legacy verification status:', error);
+        }
+      };
+
+      checkLegacyVerificationStatus();
+    }
+  }, [kycStatus, isFreshRegistration, showVerificationModal]);
+
+  // PRIORITY 2: Check wallet availability first for all verified users
+  useEffect(() => {
+    if (kycStatus) {
+      const statusData = kycStatus as any;
+      
+      // Check if user is fully verified (VERIFIED or APPROVED)
+      const isFullyVerified = ((statusData?.kycStatus === 'VERIFIED') || (statusData?.kycStatus === 'APPROVED')) && 
+                             statusData?.isVerified && 
+                             statusData?.bvnVerified && 
+                             statusData?.selfieVerified;
+      
+      if (isFullyVerified) {
+        console.log('🔍 User is fully verified, checking wallet availability first...');
+        
+        // Check if user just completed fresh registration - skip wallet check if so
+        if (isFreshRegistration) {
+          console.log('🆕 Skipping wallet availability check - fresh registration modal has priority');
+          return;
+        }
+        
+        // STEP 1: Check if wallet data is available (successful responses)
+        const hasWalletData = walletDetails && walletBalance;
+        
+        // STEP 2: Check if wallet data is missing (error responses indicate no wallet)
+        const hasWalletDetailsError = walletDetailsError && 
+          (walletDetailsError.message?.includes('not found') || 
+           walletDetailsError.message?.includes('Wallet not found') ||
+           walletDetailsError.statusCode === 404);
+           
+        const hasWalletBalanceError = walletBalanceError && 
+          (walletBalanceError.message?.includes('not found') || 
+           walletBalanceError.message?.includes('Wallet not found') ||
+           walletBalanceError.statusCode === 404);
+
+        console.log('💳 Wallet availability check for verified user:', {
+          kycStatus: statusData?.kycStatus,
+          hasWalletDetails: !!walletDetails,
+          hasWalletBalance: !!walletBalance,
+          hasWalletData,
+          walletDetailsError: walletDetailsError?.message,
+          walletBalanceError: walletBalanceError?.message,
+          hasWalletDetailsError,
+          hasWalletBalanceError
+        });
+
+        // STEP 3: Decision logic
+        if (hasWalletData) {
+          // User has wallet data - NO activation modal needed
+          console.log('✅ User has wallet data, no activation needed');
+          setIsWalletActivationMode(false);
+          setShowVerificationModal(false);
+        } else if (hasWalletDetailsError || hasWalletBalanceError) {
+          // User missing wallet data - show activation modal
+          console.log('⚠️ User missing wallet data, showing activation modal');
+          setIsWalletActivationMode(true);
+          setIsPendingVerification(false);
+          setShowVerificationModal(true);
+        } else if (!walletDetails && !walletBalance && !walletDetailsError && !walletBalanceError) {
+          // Still loading wallet data - wait
+          console.log('⏳ Wallet data still loading, waiting...');
+        }
+      } else {
+        // User not fully verified - show verification modal (not activation)
+        console.log('⚠️ User not fully verified, showing verification modal');
+        
+        // Check if fresh registration modal is already shown
+        if (isFreshRegistration) {
+          console.log('🆕 Skipping unverified modal - fresh registration modal has priority');
+          return;
+        }
+        
+        setIsWalletActivationMode(false);
+        setIsPendingVerification(false);
+        setShowVerificationModal(true);
+      }
+    }
+  }, [kycStatus, walletDetails, walletBalance, walletDetailsError, walletBalanceError, isFreshRegistration]);
+
+  // PRIORITY 3: Check PIN status for users with wallet access
+  useEffect(() => {
+    if (kycStatus && walletDetails && walletBalance && pinStatus) {
+      const statusData = kycStatus as any;
+      
+      // Check if user is fully verified and has wallet access
+      const isFullyVerified = ((statusData?.kycStatus === 'VERIFIED') || (statusData?.kycStatus === 'APPROVED')) && 
+                             statusData?.isVerified && 
+                             statusData?.bvnVerified && 
+                             statusData?.selfieVerified;
+
+      const hasWalletAccess = walletDetails && walletBalance;
+
+      if (isFullyVerified && hasWalletAccess) {
+        console.log('🔑 Checking PIN status for user with wallet access:', {
+          hasPinSet: pinStatus.hasPinSet,
+          walletExists: pinStatus.walletExists,
+          message: pinStatus.message
+        });
+
+        // If wallet exists but no PIN is set, show SetPinModal
+        if (pinStatus.walletExists && !pinStatus.hasPinSet) {
+          console.log('⚠️ Wallet exists but no PIN set, showing PIN setup modal');
+          setShowSetPinModal(true);
+        } else if (pinStatus.hasPinSet) {
+          console.log('✅ PIN is already set, user can proceed with transfers');
+        } else if (!pinStatus.walletExists) {
+          console.log('❌ Wallet does not exist, should show wallet activation');
+          // This case should be handled by the wallet check above
+        }
+      }
+    }
+  }, [kycStatus, walletDetails, walletBalance, pinStatus]);
 
   const showFlashAnimation = () => {
     Animated.sequence([
@@ -137,11 +601,20 @@ export default function CameraScreen() {
       });
 
       if (photo) {
+        // Show gamified capture animation
+        setCapturedImageUri(photo.uri);
+        setShowCaptureAnimation(true);
+        setProcessingSteps([]); // Reset processing steps
+        
+        // Start processing in background
         await processImage(photo.uri);
       }
     } catch (error) {
       console.error('Error taking picture:', error);
       Alert.alert('Error', 'Failed to capture photo. Please try again.');
+      setShowCaptureAnimation(false);
+      setCapturedImageUri('');
+      setProcessingSteps([]);
     } finally {
       setIsCapturing(false);
     }
@@ -149,44 +622,36 @@ export default function CameraScreen() {
 
   const processImage = async (imageUri: string) => {
     try {
-      setIsProcessing(true);
-
-      // Use React Query mutation to extract bank data
-      const extractedBankData = await extractBankDataMutation.mutateAsync(imageUri);
-      
-      // Check cache if we have basic account info
-      if (extractedBankData.accountNumber && extractedBankData.bankName) {
-        console.log('🔍 Checking cache for:', extractedBankData.accountNumber, extractedBankData.bankName);
-        const cachedData = await CacheService.getCachedData(
-          extractedBankData.accountNumber, 
-          extractedBankData.bankName
-        );
-        
-        if (cachedData) {
-          console.log('🚀 Using cached data!');
-          setExtractedData(cachedData);
-          setShowBankModal(true);
-          setIsProcessing(false);
-          return;
-        }
+      // Only show old loader if not using gamified animation
+      if (!showCaptureAnimation) {
+        setIsProcessing(true);
       }
-      
-      console.log('🎯 Extracted data:', extractedBankData);
 
-      if (validateExtraction(extractedBankData)) {
-        // Successfully extracted data - cache it and show modal
-        await CacheService.cacheData(extractedBankData);
-        setExtractedData(extractedBankData);
-        setShowBankModal(true);
-      } else {
-        // Low confidence but still show modal with available data
-        // Only cache if we have minimum required data
-        if (CacheService.canCache(extractedBankData)) {
-          await CacheService.cacheData(extractedBankData);
+      // Use Enhanced React Query mutation to extract bank data with OCR + compression
+      const enhancedData = await enhancedExtractBankDataMutation.mutateAsync(imageUri);
+      
+      console.log('🎯 Enhanced extraction completed:', enhancedData);
+
+      // Convert enhanced data to compatible format
+      const compatibleData: ExtractedBankData = {
+        accountNumber: enhancedData.accountNumber,
+        bankName: enhancedData.bankName,
+        amount: enhancedData.amount || '',
+        accountHolderName: '', // Will be resolved in modal
+        confidence: enhancedData.confidence,
+        extractedFields: {
+          accountNumber: !!enhancedData.accountNumber,
+          bankName: !!enhancedData.bankName,
+          amount: !!enhancedData.amount,
+          accountHolderName: false, // Will be resolved later
         }
-        setExtractedData(extractedBankData);
-        setShowBankModal(true);
-      }
+      };
+
+      // Cache the extracted data (without account resolution)
+      await CacheService.cacheData(compatibleData);
+      setExtractedData(compatibleData);
+      setShowBankModal(true);
+      
     } catch (error) {
       console.error('❌ Error processing image:', error);
       Alert.alert(
@@ -198,7 +663,10 @@ export default function CameraScreen() {
         ]
       );
     } finally {
-      setIsProcessing(false);
+      // Only hide old loader if not using gamified animation
+      if (!showCaptureAnimation) {
+        setIsProcessing(false);
+      }
     }
   };
 
@@ -260,15 +728,15 @@ export default function CameraScreen() {
     setExtractedData(null);
   };
 
-  const handleBankModalConfirm = () => {
+  const handleBankModalConfirm = (resolvedAccountName?: string) => {
     if (extractedData) {
-      // Navigate to transfer screen with extracted data
+      // Navigate to transfer screen with extracted data and resolved account name
       router.push({
         pathname: '/transfer',
         params: {
           bankName: extractedData.bankName,
           accountNumber: extractedData.accountNumber,
-          accountHolderName: extractedData.accountHolderName,
+          accountHolderName: resolvedAccountName || extractedData.accountHolderName || '',
           amount: extractedData.amount || '',
         }
       });
@@ -287,16 +755,76 @@ export default function CameraScreen() {
     setShowVerificationModal(false);
   };
 
-  const handleVerifyID = () => {
-    setShowVerificationModal(false);
-    
-    if (isPendingVerification) {
-      // Just close the modal for pending verification
-      setIsPendingVerification(false);
+  const handleVerifyID = async () => {
+    if (isWalletActivationMode) {
+      // Handle wallet activation for APPROVED users
+      console.log('🔄 Activating wallet for APPROVED user...');
+      
+      try {
+        await walletRecoveryMutation.mutateAsync();
+        console.log('✅ Wallet activation successful');
+        ToastService.success('Wallet activated');
+        
+        // Close modal and reset state
+        setShowVerificationModal(false);
+        setIsWalletActivationMode(false);
+      } catch (error: any) {
+        console.error('❌ Wallet activation failed:', error);
+        
+        // Keep modal open but show error
+        if (error.message?.includes('complete KYC verification first') || error.statusCode === 400) {
+          ToastService.error('Contact support');
+        } else {
+          ToastService.error('Activation failed');
+        }
+      }
     } else {
-      // Navigate to BVN flow first for initial verification
-      router.push('/(kyc)/bvn');
+      // Normal verification flow
+      setShowVerificationModal(false);
+      
+      if (isPendingVerification) {
+        // Just close the modal for pending verification
+        setIsPendingVerification(false);
+      } else {
+        // Check if this is a fresh registration (new users always start with BVN)
+        if (isFreshRegistration) {
+          console.log('🆕 Fresh registration user starting KYC - going to BVN');
+          setIsFreshRegistration(false); // Clear the flag since user is starting KYC
+          router.push('/(kyc)/bvn');
+          return;
+        }
+        
+        // Navigate based on current KYC status for existing users
+        if ((kycStatus as any)?.kycStatus === 'IN_PROGRESS' && (kycStatus as any)?.bvnVerified && !(kycStatus as any)?.selfieVerified) {
+          // BVN verified, need selfie - go to bridge
+          router.push('/(kyc)/bridge');
+        } else if ((kycStatus as any)?.kycStatus === 'UNDER_REVIEW' || (kycStatus as any)?.kycStatus === 'REJECTED') {
+          // Under review or rejected - go to bridge
+          router.push('/(kyc)/bridge');
+        } else {
+          // Need to start with BVN (fallback for unknown status)
+          router.push('/(kyc)/bvn');
+        }
+      }
     }
+  };
+
+  const handleSetPinModalClose = () => {
+    setShowSetPinModal(false);
+  };
+
+  const handleSetPinSuccess = () => {
+    console.log('✅ PIN setup completed successfully');
+    setShowSetPinModal(false);
+    
+    // Pin Set Successfully toast will be shown by the SetPinModal component
+  };
+
+  const handleCaptureAnimationComplete = () => {
+    console.log('🎬 Capture animation completed');
+    setShowCaptureAnimation(false);
+    setCapturedImageUri('');
+    setProcessingSteps([]);
   };
 
   const getFlashIcon = () => {
@@ -316,7 +844,7 @@ export default function CameraScreen() {
       <View style={[styles.container, { backgroundColor: '#000000' }]}>
         <CameraHeader />
         <View style={styles.permissionContainer}>
-          <Text style={[styles.permissionText, { color: colors.white }]}>
+          <Text style={[styles.permissionText, { color: '#FFFFFF' }]}>
             Requesting camera permissions...
           </Text>
         </View>
@@ -329,7 +857,7 @@ export default function CameraScreen() {
       <View style={[styles.container, { backgroundColor: '#000000' }]}>
         <CameraHeader />
         <View style={styles.permissionContainer}>
-          <Text style={[styles.permissionText, typography.heading.h4, { color: colors.white }]}>
+          <Text style={[styles.permissionText, typography.heading.h4, { color: '#FFFFFF' }]}>
             Camera Access Required
           </Text>
           <Text style={[styles.permissionSubtext, typography.body.medium, { color: colors.textSecondary }]}>
@@ -339,7 +867,7 @@ export default function CameraScreen() {
             style={[styles.permissionButton, { backgroundColor: colors.primary }]}
             onPress={requestPermission}
           >
-            <Text style={[styles.permissionButtonText, typography.button.medium, { color: colors.white }]}>
+            <Text style={[styles.permissionButtonText, typography.button.medium, { color: '#FFFFFF' }]}>
               Grant Camera Access
             </Text>
           </TouchableOpacity>
@@ -410,8 +938,10 @@ export default function CameraScreen() {
       {isProcessing && (
         <View style={styles.loaderContainer}>
           <CircularLoader size={60} color="#F5C842" />
-          <Text style={[styles.loaderText, { color: colors.white }]}>
-            Processing image...
+          <Text style={[styles.loaderText, { color: '#FFFFFF' }]}>
+            {enhancedExtractBankDataMutation.isPending ? 'Extracting data...' : 
+             resolveAccountMutation.isPending ? 'Verifying account...' : 
+             'Processing...'}
           </Text>
         </View>
       )}
@@ -478,7 +1008,16 @@ export default function CameraScreen() {
             <ChevronUp size={16} color="rgba(255, 255, 255, 0.6)" strokeWidth={1.5} />
           </View>
         </TouchableOpacity>
+
       </LinearGradient>
+
+      {/* Gamified Capture Animation */}
+      <CaptureAnimation
+        visible={showCaptureAnimation}
+        capturedImageUri={capturedImageUri}
+        processingSteps={processingSteps}
+        onAnimationComplete={handleCaptureAnimationComplete}
+      />
 
       {/* Bank Transfer Modal */}
       {extractedData && (
@@ -498,10 +1037,33 @@ export default function CameraScreen() {
         visible={showVerificationModal}
         onClose={handleVerificationModalClose}
         onVerifyID={handleVerifyID}
-        title={isPendingVerification ? "Verification\nPending.." : "Finish your\naccount setup"}
-        description={isPendingVerification ? "Verification should take 2 - 4 hrs\n\nYou will be notified" : "Complete account verification with a selfie and your BVN to start using \n Monzi"}
-        buttonText={isPendingVerification ? "Got it" : "Verify ID"}
+        title={
+          isWalletActivationMode ? "Activate Your\nWallet" :
+          isPendingVerification ? "Verification\nPending.." : 
+          "Complete your\nverification"
+        }
+        description={
+          isWalletActivationMode ? "Your verification is complete! Activate your wallet to start using all features and transfer money." :
+          isPendingVerification ? "Verification should take 2 - 4 hrs\n\nYou will be notified" : 
+          (kycStatus as any)?.bvnVerified && !(kycStatus as any)?.selfieVerified ? 
+            "Complete your biometric verification to access all features" :
+            "Complete account verification with your BVN and selfie to start using Monzi"
+        }
+        buttonText={
+          isWalletActivationMode ? 
+            (walletRecoveryMutation.isPending ? "Activating wallet" : "Activate Wallet") :
+          isPendingVerification ? "Got it" : 
+          "Continue Verification"
+        }
+        loading={isWalletActivationMode ? walletRecoveryMutation.isPending : false}
         icon={require('@/assets/images/verify/shield.png')}
+      />
+
+      {/* Set PIN Modal */}
+      <SetPinModal
+        visible={showSetPinModal}
+        onClose={handleSetPinModalClose}
+        onSuccess={handleSetPinSuccess}
       />
     </View>
   );

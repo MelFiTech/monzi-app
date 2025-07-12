@@ -31,7 +31,7 @@ export default function SplashScreenComponent() {
   }, []);
 
   const initializeApp = async () => {
-    // Hide the native splash screen and show our custom one
+    // Hide the native splash screen immediately to prevent double splash
     await SplashScreen.hideAsync();
     
     // Start logo animations

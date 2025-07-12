@@ -4,17 +4,22 @@ import { BlurView } from 'expo-blur';
 import { useTheme } from '@/providers/ThemeProvider';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
 import Button from './Button';
-import { Copy, X, Check } from 'lucide-react-native';
+import BankSelectionModal from './BankSelectionModal';
+import { Copy, X, Check, ChevronDown } from 'lucide-react-native';
 import { ExtractedBankData } from '@/services';
+import { useResolveAccountMutation } from '@/hooks/useAccountService';
+import { ToastService } from '@/services';
+import { router } from 'expo-router';
 
 interface BankTransferModalProps {
   visible: boolean;
   onClose: () => void;
-  onConfirmTransfer: () => void;
+  onConfirmTransfer: (resolvedAccountName?: string) => void;
   onSuccess: () => void;
   amount: string;
   nairaAmount: string;
   extractedData?: ExtractedBankData;
+  onBankSelect?: (bankName: string) => void;
 }
 
 export default function BankTransferModal({
@@ -24,19 +29,71 @@ export default function BankTransferModal({
   onSuccess,
   amount,
   nairaAmount,
-  extractedData
+  extractedData,
+  onBankSelect
 }: BankTransferModalProps) {
   const { colors, theme } = useTheme();
 
   const [slideAnim] = useState(new Animated.Value(0));
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showBankSelection, setShowBankSelection] = useState(false);
+  const [selectedBankName, setSelectedBankName] = useState('');
+  const [resolvedAccountName, setResolvedAccountName] = useState<string | null>(null);
+  const [isResolvingAccount, setIsResolvingAccount] = useState(false);
+  const [hasResolutionFailed, setHasResolutionFailed] = useState(false);
 
-  // Use extracted data or fallback to default values
-  const bankName = extractedData?.bankName || 'PalmPay';
-  const accountNumber = extractedData?.accountNumber || '1123456985';
-  const accountHolderName = extractedData?.accountHolderName || 'Abdullahi Ogirima Mohammad';
+  const resolveAccountMutation = useResolveAccountMutation();
+
+  // Use extracted data or selected bank name
+  const bankName = extractedData?.bankName || selectedBankName || '';
+  const accountNumber = extractedData?.accountNumber || '';
+  const accountHolderName = resolvedAccountName || extractedData?.accountHolderName || '';
   const extractedAmount = extractedData?.amount || amount;
+
+  // Check if we have minimum required data
+  const hasBankName = Boolean(bankName);
+  const hasAccountNumber = Boolean(accountNumber);
+  const hasRequiredData = hasBankName && hasAccountNumber;
+
+  // Start account resolution in background when modal opens
+  useEffect(() => {
+    if (visible && hasRequiredData && !resolvedAccountName && !hasResolutionFailed) {
+      console.log('🔄 Starting background account resolution...');
+      setIsResolvingAccount(true);
+      
+      resolveAccountMutation.mutateAsync({
+        accountNumber,
+        bankName
+      })
+      .then((result) => {
+        console.log('✅ Background account resolution successful:', result);
+        setResolvedAccountName(result.account_name);
+        setIsResolvingAccount(false);
+      })
+      .catch((error) => {
+        console.error('❌ Background account resolution failed:', error);
+        setIsResolvingAccount(false);
+        setHasResolutionFailed(true);
+        
+        // Check for specific error case
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage?.includes('Account verification failed') || 
+            errorMessage?.includes('statusCode: 400') ||
+            errorMessage?.includes('Bad Request')) {
+          
+          console.log('🚨 Specific account verification error detected');
+          ToastService.error('Please scan again');
+          
+          // Close modal and navigate to home
+          setTimeout(() => {
+            onClose();
+            router.replace('/(tabs)');
+          }, 1000);
+        }
+      });
+    }
+  }, [visible, hasRequiredData, resolvedAccountName, hasResolutionFailed, accountNumber, bankName]);
 
   // Slide animation effect
   useEffect(() => {
@@ -85,12 +142,120 @@ export default function BankTransferModal({
     );
   };
 
+  const handleBankSelection = () => {
+    setShowBankSelection(true);
+  };
+
+  const handleBankSelect = (bankName: string) => {
+    setSelectedBankName(bankName);
+    setShowBankSelection(false);
+    // Reset resolution state when bank changes
+    setResolvedAccountName(null);
+    setHasResolutionFailed(false);
+    // Notify parent component if callback provided
+    if (onBankSelect) {
+      onBankSelect(bankName);
+    }
+  };
+
   const handleConfirmPress = async () => {
+    if (!hasRequiredData) {
+      Alert.alert(
+        'Missing Information',
+        'Please ensure bank name and account number are available before proceeding.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      onConfirmTransfer();
-    }, 1000);
+    
+    // If account resolution is still in progress, wait for it
+    if (isResolvingAccount) {
+      console.log('⏳ Waiting for account resolution to complete...');
+      
+      try {
+        const result = await resolveAccountMutation.mutateAsync({
+          accountNumber,
+          bankName
+        });
+        console.log('✅ Account resolution completed:', result);
+        setResolvedAccountName(result.account_name);
+        setIsResolvingAccount(false);
+        
+                 // Continue with transfer
+         setTimeout(() => {
+           setIsLoading(false);
+           onConfirmTransfer(resolvedAccountName || undefined);
+         }, 500);
+        
+      } catch (error) {
+        console.error('❌ Account resolution failed during confirm:', error);
+        setIsLoading(false);
+        setHasResolutionFailed(true);
+        
+        // Check for specific error case
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage?.includes('Account verification failed') || 
+            errorMessage?.includes('statusCode: 400') ||
+            errorMessage?.includes('Bad Request')) {
+          
+          ToastService.error('Please scan again');
+          
+          // Close modal and navigate to home
+          setTimeout(() => {
+            onClose();
+            router.replace('/(tabs)');
+          }, 1000);
+        } else {
+          Alert.alert('Error', 'Failed to verify account details. Please try again.');
+        }
+        return;
+      }
+         } else {
+       // Resolution already completed or not needed
+       setTimeout(() => {
+         setIsLoading(false);
+         onConfirmTransfer(resolvedAccountName || undefined);
+       }, 500);
+     }
+  };
+
+  // Render account name with skeleton loading
+  const renderAccountName = () => {
+    if (isResolvingAccount) {
+      return (
+        <View style={styles.skeletonContainer}>
+          <View style={styles.skeletonLine} />
+          <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
+        </View>
+      );
+    }
+    
+    if (hasResolutionFailed) {
+      return (
+        <Text style={styles.errorAccountName}>
+          Unable to verify account name
+        </Text>
+      );
+    }
+    
+    if (accountHolderName) {
+      return (
+        <Text style={styles.nameValue}>
+          {accountHolderName.includes(' ') 
+            ? accountHolderName.replace(' ', '\n') 
+            : accountHolderName
+          }
+        </Text>
+      );
+    }
+    
+    return (
+      <Text style={styles.placeholderName}>
+        Resolving account name...
+      </Text>
+    );
   };
 
   return (
@@ -124,34 +289,44 @@ export default function BankTransferModal({
                 <View style={styles.detailsCard}>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Name</Text>
-                    <Text style={styles.nameValue}>
-                      {accountHolderName.includes(' ') 
-                        ? accountHolderName.replace(' ', '\n') 
-                        : accountHolderName
-                      }
-                    </Text>
+                    {renderAccountName()}
                   </View>
 
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Bank Name</Text>
-                    <Text style={styles.detailValue}>
-                      {bankName}
-                    </Text>
+                    {hasBankName ? (
+                      <Text style={styles.detailValue}>
+                        {bankName}
+                      </Text>
+                    ) : (
+                      <TouchableOpacity onPress={handleBankSelection} style={styles.selectBankButton}>
+                        <Text style={styles.selectBankText}>Select bank</Text>
+                        <ChevronDown size={16} color="#6CB1FF" />
+                      </TouchableOpacity>
+                    )}
                   </View>
 
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Account number</Text>
                     <View style={styles.detailValueContainer}>
-                      <Text style={styles.detailValue}>
-                        {accountNumber}
-                      </Text>
-                      <TouchableOpacity onPress={handleCopyAccountNumber} style={styles.copyButton}>
-                        {copied ? (
-                          <Check size={20} color="#10B981" />
-                        ) : (
-                          <Copy size={20} color="rgba(255, 255, 255, 0.6)" />
-                        )}
-                      </TouchableOpacity>
+                      {hasAccountNumber ? (
+                        <>
+                          <Text style={styles.detailValue}>
+                            {accountNumber}
+                          </Text>
+                          <TouchableOpacity onPress={handleCopyAccountNumber} style={styles.copyButton}>
+                            {copied ? (
+                              <Check size={20} color="#10B981" />
+                            ) : (
+                              <Copy size={20} color="rgba(255, 255, 255, 0.6)" />
+                            )}
+                          </TouchableOpacity>
+                        </>
+                      ) : (
+                        <Text style={styles.missingDataText}>
+                          Not detected - Please retake photo
+                        </Text>
+                      )}
                     </View>
                   </View>
 
@@ -165,9 +340,24 @@ export default function BankTransferModal({
                   )}
                 </View>
 
-                <Text style={styles.warningText}>
-                  Please confirm the details before sending.{'\n'}Transfers can't be reversed once completed.
-                </Text>
+                {!hasRequiredData ? (
+                  <View style={styles.warningContainer}>
+                    <Text style={styles.errorText}>
+                      ⚠️ Missing Required Information
+                    </Text>
+                    <Text style={styles.errorDetails}>
+                      {!hasBankName && !hasAccountNumber ? 
+                        'Bank name and account number are required.' :
+                        !hasBankName ? 'Please select a bank name.' :
+                        'Account number not detected. Please retake photo.'
+                      }
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.warningText}>
+                    Please confirm the details before sending.{'\n'}Transfers can't be reversed once completed.
+                  </Text>
+                )}
 
                 <View style={styles.buttonContainer}>
                   <Button
@@ -184,9 +374,15 @@ export default function BankTransferModal({
                     variant="primary"
                     size="lg"
                     onPress={handleConfirmPress}
-                    disabled={isLoading}
-                    style={styles.continueButton}
-                    textStyle={styles.continueButtonText}
+                    disabled={isLoading || !hasRequiredData}
+                    style={{
+                      ...styles.continueButton,
+                      ...((!hasRequiredData) ? styles.disabledButton : {})
+                    }}
+                    textStyle={{
+                      ...styles.continueButtonText,
+                      ...((!hasRequiredData) ? styles.disabledButtonText : {})
+                    }}
                   />
                 </View>
 
@@ -195,6 +391,13 @@ export default function BankTransferModal({
           </View>
         </BlurView>
       </View>
+
+      {/* Bank Selection Modal */}
+      <BankSelectionModal
+        visible={showBankSelection}
+        onClose={() => setShowBankSelection(false)}
+        onSelectBank={handleBankSelect}
+      />
     </Modal>
   );
 }
@@ -278,6 +481,33 @@ const styles = StyleSheet.create({
   copyButton: {
     padding: 4,
   },
+  // Skeleton loading styles
+  skeletonContainer: {
+    paddingVertical: 4,
+  },
+  skeletonLine: {
+    height: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  skeletonLineShort: {
+    width: '70%',
+    height: 16,
+    marginBottom: 0,
+  },
+  placeholderName: {
+    fontSize: 18,
+    fontFamily: fontFamilies.sora.regular,
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontStyle: 'italic',
+  },
+  errorAccountName: {
+    fontSize: 18,
+    fontFamily: fontFamilies.sora.regular,
+    color: 'rgba(255, 107, 107, 0.8)',
+    fontStyle: 'italic',
+  },
   confidenceRow: {
     marginTop: 8,
     marginBottom: 0,
@@ -320,5 +550,54 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: fontFamilies.sora.semiBold,
     color: '#000000',
+  },
+  selectBankButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(108, 177, 255, 0.1)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#6CB1FF',
+  },
+  selectBankText: {
+    fontSize: 16,
+    fontFamily: fontFamilies.sora.semiBold,
+    color: '#6CB1FF',
+    marginRight: 8,
+  },
+  disabledButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    opacity: 0.6,
+  },
+  disabledButtonText: {
+    color: 'rgba(255, 255, 255, 0.5)',
+  },
+  missingDataText: {
+    fontSize: 16,
+    fontFamily: fontFamilies.sora.regular,
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontStyle: 'italic',
+  },
+  warningContainer: {
+    backgroundColor: 'rgba(245, 200, 66, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    borderLeftWidth: 4,
+    borderLeftColor: '#F5C842',
+  },
+  errorText: {
+    fontSize: 16,
+    fontFamily: fontFamilies.sora.bold,
+    color: '#F5C842',
+    marginBottom: 8,
+  },
+  errorDetails: {
+    fontSize: 14,
+    fontFamily: fontFamilies.sora.regular,
+    color: 'rgba(255, 255, 255, 0.8)',
+    lineHeight: 20,
   },
 });

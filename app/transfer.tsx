@@ -19,12 +19,16 @@ import RecipientDetailCard from '@/components/common/RecipientDetailCard';
 import AmountPill from '@/components/common/AmountPill';
 import Button from '@/components/common/Button';
 import TransactionPinModal from '@/components/common/TransactionPinModal';
+import { useWalletBalance, useRefreshWallet, useOptimisticBalance, useTransferFunds, useWalletAccessStatus } from '@/hooks/useWalletService';
+import { useNotificationService } from '@/hooks/useNotificationService';
+import { useQueryClient } from '@tanstack/react-query';
 
 const predefinedAmounts = ['N5,000', 'N10,000', 'N20,000'];
 
 export default function TransferScreen() {
   const { colors } = useTheme();
   const params = useLocalSearchParams();
+  const queryClient = useQueryClient();
   
   // Extract navigation params (from camera extraction)
   const extractedBankName = params.bankName as string || '';
@@ -36,13 +40,170 @@ export default function TransferScreen() {
   const [amount, setAmount] = useState(extractedAmount || '');
   const [selectedPill, setSelectedPill] = useState<string | null>(null);
   const [showPinModal, setShowPinModal] = useState(false);
+  const [amountError, setAmountError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const walletBalance = 'N256,311.12';
+  // Check wallet access status
+  const { hasWalletAccess, statusMessage } = useWalletAccessStatus();
 
-  // Use extracted data or fallback defaults
-  const recipientName = extractedAccountHolderName || 'Abdullahi Ogirima Mohammad';
-  const accountNumber = extractedAccountNumber || '1123456985';
-  const bankName = extractedBankName || 'PalmPay';
+  // Fetch wallet balance only if user has access
+  const { data: balanceData, isLoading: isBalanceLoading } = useWalletBalance();
+  const { invalidateAfterTransaction } = useRefreshWallet();
+  const { updateBalanceOptimistically, revertOptimisticUpdate } = useOptimisticBalance();
+  const transferFundsMutation = useTransferFunds();
+
+  // Real-time notifications for wallet updates
+  const { 
+    isConnected: isNotificationConnected,
+    lastWalletUpdate,
+    formatAmount: formatNotificationAmount
+  } = useNotificationService(
+    {
+      autoConnect: true,
+      showToasts: true,
+      enableBalanceUpdates: true,
+      enableTransactionNotifications: true,
+      enableGeneralNotifications: true,
+    },
+    {
+      onWalletBalanceUpdate: (notification) => {
+        console.log('🔔 [TransferScreen] Real-time wallet update received:', {
+          component: 'TransferScreen',
+          timestamp: new Date().toISOString(),
+          eventType: 'wallet_balance_updated',
+          fullNotification: notification,
+          balanceChange: {
+            oldBalance: formatNotificationAmount(notification.data.oldBalance),
+            newBalance: formatNotificationAmount(notification.data.newBalance),
+            changeAmount: formatNotificationAmount(notification.data.amount),
+            isCredit: notification.data.amount > 0,
+            isDebit: notification.data.amount < 0,
+          },
+          transaction: {
+            reference: notification.data.transactionReference,
+            accountNumber: notification.data.accountNumber,
+            description: notification.data.description,
+            timestamp: notification.data.timestamp,
+          },
+          transferScreenState: {
+            currentAmount: amount,
+            hasAmountError: !!amountError,
+            amountErrorMessage: amountError,
+          }
+        });
+        
+        // Log balance comparison
+        if (notification.data.amount > 0) {
+          console.log(`💰 [TransferScreen] WALLET CREDITED: +${formatNotificationAmount(notification.data.amount)} | New Balance: ${formatNotificationAmount(notification.data.newBalance)}`);
+        } else if (notification.data.amount < 0) {
+          console.log(`💸 [TransferScreen] WALLET DEBITED: ${formatNotificationAmount(notification.data.amount)} | New Balance: ${formatNotificationAmount(notification.data.newBalance)}`);
+        }
+        
+        // Invalidate wallet queries to refresh balance display in real-time
+        queryClient.invalidateQueries({ queryKey: ['wallet', 'balance'] });
+        queryClient.invalidateQueries({ queryKey: ['wallet', 'details'] });
+        queryClient.invalidateQueries({ queryKey: ['wallet', 'transactions'] });
+        
+        console.log('🔄 [TransferScreen] React Query cache invalidated for wallet data');
+        
+        // Clear any amount errors if balance increased
+        if (notification.data.amount > 0 && amountError?.includes('balance')) {
+          setAmountError(null);
+          console.log('✅ [TransferScreen] Amount error cleared due to balance increase');
+        }
+      },
+      onTransactionNotification: (notification) => {
+        console.log('💳 [TransferScreen] Real-time transaction notification received:', {
+          component: 'TransferScreen',
+          timestamp: new Date().toISOString(),
+          eventType: 'transaction_notification',
+          fullNotification: notification,
+          transaction: {
+            type: notification.data.type,
+            amount: formatNotificationAmount(notification.data.amount),
+            reference: notification.data.transactionReference,
+            accountNumber: notification.data.accountNumber,
+            description: notification.data.description,
+            status: notification.data.status,
+            timestamp: notification.data.timestamp,
+          },
+          transferScreenState: {
+            currentAmount: amount,
+            hasAmountError: !!amountError,
+            isProcessingTransfer: transferFundsMutation.isPending,
+          }
+        });
+        
+        console.log(`💳 [TransferScreen] TRANSACTION ${notification.data.type.toUpperCase()}: ${formatNotificationAmount(notification.data.amount)} | Status: ${notification.data.status}`);
+        
+        // Refresh wallet data for any transaction
+        queryClient.invalidateQueries({ queryKey: ['wallet'] });
+        
+        console.log('🔄 [TransferScreen] React Query cache invalidated for all wallet data');
+      },
+      onConnect: () => {
+        console.log('🔌 [TransferScreen] Real-time notifications connected:', {
+          component: 'TransferScreen',
+          timestamp: new Date().toISOString(),
+          event: 'connected',
+          message: 'Successfully connected to Socket.IO notifications server',
+          transferScreenState: {
+            currentAmount: amount,
+            hasAmountError: !!amountError,
+            isProcessingTransfer: transferFundsMutation.isPending,
+          }
+        });
+      },
+      onError: (error) => {
+        console.error('❌ [TransferScreen] Real-time notification error:', {
+          component: 'TransferScreen',
+          timestamp: new Date().toISOString(),
+          event: 'error',
+          error: error,
+          errorMessage: error?.message || 'Unknown error',
+          errorType: typeof error,
+          transferScreenState: {
+            currentAmount: amount,
+            hasAmountError: !!amountError,
+            isProcessingTransfer: transferFundsMutation.isPending,
+          }
+        });
+      }
+    }
+  );
+  
+  // Handle wallet balance based on access status
+  const getWalletBalance = () => {
+    if (!hasWalletAccess) {
+      return '₦0.00';
+    }
+    return balanceData?.formattedBalance || '₦0.00';
+  };
+  
+  const walletBalance = getWalletBalance();
+  
+  // Extract numeric value from balance for comparison
+  const walletBalanceNumeric = hasWalletAccess ? (balanceData?.balance || 0) : 0;
+
+  // Use only extracted/resolved data - no fallback values
+  const recipientName = extractedAccountHolderName || '';
+  const accountNumber = extractedAccountNumber || '';
+  const bankName = extractedBankName || '';
+
+  // Validate required transfer data
+  useEffect(() => {
+    if (!accountNumber || !bankName) {
+      console.error('❌ Missing required transfer data:', { accountNumber, bankName, recipientName });
+      Alert.alert(
+        'Missing Transfer Data',
+        'Required account information is missing. Please scan the payment details again.',
+        [
+          { text: 'OK', onPress: () => router.replace('/(tabs)') }
+        ]
+      );
+      return;
+    }
+  }, [accountNumber, bankName, recipientName]);
 
   useEffect(() => {
     // If we have an extracted amount, format it properly
@@ -67,14 +228,38 @@ export default function TransferScreen() {
     parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     const formattedValue = parts.join('.');
     
+    // Check if amount exceeds balance
+    const cleanAmount = numericValue.replace(/,/g, '');
+    const enteredAmount = parseFloat(cleanAmount) || 0;
+    
+    if (enteredAmount > walletBalanceNumeric) {
+      setAmountError('Amount cannot exceed wallet balance');
+    } else {
+      setAmountError(null);
+    }
+    
     setAmount(formattedValue);
     setSelectedPill(null);
   };
 
   const handlePillPress = (pillAmount: string) => {
+    // Don't allow pill selection during processing
+    if (transferFundsMutation.isPending) return;
+    
     setSelectedPill(pillAmount);
     // Remove N and keep commas for display
     const numericAmount = pillAmount.replace('N', '');
+    
+    // Check if pill amount exceeds balance
+    const cleanAmount = numericAmount.replace(/,/g, '');
+    const enteredAmount = parseFloat(cleanAmount) || 0;
+    
+    if (enteredAmount > walletBalanceNumeric) {
+      setAmountError('Amount cannot exceed wallet balance');
+    } else {
+      setAmountError(null);
+    }
+    
     setAmount(numericAmount);
   };
 
@@ -90,27 +275,115 @@ export default function TransferScreen() {
     });
   };
 
-  const handlePay = () => {
-    if (!amount || amount === '0') {
-      Alert.alert('Invalid Amount', 'Please enter an amount to transfer');
+  const handleTransferPress = () => {
+    // Check if user has wallet access first
+    if (!hasWalletAccess) {
+      Alert.alert(
+        'Wallet Access Required',
+        statusMessage,
+        [
+          { text: 'OK', style: 'default' }
+        ]
+      );
       return;
     }
-    
-    // Show PIN modal instead of direct confirmation
+
+    // Validate amount
+    if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+      setAmountError('Please enter a valid amount');
+      return;
+    }
+
+    const transferAmount = parseFloat(amount);
+
+    // Check if amount exceeds balance
+    if (transferAmount > walletBalanceNumeric) {
+      setAmountError('Insufficient balance');
+      return;
+    }
+
+    // Clear any previous errors
+    setAmountError(null);
+
+    // Show PIN modal
     setShowPinModal(true);
   };
 
-  const handlePinConfirm = (pin: string) => {
-    // Handle PIN verification here
-    console.log('PIN entered:', pin);
-    
-    // Close PIN modal
-    setShowPinModal(false);
-    
-    // Show success message
-    Alert.alert('Success!', 'Transfer completed successfully!', [
-      { text: 'OK', onPress: () => router.push('/') }
-    ]);
+  const handlePinConfirm = async (pin: string) => {
+    try {
+      // Calculate transfer amount
+      const cleanAmount = amount.replace(/,/g, '');
+      const transferAmount = parseFloat(cleanAmount) || 0;
+      
+      if (transferAmount <= 0) {
+        Alert.alert('Invalid Amount', 'Please enter a valid amount');
+        return;
+      }
+
+      if (transferAmount > walletBalanceNumeric) {
+        Alert.alert('Insufficient Balance', 'Amount cannot exceed your wallet balance');
+        return;
+      }
+
+      console.log('🚀 Initiating transfer with:', {
+        amount: transferAmount,
+        accountNumber,
+        bankName,
+        accountName: recipientName,
+        pin
+      });
+
+      // Execute transfer using React Query mutation
+      const transferResult = await transferFundsMutation.mutateAsync({
+        amount: transferAmount,
+        accountNumber,
+        bankName,
+        accountName: recipientName,
+        description: `Transfer to ${recipientName}`,
+        pin
+      });
+
+      console.log('✅ Transfer successful:', transferResult);
+
+             // Close PIN modal
+       setShowPinModal(false);
+       
+       // Navigate to success screen with transfer details
+       router.push({
+         pathname: '/transfer-success',
+         params: {
+           amount: transferAmount.toLocaleString(),
+           recipientName: transferResult.recipientName,
+           reference: transferResult.reference,
+           newBalance: transferResult.newBalance.toLocaleString(),
+         }
+       });
+      
+    } catch (error: any) {
+      console.error('❌ Transfer failed:', error);
+      
+      // Close PIN modal
+      setShowPinModal(false);
+      
+      // Show appropriate error message
+      let errorMessage = 'Transfer failed. Please try again.';
+      
+      if (error?.message) {
+        if (error.message.includes('PIN')) {
+          errorMessage = 'Invalid PIN. Please check and try again.';
+        } else if (error.message.includes('balance') || error.message.includes('insufficient')) {
+          errorMessage = 'Insufficient balance for this transfer.';
+        } else if (error.message.includes('account')) {
+          errorMessage = 'Invalid account details. Please verify and try again.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      Alert.alert('Transfer Failed', errorMessage, [
+        { text: 'OK' }
+      ]);
+    }
   };
 
   const handlePinModalClose = () => {
@@ -157,12 +430,49 @@ export default function TransferScreen() {
                   placeholderTextColor="rgba(245, 200, 66, 0.5)"
                   autoFocus={true}
                   selectionColor="#F5C842"
+                  editable={!transferFundsMutation.isPending}
                 />
               </View>
-              <Text style={styles.balanceText}>
-                Bal: {walletBalance}
-              </Text>
+              <View style={styles.balanceContainer}>
+                {isBalanceLoading ? (
+                  <Text style={styles.balanceText}>Loading...</Text>
+                ) : (
+                  <View style={styles.balanceAmountContainer}>
+                    {(() => {
+                      // Split balance into naira and kobo parts for smaller kobo text
+                      const balanceText = walletBalance;
+                      const decimalIndex = balanceText.indexOf('.');
+                      
+                      if (decimalIndex === -1) {
+                        // No decimal point, just show the full amount
+                        return <Text style={styles.balanceText}>{`Bal: ${balanceText}`}</Text>;
+                      }
+                      
+                      const nairapart = balanceText.substring(0, decimalIndex);
+                      const kobopart = balanceText.substring(decimalIndex);
+                      
+                      return (
+                        <>
+                          <Text style={styles.balanceText}>{`Bal: ${nairapart}`}</Text>
+                          <Text style={styles.balanceKoboText}>{kobopart}</Text>
+                        </>
+                      );
+                    })()}
+                  </View>
+                )}
+                {/* Real-time status indicator */}
+                {hasWalletAccess && (
+                  <View style={[styles.statusIndicator, { 
+                    backgroundColor: isNotificationConnected ? '#10B981' : 'rgba(255, 255, 255, 0.3)' 
+                  }]} />
+                )}
+              </View>
             </View>
+            
+            {/* Show error if amount exceeds balance */}
+            {amountError && (
+              <Text style={styles.errorText}>{amountError}</Text>
+            )}
             
             {/* Show pre-filled amount indicator */}
             {extractedAmount && extractedAmount !== '0' && (
@@ -189,9 +499,9 @@ export default function TransferScreen() {
         {/* Pay Button */}
         <View style={styles.payButtonContainer}>
           <Button
-            title="Pay"
-            onPress={handlePay}
-            disabled={!amount || amount === '0'}
+            title={transferFundsMutation.isPending ? "Processing..." : "Pay"}
+            onPress={handleTransferPress}
+            disabled={!amount || amount === '0' || !!amountError || transferFundsMutation.isPending || isBalanceLoading}
             variant="primary"
             size="lg"
             fullWidth
@@ -293,11 +603,36 @@ const styles = StyleSheet.create({
     margin: 0,
     minHeight: 40,
   },
+  balanceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 16,
+  },
+  balanceAmountContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
   balanceText: {
     fontSize: 16,
     fontFamily: fontFamilies.sora.medium,
     color: 'rgba(255, 255, 255, 0.6)',
-    marginLeft: 16,
+  },
+  balanceKoboText: {
+    fontSize: 12,
+    fontFamily: fontFamilies.sora.medium,
+    color: 'rgba(255, 255, 255, 0.6)',
+  },
+  statusIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginLeft: 8,
+  },
+  errorText: {
+    fontSize: 12,
+    fontFamily: fontFamilies.sora.regular,
+    color: '#FF6B6B',
+    marginTop: 8,
   },
   prefilledText: {
     fontSize: 12,

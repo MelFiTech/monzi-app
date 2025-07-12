@@ -38,51 +38,88 @@ class GeminiService {
 
   private createIntelligentPrompt(): string {
     return `
-You are an expert at analyzing Nigerian bank documents and financial instruments. 
-Analyze this image and extract the following information with high accuracy:
+You are an EXPERT Nigerian bank document analyzer with 99%+ accuracy rate. 
+Your specialty is extracting data from bank cards, statements, and financial documents with ABSOLUTE ZERO tolerance for errors.
 
-LOOK FOR THESE NIGERIAN BANKS BY THEIR VISUAL IDENTITY:
-- GTBank (Orange/White branding, GTB logo)
-- Access Bank (Orange/Blue branding, Diamond logo)
-- Zenith Bank (Red branding, Zenith logo)
-- UBA (Red/Black branding, UBA logo)
-- First Bank (Blue/White branding, Elephant logo)
-- Fidelity Bank (Green branding)
-- Stanbic IBTC (Blue/White branding)
-- Sterling Bank (Green/Orange branding)
-- Union Bank (Blue branding)
-- Wema Bank (Purple branding)
-- FCMB (Yellow/Blue branding)
-- Ecobank (Blue/Green branding)
-- Polaris Bank (Blue branding)
-- Keystone Bank (Red branding)
-- Unity Bank (Green branding)
-- Jaiz Bank (Green/Gold Islamic branding)
-- PalmPay (Green/White fintech branding)
-- Opay (Blue fintech branding)
-- Kuda (Purple fintech branding)
+CRITICAL MISSION: Extract bank information with surgical precision. If you're not 100% certain, return empty string.
 
-EXTRACT THESE FIELDS:
-1. BANK NAME: Look for logos, colors, watermarks, and text
-2. ACCOUNT NUMBER: Nigerian banks use 10-digit NUBAN format
-3. ACCOUNT HOLDER NAME: Full name of account owner
-4. AMOUNT: Any monetary value in Naira (₦) or Dollar ($) format
+🏦 NIGERIAN BANK VISUAL SIGNATURES (Study these meticulously):
 
-DOCUMENT TYPES TO EXPECT:
-- ATM/Debit cards
-- Bank statements
-- Transfer receipts
-- Cheques
-- Account opening forms
-- Mobile banking screenshots
+TIER 1 BANKS:
+- GTBank/Guaranty Trust Bank: ORANGE/WHITE theme, "GTB" logo, Diamond-shaped logo, Unique font style
+- Access Bank: ORANGE/BLUE gradient, Diamond symbol, "ACCESS" text, Modern design
+- Zenith Bank: RED dominant color, "ZENITH" in white text, Red/White cards, Premium finish
+- UBA (United Bank for Africa): RED/BLACK theme, "UBA" logo, Pan-African branding, Lion symbol
+- First Bank: ROYAL BLUE/WHITE, Elephant logo/symbol, "FIRSTBANK" text, Heritage design
+- Fidelity Bank: GREEN primary color, "FIDELITY" text, Professional layout
+- Stanbic IBTC: BLUE/WHITE, "STANBIC IBTC" branding, Corporate style
+- Sterling Bank: GREEN/ORANGE combination, "STERLING" text, Modern aesthetic
 
-Return ONLY valid JSON in this exact format:
+TIER 2 BANKS:
+- Union Bank: NAVY BLUE, "UNION BANK" text, Traditional design
+- Wema Bank: PURPLE/VIOLET branding, "WEMA" text, Digital-forward look
+- FCMB: YELLOW/BLUE combo, "FCMB" acronym, Corporate style
+- Ecobank: BLUE/GREEN, "ECOBANK" pan-African branding, Global look
+- Polaris Bank: BLUE theme, "POLARIS" text, Contemporary design
+- Keystone Bank: RED branding, "KEYSTONE" text, Bold typography
+- Unity Bank: GREEN, "UNITY BANK" text, Clean layout
+- Jaiz Bank: GREEN/GOLD, Islamic banking, "JAIZ" text, Unique identity
+- Providus Bank: BLUE/GOLD, "PROVIDUS" text, Premium banking style
+
+FINTECH/DIGITAL BANKS:
+- PalmPay: BRIGHT GREEN/WHITE, "PalmPay" text, Modern fintech styling
+- Opay: BLUE/CYAN, "Opay" modern font, Digital wallet aesthetic
+- Kuda: PURPLE/WHITE, "KUDA" minimalist design, Digital-first
+- VFD Microfinance: BLUE, "VFD" text, Professional fintech look
+- Moniepoint: GREEN, "Moniepoint" text, Modern banking design
+
+🔍 ENHANCED EXTRACTION RULES:
+
+1. ACCOUNT NUMBERS: 
+   - Nigerian NUBAN: STRICTLY 10 digits
+   - Pattern recognition: Look for consistent spacing, font style
+   - Context validation: Position on document/card
+   - STRICT REJECTION: Any number not exactly 10 digits
+   - Double verification against bank-specific patterns
+
+2. BANK NAMES:
+   - Multi-point verification:
+     * Visual branding match
+     * Color scheme confirmation
+     * Logo identification
+     * Text pattern recognition
+   - Advanced fuzzy matching with confidence threshold
+   - Cross-reference with official bank registry
+
+3. ACCOUNT HOLDER NAMES:
+   - Full name extraction (First + Last minimum)
+   - Advanced name cleaning:
+     * Remove all titles (MR/MRS/DR/PROF)
+     * Correct capitalization
+     * Remove special characters
+     * Validate against Nigerian name patterns
+
+4. AMOUNTS:
+   - Precision extraction:
+     * Remove all currency symbols
+     * Standardize number format
+     * Validate decimal places
+     * Context-aware amount recognition
+
+🎯 ENHANCED CONFIDENCE SCORING:
+- 95-100: Crystal clear data, multiple confirmation points
+- 90-94: Very clear data, single minor uncertainty
+- 85-89: Clear data with minimal ambiguity
+- Below 85: Return something close to the correct data, but not empty strings
+-Be accurate
+
+Return ONLY this JSON (no explanation):
 {
-  "bankName": "extracted bank name or empty string",
-  "accountNumber": "10-digit number or empty string", 
-  "accountHolderName": "full name or empty string",
-  "amount": "amount without currency symbol or empty string",
-  "confidence": number between 0-100,
+  "bankName": "exact bank name from approved list or empty string",
+  "accountNumber": "exactly 10 digits or empty string", 
+  "accountHolderName": "full clean name or empty string",
+  "amount": "numerical value only or empty string",
+  "confidence": number_between_0_and_100,
   "extractedFields": {
     "bankName": boolean,
     "accountNumber": boolean, 
@@ -91,22 +128,16 @@ Return ONLY valid JSON in this exact format:
   }
 }
 
-IMPORTANT: 
-- Return empty string for fields you cannot confidently extract
-- Set extractedFields boolean to true only if you found that field
-- Confidence should reflect overall extraction accuracy
-- For amounts, extract only the numerical value (remove ₦, $, commas)
+CRITICAL: Accuracy is ABSOLUTE PRIORITY. Return empty string if 90% confidence cannot be achieved.
 `;
   }
 
   async extractBankData(imageUri: string): Promise<ExtractedBankData> {
     try {
-      console.log('🔍 Starting bank data extraction...');
+      console.log('🔍 Starting enhanced bank data extraction...');
       
-      // Convert image to base64
       const base64Image = await this.convertImageToBase64(imageUri);
       
-      // Prepare request payload for Gemini 1.5 Flash
       const requestBody = {
         contents: [
           {
@@ -122,16 +153,15 @@ IMPORTANT:
           }
         ],
         generationConfig: {
-          temperature: 0.1,
-          topK: 32,
-          topP: 1,
+          temperature: 0.05, // Reduced for higher precision
+          topK: 16, // Reduced for more focused results
+          topP: 0.9, // Adjusted for better accuracy
           maxOutputTokens: 1024,
         }
       };
 
-      console.log('📡 Making request to Gemini API...');
+      console.log('📡 Making enhanced request to Gemini API...');
 
-      // Make API request to Gemini
       const response = await fetch(GEMINI_API_URL, {
         method: 'POST',
         headers: {
@@ -151,7 +181,6 @@ IMPORTANT:
       const data = await response.json();
       console.log('📦 Full API response:', JSON.stringify(data, null, 2));
       
-      // Extract response text
       const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!responseText) {
         console.error('❌ No response text found in:', data);
@@ -160,7 +189,6 @@ IMPORTANT:
 
       console.log('🤖 Gemini response text:', responseText);
 
-      // Parse JSON response
       const cleanedResponse = responseText.replace(/```json\n?|\n?```/g, '').trim();
       let extractedData: ExtractedBankData;
       
@@ -172,7 +200,6 @@ IMPORTANT:
         throw new Error('Failed to parse Gemini response');
       }
 
-      // Validate and sanitize extracted data
       const validatedData = this.validateExtractedData(extractedData);
       console.log('✅ Validated data:', validatedData);
       
@@ -181,7 +208,6 @@ IMPORTANT:
     } catch (error) {
       console.error('❌ Error extracting bank data:', error);
       
-      // Return empty result on error
       return {
         bankName: '',
         accountNumber: '',
@@ -198,30 +224,100 @@ IMPORTANT:
     }
   }
 
+  private correctBankName(bankName: string): string {
+    if (!bankName) return '';
+    
+    const normalizedName = bankName.toLowerCase().trim();
+    
+    const bankCorrections: { [key: string]: string } = {
+      'gtb': 'GTBank',
+      'gtbank': 'GTBank',
+      'guaranty trust': 'GTBank',
+      'guaranty trust bank': 'GTBank',
+      'access': 'Access Bank',
+      'access bank': 'Access Bank',
+      'zenith': 'Zenith Bank',
+      'zenith bank': 'Zenith Bank',
+      'uba': 'United Bank for Africa',
+      'united bank': 'United Bank for Africa',
+      'united bank for africa': 'United Bank for Africa',
+      'first bank': 'First Bank',
+      'firstbank': 'First Bank',
+      'fidelity': 'Fidelity Bank',
+      'fidelity bank': 'Fidelity Bank',
+      'stanbic': 'Stanbic IBTC Bank',
+      'stanbic ibtc': 'Stanbic IBTC Bank',
+      'stanbic ibtc bank': 'Stanbic IBTC Bank',
+      'sterling': 'Sterling Bank',
+      'sterling bank': 'Sterling Bank',
+      'union bank': 'Union Bank',
+      'wema': 'Wema Bank',
+      'wema bank': 'Wema Bank',
+      'fcmb': 'FCMB',
+      'first city monument bank': 'FCMB',
+      'ecobank': 'Ecobank',
+      'polaris': 'Polaris Bank',
+      'polaris bank': 'Polaris Bank',
+      'keystone': 'Keystone Bank',
+      'keystone bank': 'Keystone Bank',
+      'unity': 'Unity Bank',
+      'unity bank': 'Unity Bank',
+      'jaiz': 'Jaiz Bank',
+      'jaiz bank': 'Jaiz Bank',
+      'palmpay': 'PalmPay',
+      'palm pay': 'PalmPay',
+      'opay': 'Opay',
+      'kuda': 'Kuda',
+      'vfd': 'VFD Microfinance Bank',
+      'vfd microfinance': 'VFD Microfinance Bank',
+      'moniepoint': 'Moniepoint',
+      'providus': 'Providus Bank',
+      'providus bank': 'Providus Bank',
+    };
+
+    if (bankCorrections[normalizedName]) {
+      return bankCorrections[normalizedName];
+    }
+
+    for (const [key, value] of Object.entries(bankCorrections)) {
+      if (normalizedName.includes(key) || key.includes(normalizedName)) {
+        return value;
+      }
+    }
+
+    const bankKeywords = ['bank', 'microfinance', 'pay', 'finance'];
+    if (bankKeywords.some(keyword => normalizedName.includes(keyword))) {
+      return bankName;
+    }
+
+    return '';
+  }
+
   private validateExtractedData(data: any): ExtractedBankData {
-    // Validate account number (must be 10 digits for Nigerian banks)
     const accountNumber = data.accountNumber?.replace(/\D/g, '') || '';
     const isValidAccountNumber = accountNumber.length === 10;
 
-    // Clean amount (remove non-numeric except decimal point)
     const amount = data.amount?.replace(/[^\d.]/g, '') || '';
 
+    const correctedBankName = this.correctBankName(data.bankName);
+
+    const accountHolderName = data.accountHolderName?.replace(/^(MR|MRS|DR|PROF|MS)\.?\s+/i, '').trim() || '';
+
     return {
-      bankName: data.bankName || '',
+      bankName: correctedBankName,
       accountNumber: isValidAccountNumber ? accountNumber : '',
-      accountHolderName: data.accountHolderName || '',
+      accountHolderName: accountHolderName,
       amount: amount,
       confidence: Math.min(Math.max(data.confidence || 0, 0), 100),
       extractedFields: {
-        bankName: Boolean(data.bankName && data.bankName.trim()),
+        bankName: Boolean(correctedBankName),
         accountNumber: isValidAccountNumber,
-        accountHolderName: Boolean(data.accountHolderName && data.accountHolderName.trim()),
+        accountHolderName: Boolean(accountHolderName),
         amount: Boolean(amount),
       }
     };
   }
 
-  // Helper method to format extracted data for display
   formatExtractedAmount(amount: string): string {
     if (!amount) return '';
     const num = parseFloat(amount);
@@ -229,12 +325,11 @@ IMPORTANT:
     return num.toLocaleString();
   }
 
-  // Check if extraction has minimum required data
   isExtractionValid(data: ExtractedBankData): boolean {
     return data.extractedFields.bankName && 
            data.extractedFields.accountNumber && 
-           data.confidence > 70;
+           data.confidence >= 90; // Increased threshold for higher accuracy
   }
 }
 
-export default new GeminiService(); 
+export default new GeminiService();

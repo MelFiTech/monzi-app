@@ -52,7 +52,7 @@ export function AuthHeader({
             style={{
               width: iconSize,
               height: iconSize,
-              tintColor: colors.white
+              tintColor: '#FFFFFF'
             }}
           />
         )}

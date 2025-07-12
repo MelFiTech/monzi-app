@@ -1,4 +1,5 @@
 import { Config } from '../constants/config';
+import SMEPlugBanksService from './SMEPlugBanksService';
 
 interface AccountResolutionRequest {
   account_number: string;
@@ -46,6 +47,7 @@ class AccountService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
         },
         body: JSON.stringify(requestBody),
       });
@@ -82,36 +84,67 @@ class AccountService {
     }
   }
 
+
+
   /**
-   * Get list of supported banks (for future use)
+   * Get list of supported banks with fallback strategy
+   * Primary: SME Plug API (more reliable)
+   * Fallback: Current backend
    */
   static async getBanks(): Promise<any[]> {
+    console.log('🎯 Starting intelligent banks fetch with fallback strategy...');
+    
+    // Try SME Plug first (primary source)
     try {
-      console.log('🏦 Fetching banks list...');
-
-      const response = await fetch(`${this.BASE_URL}${this.BANKS_ENDPOINT}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('📦 Banks list response:', data);
-
-      return data;
-    } catch (error) {
-      console.error('❌ Banks list error:', error);
+      console.log('1️⃣ Trying SME Plug API (primary)...');
+      const banks = await SMEPlugBanksService.getBanks();
+      console.log('✅ SME Plug banks fetch successful');
+      return banks;
+    } catch (smePlugError) {
+      console.log('⚠️ SME Plug failed, trying backend fallback...');
+      console.error('SME Plug error:', smePlugError);
       
-      if (error instanceof Error) {
-        throw new Error(`Failed to fetch banks: ${error.message}`);
+      // Try backend as fallback
+      try {
+        console.log('2️⃣ Trying backend API (fallback)...');
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+          console.log('⏰ Backend banks request timed out after 15 seconds');
+        }, 15000);
+
+        const response = await fetch(`${this.BASE_URL}${this.BANKS_ENDPOINT}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true',
+            'User-Agent': 'MonziApp/1.0.0',
+          },
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (data.status && Array.isArray(data.banks)) {
+          console.log(`✅ Backend: Found ${data.banks.length} banks`);
+          return data.banks;
+        } else {
+          throw new Error('Invalid response format: missing banks array');
+        }
+      } catch (backendError) {
+        console.error('❌ Both SME Plug and backend failed');
+        console.error('Backend error:', backendError);
+        
+        // Both failed, throw comprehensive error
+        throw new Error(`Failed to fetch banks from both sources. SME Plug: ${smePlugError instanceof Error ? smePlugError.message : 'Unknown error'}. Backend: ${backendError instanceof Error ? backendError.message : 'Unknown error'}`);
       }
-      
-      throw new Error('Failed to fetch banks: Unknown error');
     }
   }
 
@@ -128,6 +161,86 @@ class AccountService {
     } catch (error) {
       console.log('⚠️ Account service unavailable:', error);
       return false;
+    }
+  }
+
+  /**
+   * Comprehensive network connectivity test
+   */
+  static async testNetworkConnectivity(): Promise<{
+    isReachable: boolean;
+    latency: number;
+    error?: string;
+    details: {
+      baseUrl: string;
+      endpoint: string;
+      userAgent: string;
+      timestamp: string;
+    };
+  }> {
+    const startTime = Date.now();
+    const testEndpoint = `${this.BASE_URL}/health`;
+    
+    console.log('🔍 Testing network connectivity...');
+    console.log('📍 Testing endpoint:', testEndpoint);
+    
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const response = await fetch(testEndpoint, {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'MonziApp/1.0.0',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      const endTime = Date.now();
+      const latency = endTime - startTime;
+      
+      console.log(`✅ Network test successful - Status: ${response.status}, Latency: ${latency}ms`);
+      
+      return {
+        isReachable: response.ok,
+        latency,
+        details: {
+          baseUrl: this.BASE_URL,
+          endpoint: testEndpoint,
+          userAgent: 'MonziApp/1.0.0',
+          timestamp: new Date().toISOString(),
+        },
+      };
+    } catch (error) {
+      const endTime = Date.now();
+      const latency = endTime - startTime;
+      
+      let errorMessage = 'Unknown error';
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          errorMessage = 'Request timed out';
+        } else if (error.message.includes('Network request failed')) {
+          errorMessage = 'Network connectivity issue';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      console.log(`❌ Network test failed - Error: ${errorMessage}, Latency: ${latency}ms`);
+      
+      return {
+        isReachable: false,
+        latency,
+        error: errorMessage,
+        details: {
+          baseUrl: this.BASE_URL,
+          endpoint: testEndpoint,
+          userAgent: 'MonziApp/1.0.0',
+          timestamp: new Date().toISOString(),
+        },
+      };
     }
   }
 

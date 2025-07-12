@@ -21,55 +21,66 @@ export default function AuthLayout() {
           fontWeight: '600',
         },
         headerShadowVisible: false,
+        // Disable swipe back gestures in auth flow
+        gestureEnabled: false,
+        // Hide back button in header
+        headerBackVisible: false,
       }}
     >
       <Stack.Screen 
         name="splash" 
         options={{ 
           title: 'Splash',
-          headerShown: false
+          headerShown: false,
+          gestureEnabled: false,
         }} 
       />
       <Stack.Screen 
         name="onboarding" 
         options={{ 
           title: 'Onboarding',
-          headerShown: false
+          headerShown: false,
+          gestureEnabled: false,
         }} 
       />
       <Stack.Screen 
         name="chat" 
         options={{ 
           title: 'Account Setup',
-          headerShown: false
+          headerShown: false,
+          gestureEnabled: false,
         }} 
       />
       <Stack.Screen 
         name="register" 
         options={{ 
           title: 'Register',
-          headerShown: false
+          headerShown: false,
+          gestureEnabled: false,
         }} 
       />
       <Stack.Screen 
         name="login" 
         options={{ 
           title: 'Login',
-          headerShown: false
+          headerShown: false,
+          gestureEnabled: false,
         }} 
       />
       <Stack.Screen 
         name="verify-otp" 
         options={{ 
           title: 'Verify OTP',
-          headerShown: false
+          headerShown: false,
+          gestureEnabled: false,
         }} 
       />
       <Stack.Screen 
         name="forgot-password" 
         options={{ 
           title: 'Reset Password',
-          presentation: 'modal'
+          presentation: 'modal',
+          gestureEnabled: false,
         }} 
       />
     </Stack>

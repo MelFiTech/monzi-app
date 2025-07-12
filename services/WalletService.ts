@@ -1,5 +1,5 @@
 import { Config } from '../constants/config';
-import { AuthStorageService } from './AuthStorageService';
+import AuthStorageService from './AuthStorageService';
 
 // Wallet interfaces
 export interface WalletDetails {
@@ -8,6 +8,8 @@ export interface WalletDetails {
   currency: string;
   virtualAccountNumber: string;
   providerAccountName: string;
+  providerName: string;
+  bankName: string;
   isActive: boolean;
   dailyLimit: number;
   monthlyLimit: number;
@@ -52,6 +54,42 @@ export interface SetPinResponse {
   message: string;
 }
 
+export interface PinStatusResponse {
+  hasPinSet: boolean;
+  message: string;
+  walletExists: boolean;
+}
+
+export interface TransferRequest {
+  amount: number;
+  accountNumber: string;
+  bankName: string;
+  accountName: string;
+  description?: string;
+  pin: string;
+}
+
+export interface TransferResponse {
+  success: boolean;
+  message: string;
+  reference: string;
+  amount: number;
+  fee: number;
+  newBalance: number;
+  recipientName: string;
+  recipientAccount: string;
+  recipientBank: string;
+}
+
+export interface WalletRecoveryResponse {
+  success: boolean;
+  message: string;
+  accountNumber: string;
+  accountName: string;
+  bankName: string;
+  provider: string;
+}
+
 export interface WalletError {
   error: string;
   message: string;
@@ -90,6 +128,7 @@ class WalletService {
     return {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
     };
   }
 
@@ -124,14 +163,28 @@ class WalletService {
     try {
       const headers = await this.getAuthHeaders();
       
+      console.log('🏦 Fetching wallet details...');
+      
       const response = await fetch(`${this.baseUrl}/wallet/details`, {
         method: 'GET',
         headers,
       });
 
-      return await this.handleResponse<WalletDetails>(response);
+      const result = await this.handleResponse<WalletDetails>(response);
+      
+      console.log('✅ Wallet details response:', {
+        id: result.id,
+        accountNumber: result.virtualAccountNumber,
+        bankName: result.bankName,
+        providerName: result.providerName,
+        isActive: result.isActive,
+        balance: result.balance,
+        currency: result.currency
+      });
+      
+      return result;
     } catch (error) {
-      console.error('Get wallet details error:', error);
+      console.error('❌ Get wallet details error:', error);
       throw error;
     }
   }
@@ -143,14 +196,24 @@ class WalletService {
     try {
       const headers = await this.getAuthHeaders();
       
+      console.log('💰 Fetching wallet balance...');
+      
       const response = await fetch(`${this.baseUrl}/wallet/balance`, {
         method: 'GET',
         headers,
       });
 
-      return await this.handleResponse<WalletBalance>(response);
+      const result = await this.handleResponse<WalletBalance>(response);
+      
+      console.log('✅ Wallet balance response:', {
+        balance: result.balance,
+        currency: result.currency,
+        formattedBalance: result.formattedBalance
+      });
+      
+      return result;
     } catch (error) {
-      console.error('Get wallet balance error:', error);
+      console.error('❌ Get wallet balance error:', error);
       throw error;
     }
   }
@@ -197,15 +260,127 @@ class WalletService {
         throw new Error('PIN must be 4-6 digits');
       }
 
-      const response = await fetch(`${this.baseUrl}/wallet/pin`, {
+      console.log('🔑 Setting wallet PIN...');
+
+      const response = await fetch(`${this.baseUrl}/wallet/set-pin`, {
         method: 'POST',
         headers,
         body: JSON.stringify(data),
       });
 
-      return await this.handleResponse<SetPinResponse>(response);
+      const result = await this.handleResponse<SetPinResponse>(response);
+      
+      console.log('✅ PIN set successfully:', {
+        success: result.success,
+        message: result.message
+      });
+
+      return result;
     } catch (error) {
-      console.error('Set wallet PIN error:', error);
+      console.error('❌ Set wallet PIN error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Execute bank transfer
+   */
+  async transferFunds(data: TransferRequest): Promise<TransferResponse> {
+    try {
+      const headers = await this.getAuthHeaders();
+      
+      // Validate transfer data
+      if (!data.amount || data.amount <= 0) {
+        throw new Error('Amount must be greater than 0');
+      }
+      
+      if (!data.accountNumber || !data.bankName || !data.accountName) {
+        throw new Error('Recipient details are required');
+      }
+      
+      if (!data.pin || !/^\d{4,6}$/.test(data.pin)) {
+        throw new Error('Valid PIN is required');
+      }
+
+      console.log('🚀 Initiating transfer:', {
+        amount: data.amount,
+        recipient: data.accountName,
+        bank: data.bankName
+      });
+
+      const response = await fetch(`${this.baseUrl}/wallet/transfer`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data),
+      });
+
+      const result = await this.handleResponse<TransferResponse>(response);
+      
+      console.log('✅ Transfer completed:', {
+        reference: result.reference,
+        newBalance: result.newBalance
+      });
+
+      return result;
+    } catch (error) {
+      console.error('Transfer error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Trigger wallet recovery/activation
+   */
+  async retryWalletActivation(): Promise<WalletRecoveryResponse> {
+    try {
+      const headers = await this.getAuthHeaders();
+      
+      console.log('🔄 Triggering wallet recovery...');
+
+      const response = await fetch(`${this.baseUrl}/wallet/retry-activation`, {
+        method: 'POST',
+        headers,
+      });
+
+      const result = await this.handleResponse<WalletRecoveryResponse>(response);
+      
+      console.log('✅ Wallet recovery successful:', {
+        accountNumber: result.accountNumber,
+        provider: result.provider
+      });
+
+      return result;
+    } catch (error) {
+      console.error('❌ Wallet recovery error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check PIN status
+   */
+  async checkPinStatus(): Promise<PinStatusResponse> {
+    try {
+      const headers = await this.getAuthHeaders();
+      
+      console.log('🔑 Checking PIN status...');
+
+      const response = await fetch(`${this.baseUrl}/wallet/pin/status`, {
+        method: 'GET',
+        headers,
+      });
+
+      const result = await this.handleResponse<PinStatusResponse>(response);
+      
+      console.log('✅ PIN status response:', {
+        hasPinSet: result.hasPinSet,
+        message: result.message,
+        walletExists: result.walletExists
+      });
+
+      return result;
+    } catch (error) {
+      console.error('❌ PIN status error:', error);
       throw error;
     }
   }

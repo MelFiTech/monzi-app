@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "monzi",
+    "name": "Monzi",
     "slug": "monzi",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,9 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#FFE66C"
+      "backgroundColor": "#FFE66C",
+      "resizeMode": "contain"
     },
     "ios": {
       "supportsTablet": true,
@@ -29,7 +28,12 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.dreemlab.monzi"
+      "package": "com.dreemlab.monzi",
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "WAKE_LOCK"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -38,8 +42,23 @@
     },
     "plugins": [
       "expo-router",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      "expo-notifications",
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "Monzi uses the camera to capture selfies for KYC verification and to scan payment account numbers for quick and accurate money transfers.",
+          "enableFrameProcessors": true,
+          "enableCodeScanner": true
+        }
+      ]
     ],
+    "notification": {
+      "icon": "./assets/images/icon.png",
+      "color": "#FFD700",
+      "androidMode": "default",
+      "androidCollapsedTitle": "Monzi"
+    },
     "experiments": {
       "typedRoutes": true
     },

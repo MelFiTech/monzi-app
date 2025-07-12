@@ -1,7 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { verifyBVN, uploadSelfie, getKYCStatus, getNextStepFromStatus, getScreenForStatus } from '@/services/KYCService';
+import type { KYCStatusResponse } from '@/services/KYCService';
+import ToastService from '@/services/ToastService';
+import { useAuth } from '@/providers/AuthProvider';
 
 // Query Keys
 export const KYC_QUERY_KEYS = {
@@ -10,16 +14,66 @@ export const KYC_QUERY_KEYS = {
   selfieUpload: ['kyc', 'selfie'] as const,
 } as const;
 
-// Hook for checking KYC status
+// Hook for checking KYC status with proper caching
 export const useKYCStatus = () => {
+  const { isAuthenticated } = useAuth();
+  
   return useQuery({
     queryKey: KYC_QUERY_KEYS.status,
-    queryFn: getKYCStatus,
-    staleTime: 30000, // 30 seconds
-    refetchInterval: 30000, // Refetch every 30 seconds for status updates
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    queryFn: async () => {
+      console.log('🔍 Fetching KYC status...');
+      const status = await getKYCStatus();
+      console.log('📊 Current KYC Status:', {
+        kycStatus: status.kycStatus,
+        bvnVerified: status.bvnVerified,
+        selfieVerified: status.selfieVerified,
+        isVerified: status.isVerified,
+        nextStep: status.nextStep,
+        message: status.message
+      });
+      return status;
+    },
+    // Only enable when user is authenticated
+    enabled: isAuthenticated,
+    
+    // Cache for 15 minutes - KYC status rarely changes unless user performs actions
+    staleTime: 15 * 60 * 1000, // 15 minutes
+    gcTime: 30 * 60 * 1000, // Keep in cache for 30 minutes
+    
+    // Disable automatic refetching - only fetch when explicitly needed
+    refetchOnWindowFocus: false,
+    refetchOnMount: true, // Still refetch on mount for fresh data on app start
+    refetchOnReconnect: true, // Refetch when network reconnects
+    refetchInterval: false, // Disable automatic polling - rely on cache invalidation
+    refetchIntervalInBackground: false,
+    
+    // Retry configuration
+    retry: 2, // Reduced retries
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
+    
+    // Network mode - only when online
+    networkMode: 'online',
   });
+};
+
+// Hook to manually refresh KYC status when needed
+export const useRefreshKYCStatus = () => {
+  const queryClient = useQueryClient();
+
+  const refreshKYCStatus = async () => {
+    console.log('🔄 Manually refreshing KYC status...');
+    await queryClient.invalidateQueries({ queryKey: KYC_QUERY_KEYS.status });
+  };
+
+  const setKYCStatusCache = (data: KYCStatusResponse) => {
+    console.log('💾 Setting KYC status cache with:', data.kycStatus);
+    queryClient.setQueryData(KYC_QUERY_KEYS.status, data);
+  };
+
+  return {
+    refreshKYCStatus,
+    setKYCStatusCache,
+  };
 };
 
 // Hook for BVN verification
@@ -29,30 +83,86 @@ export const useVerifyBVN = () => {
   return useMutation({
     mutationFn: verifyBVN,
     onSuccess: (data) => {
-      // Invalidate and refetch KYC status
-      queryClient.invalidateQueries({ queryKey: KYC_QUERY_KEYS.status });
+      console.log('🎉 BVN Verification Success:', data);
+      
+      // Smart cache update instead of invalidation
+      if (data.success && data.kycStatus) {
+        console.log('💾 Updating KYC cache with BVN verification result');
+        queryClient.setQueryData(KYC_QUERY_KEYS.status, (oldData: KYCStatusResponse | undefined) => {
+          if (oldData) {
+            return {
+              ...oldData,
+              bvnVerified: true,
+              kycStatus: data.kycStatus,
+              message: data.message || oldData.message,
+            };
+          }
+          return oldData;
+        });
+      } else {
+        // Only invalidate if we don't have success data to update cache
+        queryClient.invalidateQueries({ queryKey: KYC_QUERY_KEYS.status });
+      }
       
       if (data.success) {
-        // Show success message
-        Alert.alert('Success', data.message);
+        // Show success toast
+        ToastService.success('BVN verified');
         
-        // Navigate based on status
+        console.log('🔄 BVN Verification routing based on status:', data.kycStatus);
+        
+        // Navigate based on status - follow the intended flow
         if (data.kycStatus === 'IN_PROGRESS') {
-          router.push('/(kyc)/bvn-loader');
-        } else if (data.kycStatus === 'VERIFIED') {
-          router.push('/(kyc)/bridge');
+          // BVN verified, still need selfie - go to loader then success then bridge
+          console.log('➡️ Navigating to BVN loader (IN_PROGRESS)');
+          router.push('/(kyc)/bvn-loader' as never);
+        } else if (data.kycStatus === 'UNDER_REVIEW') {
+          // BVN verified and under review - go directly to bridge for biometric flow
+          console.log('➡️ Navigating to bridge (UNDER_REVIEW) - BVN successful, ready for biometrics');
+          router.push('/(kyc)/bridge' as never);
+        } else if (data.kycStatus === 'VERIFIED' || data.kycStatus === 'APPROVED') {
+          // Fully verified/approved (shouldn't happen after just BVN) - go to bridge
+          console.log('➡️ Navigating to bridge (VERIFIED/APPROVED)');
+          router.push('/(kyc)/bridge' as never);
+        } else {
+          // Fallback to loader for any other successful response
+          console.log('➡️ Navigating to BVN loader (fallback)');
+          router.push('/(kyc)/bvn-loader' as never);
         }
       } else {
-        // Show error message
-        Alert.alert('Verification Failed', data.message);
+        // Handle different failure scenarios
+        console.error('❌ BVN Verification failed:', data.message, 'Error:', data.error);
+        
+        // Check if BVN is already verified - route to bridge for biometrics
+        if (data.message && data.message.toLowerCase().includes('bvn already verified')) {
+          console.log('✅ BVN already verified, routing to bridge for biometrics');
+          ToastService.success('BVN verified');
+          router.push('/(kyc)/bridge' as never);
+        }
+        // Check if BVN already exists for another user or needs contact support
+        else if (data.error === 'BVN_ALREADY_EXISTS' || 
+                (data.message && data.message.toLowerCase().includes('contact support'))) {
+          console.log('🚨 BVN requires contact support, setting flag and routing to bridge');
+          // Set flag for bridge screen to show contact support
+          AsyncStorage.setItem('kyc_requires_support', 'true');
+          ToastService.error('Contact support');
+          router.push('/(kyc)/bridge' as never);
+        }
+        // Other generic failures
+        else {
+          console.log('❌ General BVN failure, showing error toast');
+          ToastService.error('BVN failed');
+        }
       }
     },
     onError: (error: Error) => {
-      console.error('BVN Verification Error:', error);
-      Alert.alert(
-        'Error', 
-        error.message || 'BVN verification failed. Please try again.'
-      );
+      console.error('🚨 BVN Verification Error:', error);
+      
+      // Check if it's a network error
+      if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
+        ToastService.error('Connection failed');
+      } else {
+        ToastService.error('BVN failed');
+      }
     },
   });
 };
@@ -64,32 +174,66 @@ export const useUploadSelfie = () => {
   return useMutation({
     mutationFn: uploadSelfie,
     onSuccess: (data) => {
-      // Invalidate and refetch KYC status
-      queryClient.invalidateQueries({ queryKey: KYC_QUERY_KEYS.status });
+      console.log('🎉 Selfie Upload Success:', data);
+      
+      // Smart cache update instead of invalidation
+      if (data.success && data.kycStatus) {
+        console.log('💾 Updating KYC cache with selfie upload result');
+        queryClient.setQueryData(KYC_QUERY_KEYS.status, (oldData: KYCStatusResponse | undefined) => {
+          if (oldData) {
+            return {
+              ...oldData,
+              selfieVerified: true,
+              kycStatus: data.kycStatus,
+              message: data.message || oldData.message,
+              isVerified: data.kycStatus === 'VERIFIED' || data.kycStatus === 'APPROVED',
+            };
+          }
+          return oldData;
+        });
+      } else {
+        // Only invalidate if we don't have success data to update cache
+        queryClient.invalidateQueries({ queryKey: KYC_QUERY_KEYS.status });
+      }
       
       if (data.success) {
-        // Show success message
-        Alert.alert('Success', data.message);
+        // Show success toast
+        ToastService.success('Verification complete');
         
-        // Navigate based on status
-        if (data.kycStatus === 'VERIFIED' && data.walletCreated) {
-          // KYC completed, wallet created - go to success screen or main app
-          router.replace('/(kyc)/bridge'); // Bridge will show completion
-        } else if (data.kycStatus === 'UNDER_REVIEW') {
-          // Under admin review
-          router.replace('/(kyc)/bridge');
-        }
+        console.log('🔄 Selfie Upload routing based on status:', data.kycStatus);
+        
+        // Navigate based on status - all successful uploads go to bridge
+        console.log('➡️ Navigating to bridge after successful selfie upload');
+        router.push('/(kyc)/bridge' as never);
       } else {
-        // Show error message (user-friendly)
-        Alert.alert('Upload Failed', data.message);
+        console.error('❌ Selfie Upload failed:', data.message, 'Error:', data.error);
+        
+        // Check if it requires contact support
+        if (data.error === 'AI_VERIFICATION_FAILED' || 
+            (data.message && data.message.toLowerCase().includes('contact support'))) {
+          console.log('🚨 Selfie upload requires contact support, setting flag and routing to bridge');
+          // Set flag for bridge screen to show contact support
+          AsyncStorage.setItem('kyc_requires_support', 'true');
+          ToastService.error('Contact support');
+        } else {
+          ToastService.error('Upload failed');
+        }
+        
+        // Always navigate to bridge regardless of error type
+        // Bridge will show appropriate button based on KYC status or support flag
+        console.log('➡️ Navigating to bridge after selfie upload failure');
+        router.push('/(kyc)/bridge' as never);
       }
     },
     onError: (error: Error) => {
-      console.error('Selfie Upload Error:', error);
-      Alert.alert(
-        'Upload Error', 
-        error.message || 'Selfie upload failed. Please try again.'
-      );
+      console.error('🚨 Selfie Upload Error:', error);
+      
+      // Check if it's a network error
+      if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
+        ToastService.error('Connection failed');
+      } else {
+        ToastService.error('Upload failed');
+      }
     },
   });
 };
@@ -102,7 +246,7 @@ export const useKYCNavigation = () => {
     if (!kycStatus || isLoading) return;
 
     const targetScreen = getScreenForStatus(kycStatus.kycStatus);
-    router.replace(targetScreen);
+    router.replace(targetScreen as any);
   };
 
   return {
@@ -125,6 +269,7 @@ export const useKYCStep = () => {
       case 'IN_PROGRESS':
         return 'selfie';
       case 'VERIFIED':
+      case 'APPROVED':
         return 'complete';
       case 'REJECTED':
         return 'rejected';
@@ -136,11 +281,23 @@ export const useKYCStep = () => {
   };
 
   const canProceedToSelfie = () => {
-    return kycStatus?.bvnVerified && kycStatus?.kycStatus === 'IN_PROGRESS';
+    const canProceed = kycStatus?.bvnVerified && 
+                      !kycStatus?.selfieVerified && 
+                      (kycStatus?.kycStatus === 'IN_PROGRESS' || kycStatus?.kycStatus === 'UNDER_REVIEW');
+    console.log('🔍 Can proceed to selfie check:', {
+      bvnVerified: kycStatus?.bvnVerified,
+      selfieVerified: kycStatus?.selfieVerified,
+      kycStatus: kycStatus?.kycStatus,
+      canProceed
+    });
+    return canProceed;
   };
 
   const isKYCComplete = () => {
-    return kycStatus?.kycStatus === 'VERIFIED' && kycStatus?.isVerified;
+    return (kycStatus?.kycStatus === 'VERIFIED' || kycStatus?.kycStatus === 'APPROVED') && 
+           kycStatus?.isVerified && 
+           kycStatus?.bvnVerified && 
+           kycStatus?.selfieVerified;
   };
 
   const getStatusMessage = () => {
@@ -195,6 +352,7 @@ export const useKYCErrorHandler = () => {
 
 export default {
   useKYCStatus,
+  useRefreshKYCStatus,
   useVerifyBVN,
   useUploadSelfie,
   useKYCNavigation,

@@ -21,6 +21,7 @@ interface VerificationModalProps {
   title?: string;
   description?: string;
   buttonText?: string;
+  loading?: boolean;
   icon?: any;
 }
 
@@ -31,6 +32,7 @@ export default function VerificationModal({
   title = "Finish your\naccount setup",
   description = "Complete account verification with a selfie and your BVN to start using \n Monzi",
   buttonText = "Verify ID",
+  loading = false,
   icon = require('@/assets/images/verify/shield.png')
 }: VerificationModalProps) {
   const colorScheme = useColorScheme();
@@ -120,6 +122,7 @@ export default function VerificationModal({
                   <Button
                     title={buttonText}
                     onPress={onVerifyID}
+                    loading={loading}
                     style={{
                       backgroundColor: '#FFE66C'
                     }}

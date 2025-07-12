@@ -4,14 +4,18 @@ import {
   Text, 
   View, 
   SafeAreaView,
+  TouchableOpacity,
+  Linking,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
-import Colors from '@/constants/colors';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
 import Button from '@/components/common/Button';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AuthHeader } from '@/components/auth/AuthHeader';
 import { useKYCStatus, useKYCStep } from '@/hooks/useKYCService';
+import { useAuth } from '@/hooks/useAuthService';
+import { useWalletRecovery } from '@/hooks/useWalletService';
+import ToastService from '@/services/ToastService';
 
 interface VerificationStep {
   id: string;
@@ -39,7 +43,7 @@ const initialSteps: VerificationStep[] = [
   {
     id: 'full-access',
     title: 'Full Access',
-    description: 'Get your $ virtual card, stash account no',
+    description: 'Proceed to get full access',
     status: 'pending',
     icon: '◐'
   }
@@ -47,16 +51,47 @@ const initialSteps: VerificationStep[] = [
 
 export default function BridgeScreen() {
   const [steps, setSteps] = useState<VerificationStep[]>(initialSteps);
+  const [walletRecoveryFailed, setWalletRecoveryFailed] = useState(false);
+  const [requiresSupport, setRequiresSupport] = useState(false);
 
   // React Query hooks
   const { data: kycStatus, isLoading } = useKYCStatus();
   const { currentStep, isKYCComplete, canProceedToSelfie } = useKYCStep();
+  const { logout } = useAuth();
+  const walletRecoveryMutation = useWalletRecovery();
 
   useEffect(() => {
     if (kycStatus) {
+      console.log('🔄 Bridge screen updating steps from KYC status:', {
+        kycStatus: kycStatus.kycStatus,
+        bvnVerified: kycStatus.bvnVerified,
+        selfieVerified: kycStatus.selfieVerified,
+        isVerified: kycStatus.isVerified,
+        canProceedToSelfie,
+        isKYCComplete
+      });
       updateStepsFromKYCStatus();
     }
   }, [kycStatus]);
+
+  // Check for contact support flag on mount
+  useEffect(() => {
+    const checkSupportFlag = async () => {
+      try {
+        const supportFlag = await AsyncStorage.getItem('kyc_requires_support');
+        if (supportFlag === 'true') {
+          console.log('🚨 Bridge screen detected support flag, showing contact support');
+          setRequiresSupport(true);
+          // Clear the flag after detecting it
+          await AsyncStorage.removeItem('kyc_requires_support');
+        }
+      } catch (error) {
+        console.error('Error checking support flag:', error);
+      }
+    };
+
+    checkSupportFlag();
+  }, []);
 
   const updateStepsFromKYCStatus = () => {
     if (!kycStatus) return;
@@ -66,24 +101,25 @@ export default function BridgeScreen() {
         return { 
           ...step, 
           status: kycStatus.bvnVerified ? 'completed' as const : 
-                  kycStatus.kycStatus === 'PENDING' ? 'current' as const : 'pending' as const
+                  kycStatus.kycStatus === 'PENDING' || !kycStatus.bvnVerified ? 'current' as const : 'pending' as const
         };
       }
       if (step.id === 'biometrics') {
-        if (kycStatus.selfieVerified && kycStatus.kycStatus === 'VERIFIED') {
+        if (kycStatus.selfieVerified && (kycStatus.kycStatus === 'VERIFIED' || kycStatus.kycStatus === 'APPROVED')) {
           return { ...step, status: 'completed' as const };
-        } else if (kycStatus.kycStatus === 'UNDER_REVIEW') {
-          return { ...step, status: 'pending' as const };
-        } else if (kycStatus.bvnVerified && kycStatus.kycStatus === 'IN_PROGRESS') {
+        } else if (kycStatus.kycStatus === 'REJECTED') {
+          return { ...step, status: 'pending' as const }; // Keep it pending, user needs to contact support
+        } else if (kycStatus.bvnVerified && !kycStatus.selfieVerified && (kycStatus.kycStatus === 'IN_PROGRESS' || kycStatus.kycStatus === 'UNDER_REVIEW')) {
           return { ...step, status: 'current' as const };
         } else {
           return { ...step, status: 'pending' as const };
         }
       }
       if (step.id === 'full-access') {
+        // Full Access step should remain pending - it represents the action user needs to take
         return { 
           ...step, 
-          status: kycStatus.kycStatus === 'VERIFIED' ? 'completed' as const : 'pending' as const
+          status: 'pending' as const
         };
       }
       return step;
@@ -91,15 +127,19 @@ export default function BridgeScreen() {
     
     setSteps(updatedSteps);
     
-    // Auto-navigate if KYC is complete
-    if (isKYCComplete) {
-      setTimeout(() => {
-        completeVerification();
-      }, 1000);
+    // Auto-navigate if KYC is complete (only if fully verified/approved)
+    if (isKYCComplete && (kycStatus.kycStatus === 'VERIFIED' || kycStatus.kycStatus === 'APPROVED') && kycStatus.isVerified && kycStatus.bvnVerified && kycStatus.selfieVerified) {
+      // Don't auto-navigate for APPROVED status, let user click "Get full access"
+      if (kycStatus.kycStatus === 'VERIFIED') {
+        setTimeout(() => {
+          completeVerification();
+        }, 1000);
+      }
     }
   };
 
   const handleVerifyBiometrics = () => {
+    console.log('🚀 User proceeding to biometrics verification');
     router.push('/(kyc)/biometrics');
   };
 
@@ -109,9 +149,41 @@ export default function BridgeScreen() {
 
   const completeVerification = async () => {
     try {
-      await AsyncStorage.setItem('user_verified', 'true');
-      await AsyncStorage.setItem('biometrics_completed', 'true');
-      router.replace('/(tabs)');
+      // For APPROVED users, try wallet recovery first
+      if ((kycStatus as any)?.kycStatus === 'APPROVED') {
+        console.log('🔄 APPROVED user - attempting wallet recovery...');
+        
+        try {
+          await walletRecoveryMutation.mutateAsync();
+          console.log('✅ Wallet recovery successful');
+          ToastService.success('Wallet activated');
+          
+          // Set verification flags and navigate to home
+          await AsyncStorage.setItem('user_verified', 'true');
+          await AsyncStorage.setItem('biometrics_completed', 'true');
+          router.replace('/(tabs)');
+        } catch (walletError: any) {
+          console.error('❌ Wallet recovery failed:', walletError);
+          
+          // Check if it's a KYC verification error
+          if (walletError.message?.includes('complete KYC verification first') || 
+              walletError.statusCode === 400) {
+            console.log('❌ KYC error for APPROVED user - showing contact support');
+            setWalletRecoveryFailed(true);
+            ToastService.error('Contact support');
+          } else {
+            // Other errors, show generic message
+            console.log('❌ Other wallet error - showing contact support');
+            setWalletRecoveryFailed(true);
+            ToastService.error('Contact support');
+          }
+        }
+      } else {
+        // For VERIFIED users, proceed normally
+        await AsyncStorage.setItem('user_verified', 'true');
+        await AsyncStorage.setItem('biometrics_completed', 'true');
+        router.replace('/(tabs)');
+      }
     } catch (error) {
       console.error('Error completing verification:', error);
       router.replace('/(tabs)');
@@ -121,13 +193,13 @@ export default function BridgeScreen() {
   const getStepStatusColor = (status: string, stepId?: string) => {
     switch (status) {
       case 'completed':
-        return Colors.dark.primary; // Primary color for completed steps
+        return '#F5C842'; // Primary color for completed steps
       case 'current':
-        return Colors.dark.white;
+        return '#FFFFFF';
       case 'pending':
-        return Colors.dark.textTertiary; // Gray for all pending steps
+        return 'rgba(255, 255, 255, 0.3)'; // Gray for all pending steps
       default:
-        return Colors.dark.textTertiary;
+        return 'rgba(255, 255, 255, 0.3)';
     }
   };
 
@@ -138,99 +210,190 @@ export default function BridgeScreen() {
     return step.icon;
   };
 
+  const handleSignOut = async () => {
+    try {
+      await logout.mutateAsync({ clearAllData: true });
+      router.replace('/(auth)/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      router.replace('/(auth)/login');
+    }
+  };
+
+  const handleContactSupport = async () => {
+    const message = encodeURIComponent("Hi, I need help with my account verification. My verification was rejected and I need assistance to complete the process.");
+    const instagramUrl = `instagram://user?username=monzimoney`;
+    const fallbackUrl = `https://www.instagram.com/monzimoney/`;
+    
+    try {
+      const canOpen = await Linking.canOpenURL(instagramUrl);
+      if (canOpen) {
+        await Linking.openURL(instagramUrl);
+      } else {
+        // Fallback to web Instagram
+        await Linking.openURL(fallbackUrl);
+      }
+    } catch (error) {
+      console.error('Error opening Instagram:', error);
+      Alert.alert(
+        'Contact Support',
+        'Please reach out to us on Instagram @monzimoney for assistance with your verification.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: Colors.dark.background }]}>
-      <AuthHeader />
+    <SafeAreaView style={styles.container}>
+      <View style={styles.headerContainer}>
+        <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
+          <Text style={styles.signOutText}>Sign out</Text>
+        </TouchableOpacity>
+      </View>
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: Colors.dark.white }]}>Verify your{"\n"}Identity</Text>
+          <Text style={styles.title}>Verify your{"\n"}Identity</Text>
         </View>
         <View style={styles.stepsContainer}>
           {steps.map((step, index) => (
             <View key={step.id} style={styles.stepItem}>
               <View style={styles.stepIconContainer}>
                 <View style={[styles.stepIcon, { backgroundColor: getStepStatusColor(step.status, step.id) }]}>
-                  <Text style={[styles.stepIconText, { color: step.status === 'completed' ? Colors.dark.black : step.status === 'current' ? Colors.dark.black : Colors.dark.white }]}>{getStepIcon(step)}</Text>
+                  <Text style={[styles.stepIconText, { color: step.status === 'completed' ? '#000000' : step.status === 'current' ? '#000000' : '#FFFFFF' }]}>{getStepIcon(step)}</Text>
                 </View>
                 {index < steps.length - 1 && (
-                  <View style={[styles.connectingLine, { backgroundColor: step.status === 'completed' ? Colors.dark.primary : Colors.dark.textTertiary }]} />
+                  <View style={[styles.connectingLine, { backgroundColor: step.status === 'completed' ? '#F5C842' : 'rgba(255, 255, 255, 0.3)' }]} />
                 )}
               </View>
               <View style={styles.stepContent}>
                 <View style={styles.stepHeader}>
-                  <Text style={[styles.stepTitle, { color: Colors.dark.white }]}>{step.title}</Text>
+                  <Text style={styles.stepTitle}>{step.title}</Text>
                   {step.status === 'completed' && (
-                    <View style={[styles.successBadge, { backgroundColor: Colors.dark.primary }]}>
-                      <Text style={[styles.successBadgeText, { color: Colors.dark.black }]}>Success</Text>
+                    <View style={styles.successBadge}>
+                      <Text style={styles.successBadgeText}>Success</Text>
                     </View>
                   )}
                 </View>
-                <Text style={[styles.stepDescription, { color: step.status === 'pending' ? Colors.dark.textTertiary : Colors.dark.textSecondary }]}>{step.description}</Text>
+                <Text style={[styles.stepDescription, { color: step.status === 'pending' ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.7)' }]}>{step.description}</Text>
               </View>
             </View>
           ))}
         </View>
       </View>
       <View style={styles.footer}>
-        {isLoading ? (
-          <Button
-            title="Loading..."
-            variant="primary"
-            size="lg"
-            style={{ backgroundColor: Colors.dark.primary, width: '100%' }}
-            textStyle={{ color: Colors.dark.black }}
-            disabled={true}
-            onPress={() => {}}
-          />
-        ) : kycStatus?.kycStatus === 'PENDING' ? (
-          <Button
-            title="Verify BVN"
-            variant="primary"
-            size="lg"
-            style={{ backgroundColor: Colors.dark.primary, width: '100%' }}
-            textStyle={{ color: Colors.dark.black }}
-            onPress={handleVerifyBVN}
-          />
-        ) : kycStatus?.kycStatus === 'IN_PROGRESS' && canProceedToSelfie ? (
-          <Button
-            title="Verify Biometrics"
-            variant="primary"
-            size="lg"
-            style={{ backgroundColor: Colors.dark.primary, width: '100%' }}
-            textStyle={{ color: Colors.dark.black }}
-            onPress={handleVerifyBiometrics}
-          />
-        ) : kycStatus?.kycStatus === 'UNDER_REVIEW' ? (
-          <Button
-            title="Notify me when verified"
-            variant="primary"
-            size="lg"
-            style={{ backgroundColor: Colors.dark.primary, width: '100%' }}
-            textStyle={{ color: Colors.dark.black }}
-            onPress={async () => {
-              await AsyncStorage.setItem('show_pending_modal', 'true');
-              router.replace('/(tabs)');
-            }}
-          />
-        ) : kycStatus?.kycStatus === 'VERIFIED' ? (
-          <Button
-            title="Verification Complete"
-            variant="primary"
-            size="lg"
-            style={{ backgroundColor: Colors.dark.primary, width: '100%' }}
-            textStyle={{ color: Colors.dark.black }}
-            onPress={completeVerification}
-          />
-        ) : (
-          <Button
-            title="Continue"
-            variant="primary"
-            size="lg"
-            style={{ backgroundColor: Colors.dark.primary, width: '100%' }}
-            textStyle={{ color: Colors.dark.black }}
-            onPress={() => router.push('/(kyc)/bvn')}
-          />
-        )}
+        {(() => {
+          // Priority check: If user requires support (e.g., BVN_ALREADY_EXISTS), show contact support
+          if (requiresSupport) {
+            console.log('🔄 Bridge button: Contact Support (requires support flag)');
+            return (
+              <Button
+                title="Contact Support"
+                variant="primary"
+                size="lg"
+                fullWidth
+                onPress={handleContactSupport}
+              />
+            );
+          } else if (isLoading) {
+            console.log('🔄 Bridge button: Loading...');
+            return (
+              <Button
+                title="Loading..."
+                variant="primary"
+                size="lg"
+                fullWidth
+                disabled={true}
+                onPress={() => {}}
+              />
+            );
+          } else if ((kycStatus as any)?.kycStatus === 'PENDING' || !(kycStatus as any)?.bvnVerified) {
+            console.log('🔄 Bridge button: Verify BVN (PENDING or BVN not verified)');
+            return (
+              <Button
+                title="Verify BVN"
+                variant="primary"
+                size="lg"
+                fullWidth
+                onPress={handleVerifyBVN}
+              />
+            );
+          } else if ((kycStatus as any)?.kycStatus === 'REJECTED') {
+            console.log('🔄 Bridge button: Contact Support (REJECTED)');
+            return (
+              <Button
+                title="Contact Support"
+                variant="primary"
+                size="lg"
+                fullWidth
+                onPress={handleContactSupport}
+              />
+            );
+          } else if (kycStatus?.bvnVerified && !kycStatus?.selfieVerified && (kycStatus?.kycStatus === 'IN_PROGRESS' || kycStatus?.kycStatus === 'UNDER_REVIEW' || canProceedToSelfie)) {
+            console.log('🔄 Bridge button: Verify Biometrics (BVN verified, selfie needed)', {
+              kycStatus: kycStatus?.kycStatus,
+              bvnVerified: kycStatus?.bvnVerified,
+              selfieVerified: kycStatus?.selfieVerified,
+              canProceedToSelfie
+            });
+            return (
+              <Button
+                title="Verify Biometrics"
+                variant="primary"
+                size="lg"
+                fullWidth
+                onPress={handleVerifyBiometrics}
+              />
+            );
+          } else if ((kycStatus as any)?.kycStatus === 'APPROVED' && (kycStatus as any)?.isVerified && (kycStatus as any)?.bvnVerified && (kycStatus as any)?.selfieVerified) {
+            // If wallet recovery failed for APPROVED user, show Contact Support
+            if (walletRecoveryFailed) {
+              console.log('🔄 Bridge button: Contact Support (APPROVED - wallet recovery failed)');
+              return (
+                <Button
+                  title="Contact Support"
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  onPress={handleContactSupport}
+                />
+              );
+            } else {
+              console.log('🔄 Bridge button: Get full access (APPROVED)');
+              return (
+                <Button
+                  title="Get full access"
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  loading={walletRecoveryMutation.isPending}
+                  onPress={completeVerification}
+                />
+              );
+            }
+          } else if ((kycStatus as any)?.kycStatus === 'VERIFIED' && (kycStatus as any)?.isVerified && (kycStatus as any)?.bvnVerified && (kycStatus as any)?.selfieVerified) {
+            console.log('🔄 Bridge button: Verification Complete (VERIFIED)');
+            return (
+              <Button
+                title="Verification Complete"
+                variant="primary"
+                size="lg"
+                fullWidth
+                onPress={completeVerification}
+              />
+            );
+          } else {
+            console.log('🔄 Bridge button: Continue (fallback)', kycStatus);
+            return (
+              <Button
+                title="Continue"
+                variant="primary"
+                size="lg"
+                fullWidth
+                onPress={() => router.push('/(kyc)/bvn')}
+              />
+            );
+          }
+        })()}
       </View>
     </SafeAreaView>
   );
@@ -239,6 +402,23 @@ export default function BridgeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000000',
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 16,
+    paddingBottom: 24,
+    paddingHorizontal: 24,
+    justifyContent: 'flex-end',
+  },
+  signOutButton: {
+    padding: 8,
+  },
+  signOutText: {
+    fontSize: fontSizes.sm,
+    fontFamily: fontFamilies.sora.medium,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   content: {
     flex: 1,
@@ -252,6 +432,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.clashDisplay.semibold,
     lineHeight: fontSizes['4xl'] * 1.2,
     marginTop: -30,
+    color: '#FFFFFF',
   },
   stepsContainer: {
     flex: 1,
@@ -293,16 +474,18 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.lg,
     fontFamily: fontFamilies.sora.bold,
     marginRight: 12,
+    color: '#FFFFFF',
   },
   successBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 12,
+    backgroundColor: '#F5C842',
   },
   successBadgeText: {
     fontSize: fontSizes.xs,
     fontFamily: fontFamilies.sora.bold,
-    color: Colors.dark.white,
+    color: '#000000',
   },
   stepDescription: {
     fontSize: fontSizes.sm,
@@ -310,8 +493,8 @@ const styles = StyleSheet.create({
     lineHeight: fontSizes.sm * 1.4,
   },
   footer: {
-    paddingHorizontal: 24,
-    paddingBottom: -14,
-    paddingTop: 16,
+    paddingHorizontal: 14,
+    paddingBottom: 34,
+    paddingTop: 20,
   },
 }); 

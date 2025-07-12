@@ -152,7 +152,11 @@ export const useProfile = () => {
       }
     },
     enabled: true,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 60 * 60 * 1000, // 1 hour (user profile rarely changes)
+    gcTime: 4 * 60 * 60 * 1000, // 4 hours cache time
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnReconnect: true, // Refetch on reconnect
+    refetchInterval: false, // No automatic refetching
     retry: (failureCount, error) => {
       // Don't retry if unauthorized
       if (error.message.includes('401') || error.message.includes('unauthorized')) {
@@ -172,8 +176,11 @@ export const useAuthStatus = () => {
     queryFn: async () => {
       return await authStorageService.getAuthStatus();
     },
-    staleTime: 30 * 1000, // 30 seconds
-    refetchInterval: 60 * 1000, // Refetch every minute
+    staleTime: 15 * 60 * 1000, // 15 minutes (auth status doesn't change often)
+    gcTime: 30 * 60 * 1000, // 30 minutes cache time
+    refetchInterval: false, // No automatic refetching (only when needed)
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnReconnect: true, // Refetch on reconnect
   });
 };
 
@@ -186,7 +193,11 @@ export const useDeviceInfo = () => {
     queryFn: async () => {
       return await authStorageService.getDeviceInfo();
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 24 * 60 * 60 * 1000, // 24 hours (device info rarely changes)
+    gcTime: 7 * 24 * 60 * 60 * 1000, // 7 days cache time
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnReconnect: false, // Don't refetch on reconnect
+    refetchInterval: false, // No automatic refetching
   });
 };
 
@@ -205,15 +216,121 @@ export const useLogout = () => {
       }
     },
     onSuccess: () => {
-      // Clear all auth-related queries
-      queryClient.removeQueries({ queryKey: authKeys.all });
+      // Clear all queries (auth, wallet, account, etc.)
       queryClient.clear();
-      console.log('Logout successful');
+      
+      // Also clear specific auth-related queries
+      queryClient.removeQueries({ queryKey: authKeys.all });
+      
+      // Clear wallet queries if they exist
+      try {
+        queryClient.removeQueries({ queryKey: ['wallet'] });
+        queryClient.removeQueries({ queryKey: ['accounts'] });
+      } catch (error) {
+        console.log('No wallet/account queries to clear');
+      }
+      
+      console.log('Logout successful - all session data cleared');
     },
     onError: (error) => {
       console.log('Logout failed:', error);
     },
   });
+};
+
+/**
+ * Hook for strategic cache invalidation
+ */
+export const useAuthCacheManagement = () => {
+  const queryClient = useQueryClient();
+
+  return {
+    // Force refresh profile data (use sparingly)
+    forceRefreshProfile: () => {
+      queryClient.invalidateQueries({ queryKey: authKeys.profile() });
+    },
+    
+    // Force refresh auth status (use when auth state changes)
+    forceRefreshAuthStatus: () => {
+      queryClient.invalidateQueries({ queryKey: authKeys.authStatus() });
+    },
+    
+    // Update profile data optimistically (for profile updates)
+    updateProfileOptimistically: (newProfileData: Partial<UserProfile>) => {
+      queryClient.setQueryData(authKeys.profile(), (oldData: UserProfile | null) => {
+        if (!oldData) return null;
+        return { ...oldData, ...newProfileData };
+      });
+    },
+    
+    // Check if profile data is stale
+    isProfileStale: () => {
+      const queryState = queryClient.getQueryState(authKeys.profile());
+      const staleTime = 60 * 60 * 1000; // 1 hour
+      return !queryState || Date.now() - queryState.dataUpdatedAt > staleTime;
+    },
+    
+    // Get cached profile without triggering fetch
+    getCachedProfile: (): UserProfile | null => {
+      return queryClient.getQueryData(authKeys.profile()) || null;
+    },
+    
+    // Prefetch profile data
+    prefetchProfile: () => {
+      queryClient.prefetchQuery({
+        queryKey: authKeys.profile(),
+        queryFn: async () => {
+          const accessToken = await authStorageService.getAccessToken();
+          if (!accessToken) return null;
+          try {
+            const response = await authService.getProfile(accessToken);
+            return response.data;
+          } catch (error) {
+            console.log('Failed to prefetch profile:', error);
+            return null;
+          }
+        },
+        staleTime: 60 * 60 * 1000, // 1 hour
+      });
+    },
+    
+    // Clear only outdated cache entries
+    clearStaleCache: () => {
+      queryClient.removeQueries({
+        queryKey: authKeys.all,
+        predicate: (query) => {
+          const staleTime = 60 * 60 * 1000; // 1 hour
+          return Date.now() - query.state.dataUpdatedAt > staleTime;
+        },
+      });
+    },
+    
+    // Complete logout with navigation
+    performCompleteLogout: async (clearAllData: boolean = false) => {
+      try {
+        // Clear authentication data
+        if (clearAllData) {
+          await authStorageService.clearAllData();
+        } else {
+          await authStorageService.clearAuthData();
+        }
+        
+        // Clear all queries
+        queryClient.clear();
+        
+        // Clear specific query caches
+        queryClient.removeQueries({ queryKey: authKeys.all });
+        queryClient.removeQueries({ queryKey: ['wallet'] });
+        queryClient.removeQueries({ queryKey: ['accounts'] });
+        
+        console.log('Complete logout successful - all session data cleared');
+        return true;
+      } catch (error) {
+        console.error('Complete logout failed:', error);
+        return false;
+      }
+    },
+  };
 };
 
 /**
@@ -282,6 +399,7 @@ export const useAuth = () => {
   const logout = useLogout();
   const biometricAuth = useBiometricAuth();
   const biometricSettings = useBiometricSettings();
+  const cacheManagement = useAuthCacheManagement();
 
   const isLoading = authStatus.isLoading || profile.isLoading;
   const isAuthenticated = authStatus.data?.isAuthenticated || false;
@@ -303,9 +421,16 @@ export const useAuth = () => {
     biometricAuth,
     biometricSettings,
     
+    // Cache Management
+    cacheManagement,
+    
     // Utilities
     refetchAuthStatus: authStatus.refetch,
     refetchProfile: profile.refetch,
+    
+    // Quick access to cached data (no backend call)
+    getCachedProfile: cacheManagement.getCachedProfile,
+    isProfileStale: cacheManagement.isProfileStale,
   };
 };
 

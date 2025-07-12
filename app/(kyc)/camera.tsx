@@ -7,32 +7,55 @@ import {
   TouchableOpacity,
   Alert,
   Dimensions,
+  ActivityIndicator
 } from 'react-native';
 import { router } from 'expo-router';
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
-import Colors from '@/constants/colors';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
+import { useAuth } from '@/hooks/useAuthService';
+import { X, RotateCcw } from 'lucide-react-native';
+import Colors from '@/constants/colors';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const CIRCLE_SIZE = screenWidth * 0.8;
 
 export default function CameraScreen() {
-  const [facing, setFacing] = useState<CameraType>('front');
+  const [facing, setFacing] = useState<'front' | 'back'>('front');
   const [permission, requestPermission] = useCameraPermissions();
   const [isCapturing, setIsCapturing] = useState(false);
   const cameraRef = useRef<CameraView>(null);
+  const { logout } = useAuth();
+
+  const handleSignOut = async () => {
+    try {
+      await logout.mutateAsync({ clearAllData: true });
+      router.replace('/(auth)/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      router.replace('/(auth)/login');
+    }
+  };
 
   if (!permission) {
-    return <View style={[styles.container, { backgroundColor: Colors.dark.background }]} />;
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color={Colors.colors.primary[400]} />
+      </View>
+    );
   }
 
   if (!permission.granted) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: Colors.dark.background }]}> 
+      <SafeAreaView style={styles.container}> 
+        <View style={styles.headerContainer}>
+          <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
+            <Text style={styles.signOutText}>Sign out</Text>
+          </TouchableOpacity>
+        </View>
         <View style={styles.permissionContainer}>
-          <Text style={[styles.permissionText, { color: Colors.dark.white }]}>We need your permission to show the camera</Text>
+          <Text style={styles.permissionText}>Camera access is required for identity verification</Text>
           <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
-            <Text style={styles.permissionButtonText}>Grant Permission</Text>
+            <Text style={styles.permissionButtonText}>Enable Camera</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -44,24 +67,34 @@ export default function CameraScreen() {
       try {
         setIsCapturing(true);
         const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.8,
+          quality: 1,
           base64: false,
+          exif: false
         });
+        
         if (photo && photo.uri) {
-          router.push({ pathname: '/(kyc)/photo-review', params: { photoUri: photo.uri } });
+          router.push({ 
+            pathname: '/(kyc)/photo-review', 
+            params: { photoUri: photo.uri } 
+          });
         } else {
           throw new Error('Failed to capture photo');
         }
       } catch (error) {
         console.error('Error taking picture:', error);
-        Alert.alert('Error', 'Failed to take picture. Please try again.');
+        Alert.alert(
+          'Camera Error',
+          'Failed to take picture. Please try again.',
+          [{ text: 'OK' }]
+        );
+      } finally {
         setIsCapturing(false);
       }
     }
   };
 
   const flipCamera = () => {
-    setFacing(current => (current === 'back' ? 'front' : 'back'));
+    setFacing((current: 'front' | 'back') => (current === 'back' ? 'front' : 'back'));
   };
 
   return (
@@ -72,43 +105,54 @@ export default function CameraScreen() {
         ref={cameraRef}
       />
       
-      {/* Overlay elements positioned absolutely on top of camera */}
-      <SafeAreaView style={styles.headerContainer}>
+      {/* Header */}
+      <SafeAreaView style={styles.headerOverlay}>
         <TouchableOpacity 
           style={styles.closeButton}
           onPress={() => router.back()}
         >
-          <Text style={styles.closeButtonText}>✕</Text>
+          <X size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+        
+        <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
+          <Text style={styles.signOutText}>Sign out</Text>
         </TouchableOpacity>
       </SafeAreaView>
       
+      {/* Face Outline */}
       <View style={styles.overlay}>
         <View style={styles.circleContainer}>
-          <View style={[styles.circle, { borderColor: Colors.dark.white }]} />
+          <View style={styles.circle} />
         </View>
       </View>
       
+      {/* Instructions */}
       <View style={styles.instructionsContainer}>
-        <Text style={[styles.instructionText, { color: Colors.dark.white }]}>
-          Ensure your face is clearly visible and lightening is good
+        <Text style={styles.instructionText}>
+          Position your face within the circle and ensure good lighting
         </Text>
       </View>
       
+      {/* Camera Controls */}
       <SafeAreaView style={styles.controlsContainer}>
         <TouchableOpacity 
-          style={[styles.flipButton, { marginLeft: 24 }]} 
+          style={styles.flipButton} 
           onPress={flipCamera}
         >
-          <Text style={styles.flipButtonText}>🔄</Text>
+          <RotateCcw size={24} color="#FFFFFF" />
         </TouchableOpacity>
+        
         <TouchableOpacity 
-          style={[styles.captureButton, { opacity: isCapturing ? 0.6 : 1 }]} 
-          onPress={takePicture} 
+          onPress={takePicture}
           disabled={isCapturing}
+          style={[styles.captureButton, { opacity: isCapturing ? 0.5 : 1 }]}
         >
-          <View style={styles.captureButtonInner} />
+          <View style={styles.captureButtonInner}>
+            <View style={styles.captureButtonCore} />
+          </View>
         </TouchableOpacity>
-        <View style={[styles.placeholder, { marginRight: 24 }]} />
+        
+        <View style={styles.placeholder} />
       </SafeAreaView>
     </View>
   );
@@ -117,7 +161,24 @@ export default function CameraScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: '#000000',
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center', 
+    paddingTop: 16,
+    paddingBottom: 24,
+    paddingHorizontal: 24,
+    justifyContent: 'flex-end',
+  },
+  signOutButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  signOutText: {
+    fontSize: fontSizes.sm,
+    fontFamily: fontFamilies.sora.medium,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   permissionContainer: {
     flex: 1,
@@ -129,30 +190,38 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.lg,
     fontFamily: fontFamilies.sora.regular,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
+    color: '#FFFFFF',
   },
   permissionButton: {
-    backgroundColor: '#64D600',
+    backgroundColor: Colors.colors.primary[400],
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
   },
   permissionButtonText: {
-    color: Colors.dark.white,
+    color: '#000000',
     fontSize: fontSizes.base,
     fontFamily: fontFamilies.sora.bold,
   },
   camera: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
-  headerContainer: {
+  headerOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     zIndex: 1000,
     paddingHorizontal: 24,
-    paddingTop: 8,
+    paddingTop: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   closeButton: {
     width: 44,
@@ -163,13 +232,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: 16,
   },
-  closeButtonText: {
-    color: Colors.dark.white,
-    fontSize: 18,
-    fontFamily: fontFamilies.sora.bold,
-  },
   overlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -184,10 +248,11 @@ const styles = StyleSheet.create({
     borderRadius: CIRCLE_SIZE / 2,
     borderWidth: 3,
     backgroundColor: 'transparent',
+    borderColor: '#FFFFFF',
   },
   instructionsContainer: {
     position: 'absolute',
-    bottom: 120,
+    bottom: 140,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -195,12 +260,12 @@ const styles = StyleSheet.create({
   },
   instructionText: {
     fontSize: fontSizes.base,
-    fontFamily: fontFamilies.sora.regular,
+    fontFamily: fontFamilies.sora.medium,
     textAlign: 'center',
+    color: '#FFFFFF',
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
-    marginBottom: 66,
   },
   controlsContainer: {
     position: 'absolute',
@@ -210,7 +275,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingBottom: 20,
+    paddingBottom: 32,
+    paddingHorizontal: 24,
   },
   flipButton: {
     width: 50,
@@ -221,32 +287,33 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     marginLeft: 16,
   },
-  flipButtonText: {
-    fontSize: fontSizes.xl,
-    color: Colors.dark.white,
-  },
   captureButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.dark.white,
+    width: 90,
+    height: 90,
+    borderRadius: 100,
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    marginRight: 16,
+    borderWidth: 4,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   captureButtonInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: Colors.dark.black,
+    width: 70,
+    height: 70,
+    borderRadius: 70,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  captureButtonCore: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',
   },
   placeholder: {
     width: 50,
     height: 50,
+    marginRight: 16,
   },
-}); 
+});

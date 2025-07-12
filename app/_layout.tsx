@@ -10,6 +10,7 @@ import { useColorScheme } from '@/components/common/useColorScheme';
 import { QueryProvider } from '@/providers/QueryProvider';
 import { CustomThemeProvider } from '@/providers/ThemeProvider';
 import { AuthProvider } from '@/providers/AuthProvider';
+import ToastProvider from '@/providers/ToastProvider';
 import {
   Sora_300Light,
   Sora_400Regular,
@@ -80,22 +81,25 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   return (
+    <QueryProvider>
     <AuthProvider>
-      <QueryProvider>
         <CustomThemeProvider>
-          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <Stack>
-              <Stack.Screen name="index" options={{ headerShown: false }} />
-              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-              <Stack.Screen name="amount" options={{ headerShown: false }} />
-              <Stack.Screen name="transfer" options={{ headerShown: false }} />
-              <Stack.Screen name="(kyc)" options={{ headerShown: false }} />
-            </Stack>
-          </ThemeProvider>
+          <ToastProvider>
+            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+              <Stack>
+                <Stack.Screen name="index" options={{ headerShown: false }} />
+                <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: false }} />
+                <Stack.Screen name="profile" options={{ headerShown: false }} />
+                <Stack.Screen name="transfer" options={{ headerShown: false }} />
+                <Stack.Screen name="(kyc)" options={{ headerShown: false, gestureEnabled: false }} />
+                <Stack.Screen name="transfer-success" options={{ headerShown: false }} />
+              </Stack>
+            </ThemeProvider>
+          </ToastProvider>
         </CustomThemeProvider>
+      </AuthProvider>
       </QueryProvider>
-    </AuthProvider>
   );
 }

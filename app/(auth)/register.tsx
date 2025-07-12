@@ -18,6 +18,7 @@ import { useRegister } from '@/hooks';
 import { fontFamilies } from '@/constants/fonts';
 import { X } from 'lucide-react-native';
 import { RegisterAuthInput } from '@/components/auth';
+import PhoneNumberInput from '@/components/auth/PhoneNumberInput';
 import { Button, GenderSelectionModal, DatePickerModal } from '@/components/common';
 
 export default function RegisterScreen() {
@@ -27,6 +28,7 @@ export default function RegisterScreen() {
   const [formData, setFormData] = useState({
     email: '',
     phone: '',
+    phoneDisplay: '', // For displaying formatted phone number
     gender: '',
     dob: '',
     passcode: '',
@@ -52,10 +54,29 @@ export default function RegisterScreen() {
   };
 
   const updateField = (field: string, value: string) => {
+    if (field === 'passcode') {
+      // Only allow digits and max 6 characters for passcode
+      const digitsOnly = value.replace(/[^0-9]/g, '');
+      value = digitsOnly.slice(0, 6);
+    }
+    
     setFormData(prev => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  const handlePhoneChange = (formattedValue: string, rawValue: string) => {
+    setFormData(prev => ({ 
+      ...prev, 
+      phoneDisplay: formattedValue,
+      phone: rawValue 
+    }));
+    
+    // Clear error when user starts typing
+    if (errors.phone) {
+      setErrors(prev => ({ ...prev, phone: '' }));
     }
   };
 
@@ -104,13 +125,10 @@ export default function RegisterScreen() {
     if (!formData.phone) {
       newErrors.phone = 'Phone number is required';
     } else {
-      // Remove any non-digits
+      // Validate raw phone number (should be 11 digits starting with 0)
       const digitsOnly = formData.phone.replace(/[^0-9]/g, '');
-      // Check if it's a valid Nigerian number (10 or 11 digits)
-      if (digitsOnly.length < 10 || digitsOnly.length > 11) {
+      if (digitsOnly.length !== 11 || !digitsOnly.startsWith('0')) {
         newErrors.phone = 'Please enter a valid Nigerian phone number';
-      } else if (digitsOnly.length === 11 && !digitsOnly.startsWith('0')) {
-        newErrors.phone = 'Phone number should start with 0 if 11 digits';
       }
     }
 
@@ -139,7 +157,7 @@ export default function RegisterScreen() {
       // Convert form data to API format
       const registrationData = {
         email: formData.email.trim(),
-        phone: formData.phone.trim(),
+        phone: formData.phone.trim(), // Raw phone number (e.g., "09038819008")
         gender: formData.gender.toUpperCase() as 'MALE' | 'FEMALE' | 'OTHER',
         dateOfBirth: formatDateForAPI(selectedDate!), // Convert to YYYY-MM-DD
         passcode: formData.passcode,
@@ -165,8 +183,9 @@ export default function RegisterScreen() {
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     const isEmailValid = formData.email && emailRegex.test(formData.email);
     
+    // Check raw phone number
     const digitsOnly = formData.phone.replace(/[^0-9]/g, '');
-    const isPhoneValid = digitsOnly.length >= 10 && digitsOnly.length <= 11;
+    const isPhoneValid = digitsOnly.length === 11 && digitsOnly.startsWith('0');
     
     return isEmailValid && 
            isPhoneValid &&
@@ -216,12 +235,10 @@ export default function RegisterScreen() {
               error={errors.email}
             />
 
-            <RegisterAuthInput
+            <PhoneNumberInput
               label="Phone Number"
-              value={formData.phone}
-              onChangeText={(text) => updateField('phone', text)}
-              placeholder="Phone Number"
-              inputType="phone"
+              value={formData.phoneDisplay}
+              onChangeText={handlePhoneChange}
               error={errors.phone}
             />
 
@@ -257,6 +274,8 @@ export default function RegisterScreen() {
               placeholder="Set Passcode"
               inputType="password"
               error={errors.passcode}
+              keyboardType="numeric"
+              maxLength={6}
             />
           </View>
         </ScrollView>

@@ -141,6 +141,7 @@ const styles = StyleSheet.create({
   content: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   iconContainer: {
     marginRight: 12,
@@ -155,6 +156,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.sora.medium,
     color: '#FFFFFF',
     lineHeight: 20,
+    textAlign: 'center',
   },
   errorIcon: {
     fontSize: 16,

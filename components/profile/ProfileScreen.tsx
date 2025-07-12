@@ -117,7 +117,7 @@ export function ProfileScreen() {
     );
   };
 
-  const userName = user?.email?.split('@')[0] || 'User';
+  const userName = user?.email?.split('@')[0].replace(/\b\w/g, l => l.toUpperCase()) || 'User';
   const userEmail = user?.email || 'user@example.com';
 
   return (
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
+    paddingVertical: 8,
     paddingHorizontal: 20,
     borderBottomWidth: 0.5,
   },
@@ -316,4 +316,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ProfileScreen; 
+export default ProfileScreen;

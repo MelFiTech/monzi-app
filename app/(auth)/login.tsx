@@ -21,7 +21,7 @@ import { useLogin } from '@/hooks';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [passcode, setPasscode] = useState('');
   const [isValid, setIsValid] = useState(false);
   const emailRef = useRef<TextInput>(null);
   const loginMutation = useLogin();
@@ -34,23 +34,23 @@ export default function LoginScreen() {
   }, []);
 
   useEffect(() => {
-    // Validate email and password
+    // Validate email and passcode
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     const isEmailValid = email.trim() !== '' && emailRegex.test(email.trim());
-    const isPasswordValid = password.length >= 6;
+    const isPasscodeValid = passcode.length === 6;
     
-    setIsValid(isEmailValid && isPasswordValid);
-  }, [email, password]);
+    setIsValid(isEmailValid && isPasscodeValid);
+  }, [email, passcode]);
 
   const handleLogin = async () => {
     if (!isValid) return;
     
     try {
-      console.log('Login attempt with:', { email, password });
+      console.log('Login attempt with:', { email, passcode });
       
       const result = await loginMutation.mutateAsync({
         email: email.trim(),
-        passcode: password.trim(),
+        passcode: passcode.trim(),
       });
       
       if (result.success) {
@@ -66,7 +66,7 @@ export default function LoginScreen() {
   };
 
   const handleClose = () => {
-    router.back();
+    router.replace('/(auth)/onboarding');
   };
 
   return (
@@ -112,15 +112,22 @@ export default function LoginScreen() {
                 />
 
               <RegisterAuthInput
-                label="Password"
-                value={password}
-                onChangeText={setPassword}
-                placeholder="**************"
+                label="Passcode"
+                value={passcode}
+                onChangeText={(text) => {
+                  // Only allow digits
+                  const numbersOnly = text.replace(/[^0-9]/g, '');
+                  if (numbersOnly.length <= 6) {
+                    setPasscode(numbersOnly);
+                  }
+                }}
+                placeholder="******"
                 inputType="password"
                 style={styles.authInput}
                 returnKeyType="done"
                 onSubmitEditing={handleLogin}
                 keyboardType="number-pad"
+                maxLength={6}
               />
             </View>
           </View>

@@ -113,9 +113,9 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 86,
+    height: 86,
+    borderRadius: 86,
     marginRight: 12,
   },
   defaultAvatar: {

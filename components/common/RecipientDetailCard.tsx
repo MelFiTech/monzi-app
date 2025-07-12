@@ -26,7 +26,9 @@ export default function RecipientDetailCard({
       </View>
       
       <View style={styles.detailsContainer}>
-        <Text style={styles.nameText}>{name}</Text>
+        <Text style={styles.nameText}>
+          {name || 'Resolving account name...'}
+        </Text>
         <Text style={styles.accountText}>
           {accountNumber} • {bankName}
         </Text>

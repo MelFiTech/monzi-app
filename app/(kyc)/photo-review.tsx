@@ -6,13 +6,13 @@ import {
   SafeAreaView, 
   Image,
   Dimensions,
+  TouchableOpacity,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import Colors from '@/constants/colors';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
 import Button from '@/components/common/Button';
-import { AuthHeader } from '@/components/auth/AuthHeader';
 import { useUploadSelfie } from '@/hooks/useKYCService';
+import { useAuth } from '@/hooks/useAuthService';
 
 const { width: screenWidth } = Dimensions.get('window');
 const CIRCLE_SIZE = screenWidth * 0.85;
@@ -20,9 +20,20 @@ const CIRCLE_SIZE = screenWidth * 0.85;
 export default function PhotoReviewScreen() {
   const { photoUri } = useLocalSearchParams<{ photoUri: string }>();
   const uploadSelfieMutation = useUploadSelfie();
+  const { logout } = useAuth();
 
   const handleRetake = () => {
     router.push('/(kyc)/camera');
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await logout.mutateAsync({ clearAllData: true });
+      router.replace('/(auth)/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      router.replace('/(auth)/login');
+    }
   };
 
   const handleSubmit = async () => {
@@ -32,15 +43,17 @@ export default function PhotoReviewScreen() {
     }
 
     try {
-      // Create a file-like object from the photo URI
-      const response = await fetch(photoUri);
-      const blob = await response.blob();
+      // For React Native, create a file object that FormData can handle
+      const fileObject = {
+        uri: photoUri,
+        type: 'image/jpeg',
+        name: 'selfie.jpg',
+      };
       
-      // Create a File object for the upload
-      const file = new File([blob], 'selfie.jpg', { type: 'image/jpeg' });
+      console.log('📤 Preparing selfie upload:', fileObject);
       
       // Upload using React Query
-      uploadSelfieMutation.mutate(file);
+      uploadSelfieMutation.mutate(fileObject);
     } catch (error) {
       console.error('Error preparing selfie for upload:', error);
       router.replace('/(kyc)/selfie-loader');
@@ -48,8 +61,12 @@ export default function PhotoReviewScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: Colors.dark.background }]}> 
-      <AuthHeader />
+    <SafeAreaView style={styles.container}> 
+      <View style={styles.headerContainer}>
+        <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
+          <Text style={styles.signOutText}>Sign out</Text>
+        </TouchableOpacity>
+      </View>
       <View style={styles.photoContainer}>
         <View style={styles.circularImageContainer}>
           <Image 
@@ -59,27 +76,30 @@ export default function PhotoReviewScreen() {
           />
         </View>
         <View style={styles.instructionsContainer}>
-          <Text style={[styles.instructionText, { color: Colors.dark.white }]}>Ensure your face is clearly visible and lightening is good</Text>
+          <Text style={styles.instructionText}>Ensure your face is clearly visible and lightening is good</Text>
         </View>
       </View>
       <View style={styles.controlsContainer}>
-        <Button
-          title="Retake selfie"
-          variant="secondary"
-          size="lg"
-          style={{ backgroundColor: Colors.dark.primary, borderRadius: 24, width: '48%' }}
-          textStyle={{ color: Colors.dark.black, fontSize: fontSizes.base, fontFamily: fontFamilies.sora.bold }}
-          onPress={handleRetake}
-        />
-        <Button
-          title={uploadSelfieMutation.isPending ? "Uploading..." : "Submit"}
-          variant="primary"
-          size="lg"
-          style={{ backgroundColor: Colors.dark.primary, borderRadius: 24, width: '48%' }}
-          textStyle={{ color: Colors.dark.black, fontSize: fontSizes.base, fontFamily: fontFamilies.sora.bold }}
-          onPress={handleSubmit}
-          disabled={uploadSelfieMutation.isPending}
-        />
+        <View style={styles.buttonContainer}>
+          <Button
+            title="Retake selfie"
+            variant="secondary"
+            size="lg"
+            onPress={handleRetake}
+            style={styles.button}
+          />
+        </View>
+        <View style={styles.buttonContainer}>
+          <Button
+            title={uploadSelfieMutation.isPending ? "Uploading..." : "Submit"}
+            variant="primary"
+            size="lg"
+            onPress={handleSubmit}
+            disabled={uploadSelfieMutation.isPending}
+            loading={uploadSelfieMutation.isPending}
+            style={styles.button}
+          />
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -88,6 +108,23 @@ export default function PhotoReviewScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000000',
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 16,
+    paddingBottom: 24,
+    paddingHorizontal: 24,
+    justifyContent: 'flex-end',
+  },
+  signOutButton: {
+    padding: 8,
+  },
+  signOutText: {
+    fontSize: fontSizes.sm,
+    fontFamily: fontFamilies.sora.medium,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   photoContainer: {
     flex: 1,
@@ -118,12 +155,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: fontSizes.base * 1.5,
     maxWidth: 280,
+    color: '#FFFFFF',
   },
   controlsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     paddingHorizontal: 24,
-    paddingBottom: 10,
+    paddingBottom: 34,
+    paddingTop: 20,
     gap: 12,
+  },
+  buttonContainer: {
+    flex: 1,
+  },
+  button: {
+    width: '100%',
   },
 }); 
