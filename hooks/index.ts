@@ -4,6 +4,7 @@ export * from './useAccountService';
 export * from './useBiometricService';
 export * from './useGeminiService';
 export * from './useCloudVisionService';
+export * from './useClaudeService';
 export * from './useHybridVisionService';
 
 export * from './useChatService';

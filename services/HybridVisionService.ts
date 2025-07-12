@@ -1,8 +1,9 @@
 import CloudVisionService from './CloudVisionService';
+import ClaudeService from './ClaudeService';
 import GeminiService, { type ExtractedBankData } from './GeminiService';
 
 interface ExtractionAttempt {
-  service: 'cloudVision' | 'gemini';
+  service: 'cloudVision' | 'claude' | 'gemini';
   data: ExtractedBankData;
   duration: number;
   success: boolean;
@@ -11,24 +12,24 @@ interface ExtractionAttempt {
 interface ExtractionResult {
   data: ExtractedBankData;
   attempts: ExtractionAttempt[];
-  primaryService: 'cloudVision' | 'gemini';
+  primaryService: 'cloudVision' | 'claude' | 'gemini';
   fallbackUsed: boolean;
   totalDuration: number;
 }
 
 class HybridVisionService {
   private readonly CONFIDENCE_THRESHOLD = 85;
-  private readonly CLOUD_VISION_TIMEOUT = 10000; // 10 seconds
-  private readonly GEMINI_TIMEOUT = 15000; // 15 seconds
+  private readonly PARALLEL_TIMEOUT = 8000; // 8 seconds for parallel processing (Claude Haiku is faster)
+  private readonly GEMINI_TIMEOUT = 15000; // 15 seconds for final fallback
 
   /**
-   * Extract bank data using intelligent service selection
-   * 1. Try CloudVision first (faster, more accurate for structured documents)
-   * 2. If confidence < threshold, try Gemini as fallback
-   * 3. Return the best result based on confidence and completeness
+   * Extract bank data using parallel processing for speed
+   * 1. Run CloudVision + Claude in parallel (fastest approach)
+   * 2. Use the first good result or the best of both
+   * 3. Fall back to Gemini if both fail or have low quality
    */
   async extractBankData(imageUri: string): Promise<ExtractedBankData> {
-    console.log('🎯 HybridVision: Starting intelligent bank data extraction...');
+    console.log('🚀 HybridVision: Starting parallel bank data extraction...');
     
     const startTime = Date.now();
     const attempts: ExtractionAttempt[] = [];
@@ -36,13 +37,26 @@ class HybridVisionService {
     let fallbackUsed = false;
 
     try {
-      // STEP 1: Try CloudVision first
-      console.log('1️⃣ HybridVision: Trying CloudVision API...');
-      const cloudVisionResult = await this.tryWithTimeout(
-        () => CloudVisionService.extractBankData(imageUri),
-        this.CLOUD_VISION_TIMEOUT,
-        'CloudVision'
-      );
+      // STEP 1: Run CloudVision and Claude in parallel for speed
+      console.log('⚡ HybridVision: Running CloudVision + Claude in parallel...');
+      
+      const parallelResults = await Promise.allSettled([
+        this.tryWithTimeout(
+          () => CloudVisionService.extractBankData(imageUri),
+          this.PARALLEL_TIMEOUT,
+          'CloudVision'
+        ),
+        this.tryWithTimeout(
+          () => ClaudeService.extractBankData(imageUri),
+          this.PARALLEL_TIMEOUT,
+          'Claude'
+        )
+      ]);
+
+      // Process CloudVision result
+      const cloudVisionResult = parallelResults[0].status === 'fulfilled' 
+        ? parallelResults[0].value 
+        : { data: {} as ExtractedBankData, duration: 0, success: false, error: 'Promise rejected' };
 
       const cloudVisionAttempt: ExtractionAttempt = {
         service: 'cloudVision',
@@ -52,25 +66,62 @@ class HybridVisionService {
       };
       attempts.push(cloudVisionAttempt);
 
+      // Process Claude result
+      const claudeResult = parallelResults[1].status === 'fulfilled' 
+        ? parallelResults[1].value 
+        : { data: {} as ExtractedBankData, duration: 0, success: false, error: 'Promise rejected' };
+
+      const claudeAttempt: ExtractionAttempt = {
+        service: 'claude',
+        data: claudeResult.data,
+        duration: claudeResult.duration,
+        success: claudeResult.success
+      };
+      attempts.push(claudeAttempt);
+
+      // Analyze parallel results
+      const validResults: { service: string; data: ExtractedBankData; duration: number }[] = [];
+
       if (cloudVisionResult.success) {
-        console.log('✅ HybridVision: CloudVision extraction successful');
+        console.log('✅ CloudVision extraction successful');
         console.log(`📊 CloudVision confidence: ${cloudVisionResult.data.confidence}%`);
-        
-        // Check if CloudVision result meets our quality threshold
-        if (this.isHighQualityResult(cloudVisionResult.data)) {
-          console.log('🎉 HybridVision: CloudVision result meets quality threshold, using as final result');
-          bestResult = cloudVisionResult.data;
-        } else {
-          console.log('⚠️ HybridVision: CloudVision result below quality threshold, will try Gemini fallback');
-          bestResult = cloudVisionResult.data; // Keep as backup
-        }
+        validResults.push({ service: 'CloudVision', data: cloudVisionResult.data, duration: cloudVisionResult.duration });
       } else {
-        console.warn('❌ HybridVision: CloudVision extraction failed:', cloudVisionResult.error);
+        console.warn('❌ CloudVision extraction failed:', cloudVisionResult.error);
       }
 
-      // STEP 2: Try Gemini if CloudVision didn't meet quality threshold or failed
+      if (claudeResult.success) {
+        console.log('✅ Claude extraction successful');
+        console.log(`📊 Claude confidence: ${claudeResult.data.confidence}%`);
+        validResults.push({ service: 'Claude', data: claudeResult.data, duration: claudeResult.duration });
+      } else {
+        console.warn('❌ Claude extraction failed:', claudeResult.error);
+      }
+
+      // Choose the best result from parallel processing
+      if (validResults.length > 0) {
+        // First, check if any result meets the high quality threshold
+        const highQualityResults = validResults.filter(r => this.isHighQualityResult(r.data));
+        
+        if (highQualityResults.length > 0) {
+          // Use the fastest high-quality result
+          const fastestGoodResult = highQualityResults.reduce((fastest, current) => 
+            current.duration < fastest.duration ? current : fastest
+          );
+          bestResult = fastestGoodResult.data;
+          console.log(`🎉 Using high-quality result from ${fastestGoodResult.service} (${fastestGoodResult.duration}ms)`);
+        } else {
+          // No high-quality results, choose the best available
+          bestResult = validResults.reduce((best, current) => 
+            this.compareResults(current.data, best.data) > 0 ? current : best
+          ).data;
+          console.log('⚠️ No high-quality results from parallel processing, using best available');
+        }
+      }
+
+      // STEP 2: Fall back to Gemini if parallel processing didn't produce good results
       if (!bestResult || !this.isHighQualityResult(bestResult)) {
-        console.log('2️⃣ HybridVision: Trying Gemini API as fallback...');
+        console.log('2️⃣ HybridVision: Parallel processing insufficient, trying Gemini fallback...');
         fallbackUsed = true;
 
         const geminiResult = await this.tryWithTimeout(
@@ -91,12 +142,12 @@ class HybridVisionService {
           console.log('✅ HybridVision: Gemini extraction successful');
           console.log(`📊 Gemini confidence: ${geminiResult.data.confidence}%`);
           
-          // Compare results and choose the best one
+          // Compare with existing best result
           if (!bestResult || this.compareResults(geminiResult.data, bestResult) > 0) {
             console.log('🔄 HybridVision: Gemini result is better, using as final result');
             bestResult = geminiResult.data;
           } else {
-            console.log('🔄 HybridVision: CloudVision result is still better, keeping it');
+            console.log('🔄 HybridVision: Previous result is still better, keeping it');
           }
         } else {
           console.warn('❌ HybridVision: Gemini extraction also failed:', geminiResult.error);
@@ -110,7 +161,7 @@ class HybridVisionService {
         console.log('🎉 HybridVision: Extraction completed successfully');
         console.log(`📊 Final result confidence: ${bestResult.confidence}%`);
         console.log(`⏱️ Total extraction time: ${totalDuration}ms`);
-        console.log(`🔧 Services used: ${attempts.map(a => a.service).join(' → ')}`);
+        console.log(`🔧 Services used: ${attempts.map(a => a.service).join(', ')}`);
         
         return this.enhanceResultWithMetadata(bestResult, {
           attempts,
@@ -265,7 +316,7 @@ class HybridVisionService {
   /**
    * Get the primary service used for extraction
    */
-  getPrimaryService(data: ExtractedBankData): 'cloudVision' | 'gemini' | null {
+  getPrimaryService(data: ExtractedBankData): 'cloudVision' | 'claude' | 'gemini' | null {
     return (data as any)._extractionMetadata?.primaryService || null;
   }
 }

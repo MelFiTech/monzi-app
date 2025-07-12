@@ -1,6 +1,7 @@
 export { default as ChatService } from './ChatService';
 export { default as GeminiService } from './GeminiService';
 export { default as CloudVisionService } from './CloudVisionService';
+export { default as ClaudeService } from './ClaudeService';
 export { default as HybridVisionService } from './HybridVisionService';
 
 export { default as CacheService } from './CacheService';
