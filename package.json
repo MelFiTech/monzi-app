@@ -13,7 +13,6 @@
     "preset": "jest-expo"
   },
   "dependencies": {
-    "@bam.tech/react-native-image-resizer": "^3.0.11",
     "@expo-google-fonts/sora": "^0.4.1",
     "@expo/vector-icons": "^14.1.0",
     "@react-native-async-storage/async-storage": "2.1.2",
@@ -53,9 +52,7 @@
     "react-native-svg": "15.11.2",
     "react-native-vision-camera": "^4.7.0",
     "react-native-web": "~0.20.0",
-    "react-native-worklets-core": "^1.6.0",
-    "socket.io-client": "^4.8.1",
-    "vision-camera-ocr": "^1.0.0"
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

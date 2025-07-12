@@ -47,9 +47,7 @@
       [
         "react-native-vision-camera",
         {
-          "cameraPermissionText": "Monzi uses the camera to capture selfies for KYC verification and to scan payment account numbers for quick and accurate money transfers.",
-          "enableFrameProcessors": true,
-          "enableCodeScanner": true
+          "cameraPermissionText": "Monzi uses the camera to capture selfies for KYC verification and to scan payment account numbers for quick and accurate money transfers."
         }
       ]
     ],

@@ -1103,16 +1103,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@bam.tech/react-native-image-resizer@npm:^3.0.11":
-  version: 3.0.11
-  resolution: "@bam.tech/react-native-image-resizer@npm:3.0.11"
-  peerDependencies:
-    react: "*"
-    react-native: "*"
-  checksum: 0d9e95c625f8ef3a5d7195721d8ac6463a08468c9474f2627a1a85cefa509efc06bd160bd9108d1cce1fa05751a4b69871dce975659571009149d258cf9ddd8b
-  languageName: node
-  linkType: hard
-
 "@bcoe/v8-coverage@npm:^0.2.3":
   version: 0.2.3
   resolution: "@bcoe/v8-coverage@npm:0.2.3"
@@ -7004,7 +6994,6 @@ __metadata:
   resolution: "monzi@workspace:."
   dependencies:
     "@babel/core": ^7.25.2
-    "@bam.tech/react-native-image-resizer": ^3.0.11
     "@expo-google-fonts/sora": ^0.4.1
     "@expo/vector-icons": ^14.1.0
     "@react-native-async-storage/async-storage": 2.1.2
@@ -7047,12 +7036,10 @@ __metadata:
     react-native-svg: 15.11.2
     react-native-vision-camera: ^4.7.0
     react-native-web: ~0.20.0
-    react-native-worklets-core: ^1.6.0
     react-test-renderer: 19.0.0
     socket.io-client: ^4.8.1
     tailwindcss: ^4.1.11
     typescript: ~5.8.3
-    vision-camera-ocr: ^1.0.0
   languageName: unknown
   linkType: soft
 
@@ -8007,18 +7994,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-native-worklets-core@npm:^1.6.0":
-  version: 1.6.0
-  resolution: "react-native-worklets-core@npm:1.6.0"
-  dependencies:
-    string-hash-64: ^1.0.3
-  peerDependencies:
-    react: "*"
-    react-native: "*"
-  checksum: facd10331791fa8d3d6111d621ffac16cd79a03ab4d6daaac99dc382855baf345ec47e435edc08dff9fc5fa9cb23041e260d879ed823d5224e2deffa8847f53c
-  languageName: node
-  linkType: hard
-
 "react-native@npm:0.79.5":
   version: 0.79.5
   resolution: "react-native@npm:0.79.5"
@@ -8801,13 +8776,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"string-hash-64@npm:^1.0.3":
-  version: 1.0.3
-  resolution: "string-hash-64@npm:1.0.3"
-  checksum: 79de8431b4fa3e85a2429cd52a34f7948221ff167b7a094e05d6bcfd0173474b232e0c9845c96f74b0d7b6b0c8bbe2c3532a4cacb21635293ef0cf3cc8e77f06
-  languageName: node
-  linkType: hard
-
 "string-length@npm:^4.0.1":
   version: 4.0.2
   resolution: "string-length@npm:4.0.2"
@@ -9398,16 +9366,6 @@ __metadata:
   version: 1.1.2
   resolution: "vary@npm:1.1.2"
   checksum: ae0123222c6df65b437669d63dfa8c36cee20a504101b2fcd97b8bf76f91259c17f9f2b4d70a1e3c6bbcee7f51b28392833adb6b2770b23b01abec84e369660b
-  languageName: node
-  linkType: hard
-
-"vision-camera-ocr@npm:^1.0.0":
-  version: 1.0.0
-  resolution: "vision-camera-ocr@npm:1.0.0"
-  peerDependencies:
-    react: "*"
-    react-native: "*"
-  checksum: 00e724bac149295ae124be418f3b5a5d6790c75b2aa39b536b48e3204cfbe6271bea5a7c4bd7c8384c5a9e5e69a35655c3a15113179ac9287ab6383d59be3667
   languageName: node
   linkType: hard
 
