@@ -19,9 +19,8 @@ import CameraButton from '@/components/camera/CameraButton';
 import { CameraHeader } from '@/components/layout';
 import { BankTransferModal, CircularLoader, VerificationModal, Toast, SetPinModal } from '@/components/common';
 import { CaptureAnimation } from '@/components/camera';
-import { ExtractedBankData, CacheService, EnhancedExtractedBankData, ProcessingStep } from '@/services';
+import { ExtractedBankData, CacheService } from '@/services';
 import { useHybridVisionExtractBankDataMutation, useHybridVisionDataValidation } from '@/hooks';
-import { useEnhancedVisionExtractBankData } from '@/hooks/useEnhancedVisionService';
 import ToastService from '@/services/ToastService';
 import { useResolveAccountMutation } from '@/hooks/useAccountService';
 import { useKYCStatus } from '@/hooks/useKYCService';
@@ -86,25 +85,15 @@ export default function CameraScreen() {
   const [isFreshRegistration, setIsFreshRegistration] = useState(false);
   const [extractedData, setExtractedData] = useState<ExtractedBankData | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [capturedImageUri, setCapturedImageUri] = useState<string>('');
+  const [capturedImageUri, setCapturedImageUri] = useState<string | null>(null);
   const [showCaptureAnimation, setShowCaptureAnimation] = useState(false);
-  const [processingSteps, setProcessingSteps] = useState<ProcessingStep[]>([]);
   const cameraRef = useRef<CameraView>(null);
   const flashAnimation = useRef(new Animated.Value(0)).current;
   const instructionAnimation = useRef(new Animated.Value(1)).current;
   const zoomAnimation = useRef(new Animated.Value(1)).current;
 
-  // React Query hooks - Enhanced Vision Service
-  const enhancedExtractBankDataMutation = useEnhancedVisionExtractBankData({
-    onProgress: (step: ProcessingStep) => {
-      console.log('🔄 Processing step:', step);
-      setProcessingSteps(prev => [...prev, step]);
-    },
-    onQuickPreview: (preview) => {
-      console.log('👀 Quick preview:', preview);
-      // Could show instant feedback here
-    }
-  });
+  // React Query hooks - AI-only extraction
+  const extractBankDataMutation = useHybridVisionExtractBankDataMutation();
   const resolveAccountMutation = useResolveAccountMutation();
   const { validateExtraction, formatAmount } = useHybridVisionDataValidation();
   const { data: walletDetails, error: walletDetailsError, isLoading: walletDetailsLoading, isError: walletDetailsIsError } = useWalletDetails();
@@ -604,7 +593,6 @@ export default function CameraScreen() {
         // Show gamified capture animation
         setCapturedImageUri(photo.uri);
         setShowCaptureAnimation(true);
-        setProcessingSteps([]); // Reset processing steps
         
         // Start processing in background
         await processImage(photo.uri);
@@ -613,8 +601,7 @@ export default function CameraScreen() {
       console.error('Error taking picture:', error);
       Alert.alert('Error', 'Failed to capture photo. Please try again.');
       setShowCaptureAnimation(false);
-      setCapturedImageUri('');
-      setProcessingSteps([]);
+      setCapturedImageUri(null);
     } finally {
       setIsCapturing(false);
     }
@@ -627,25 +614,13 @@ export default function CameraScreen() {
         setIsProcessing(true);
       }
 
-      // Use Enhanced React Query mutation to extract bank data with OCR + compression
-      const enhancedData = await enhancedExtractBankDataMutation.mutateAsync(imageUri);
+      // Use AI-based React Query mutation to extract bank data
+      const extractedBankData = await extractBankDataMutation.mutateAsync(imageUri);
       
-      console.log('🎯 Enhanced extraction completed:', enhancedData);
+      console.log('🎯 AI extraction completed:', extractedBankData);
 
-      // Convert enhanced data to compatible format
-      const compatibleData: ExtractedBankData = {
-        accountNumber: enhancedData.accountNumber,
-        bankName: enhancedData.bankName,
-        amount: enhancedData.amount || '',
-        accountHolderName: '', // Will be resolved in modal
-        confidence: enhancedData.confidence,
-        extractedFields: {
-          accountNumber: !!enhancedData.accountNumber,
-          bankName: !!enhancedData.bankName,
-          amount: !!enhancedData.amount,
-          accountHolderName: false, // Will be resolved later
-        }
-      };
+      // Use the extracted data directly (already in compatible format)
+      const compatibleData: ExtractedBankData = extractedBankData;
 
       // Cache the extracted data (without account resolution)
       await CacheService.cacheData(compatibleData);
@@ -823,8 +798,7 @@ export default function CameraScreen() {
   const handleCaptureAnimationComplete = () => {
     console.log('🎬 Capture animation completed');
     setShowCaptureAnimation(false);
-    setCapturedImageUri('');
-    setProcessingSteps([]);
+    setCapturedImageUri(null);
   };
 
   const getFlashIcon = () => {
@@ -939,7 +913,7 @@ export default function CameraScreen() {
         <View style={styles.loaderContainer}>
           <CircularLoader size={60} color="#F5C842" />
           <Text style={[styles.loaderText, { color: '#FFFFFF' }]}>
-            {enhancedExtractBankDataMutation.isPending ? 'Extracting data...' : 
+            {extractBankDataMutation.isPending ? 'Extracting data...' : 
              resolveAccountMutation.isPending ? 'Verifying account...' : 
              'Processing...'}
           </Text>
@@ -1014,8 +988,8 @@ export default function CameraScreen() {
       {/* Gamified Capture Animation */}
       <CaptureAnimation
         visible={showCaptureAnimation}
-        capturedImageUri={capturedImageUri}
-        processingSteps={processingSteps}
+        capturedImageUri={capturedImageUri || undefined}
+        processingSteps={[]}
         onAnimationComplete={handleCaptureAnimationComplete}
       />
 

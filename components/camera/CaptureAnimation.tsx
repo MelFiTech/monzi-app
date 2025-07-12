@@ -8,14 +8,12 @@ import {
   StyleSheet 
 } from 'react-native';
 import { fontFamilies } from '@/constants/fonts';
-import { ProcessingStep } from '@/services/EnhancedVisionService';
-
 const { width, height } = Dimensions.get('window');
 
 interface CaptureAnimationProps {
   visible: boolean;
   capturedImageUri?: string;
-  processingSteps: ProcessingStep[];
+  processingSteps: any[]; // Simplified - no longer using ProcessingStep
   onAnimationComplete?: () => void;
 }
 
@@ -25,7 +23,7 @@ export default function CaptureAnimation({
   processingSteps,
   onAnimationComplete
 }: CaptureAnimationProps) {
-  const [currentStep, setCurrentStep] = useState<ProcessingStep | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -35,11 +33,10 @@ export default function CaptureAnimation({
   const progressAnim = useRef(new Animated.Value(0)).current;
   const stepOpacity = useRef(new Animated.Value(0)).current;
   
-  // Track processing steps
+  // Simplified processing animation
   useEffect(() => {
-    if (processingSteps.length > 0) {
-      const latestStep = processingSteps[processingSteps.length - 1];
-      setCurrentStep(latestStep);
+    if (visible && capturedImageUri) {
+      setIsProcessing(true);
       
       // Animate step appearance
       Animated.sequence([
@@ -55,18 +52,16 @@ export default function CaptureAnimation({
         }),
       ]).start();
       
-      // Update progress bar
-      const completedSteps = processingSteps.filter(step => step.status === 'completed').length;
-      const totalExpectedSteps = 4; // Compression, Local OCR, API, Complete
-      const progress = Math.min(completedSteps / totalExpectedSteps, 1);
-      
+      // Animate progress bar to completion over 3 seconds
       Animated.timing(progressAnim, {
-        toValue: progress,
-        duration: 500,
+        toValue: 1,
+        duration: 3000,
         useNativeDriver: false,
       }).start();
+    } else {
+      setIsProcessing(false);
     }
-  }, [processingSteps]);
+  }, [visible, capturedImageUri]);
 
   // Initial animation when visible
   useEffect(() => {
@@ -113,20 +108,17 @@ export default function CaptureAnimation({
     }
   }, [visible, capturedImageUri]);
 
-  // Check if processing is complete
+  // Auto-complete after animation duration
   useEffect(() => {
-    const hasCompletedStep = processingSteps.some(step => 
-      step.status === 'completed' && 
-      (step.step === 'API Extraction' || step.step === 'Local OCR Processing')
-    );
-    
-    if (hasCompletedStep && onAnimationComplete) {
-      // Delay before calling completion to show success state
-      setTimeout(() => {
+    if (visible && capturedImageUri && onAnimationComplete) {
+      // Auto-complete after 4 seconds (1 second longer than progress animation)
+      const timer = setTimeout(() => {
         onAnimationComplete();
-      }, 1500);
+      }, 4000);
+      
+      return () => clearTimeout(timer);
     }
-  }, [processingSteps, onAnimationComplete]);
+  }, [visible, capturedImageUri, onAnimationComplete]);
 
   if (!visible) return null;
 
@@ -146,28 +138,12 @@ export default function CaptureAnimation({
     }
   ];
 
-  const getStepIcon = (step: ProcessingStep) => {
-    switch (step.status) {
-      case 'completed':
-        return '✅';
-      case 'failed':
-        return '❌';
-      case 'starting':
-      default:
-        return '⏳';
-    }
+  const getProcessingIcon = () => {
+    return isProcessing ? '⏳' : '✅';
   };
 
-  const getStepColor = (step: ProcessingStep) => {
-    switch (step.status) {
-      case 'completed':
-        return '#10B981'; // Green
-      case 'failed':
-        return '#EF4444'; // Red
-      case 'starting':
-      default:
-        return '#F59E0B'; // Yellow
-    }
+  const getProcessingColor = () => {
+    return isProcessing ? '#F59E0B' : '#10B981'; // Yellow while processing, green when done
   };
 
   return (
@@ -211,16 +187,14 @@ export default function CaptureAnimation({
         </View>
 
         {/* Current Step Display */}
-        {currentStep && (
+        {isProcessing && (
           <Animated.View style={[styles.stepContainer, { opacity: stepOpacity }]}>
             <View style={styles.stepContent}>
-              <Text style={styles.stepIcon}>{getStepIcon(currentStep)}</Text>
+              <Text style={styles.stepIcon}>{getProcessingIcon()}</Text>
               <View style={styles.stepText}>
-                <Text style={styles.stepTitle}>{currentStep.step}</Text>
-                <Text style={[styles.stepStatus, { color: getStepColor(currentStep) }]}>
-                  {currentStep.status === 'starting' && 'Processing...'}
-                  {currentStep.status === 'completed' && `Completed in ${currentStep.duration || 0}ms`}
-                  {currentStep.status === 'failed' && 'Failed - trying alternative'}
+                <Text style={styles.stepTitle}>AI Processing</Text>
+                <Text style={[styles.stepStatus, { color: getProcessingColor() }]}>
+                  {isProcessing ? 'Extracting bank details...' : 'Processing complete!'}
                 </Text>
               </View>
             </View>
@@ -232,7 +206,7 @@ export default function CaptureAnimation({
           Extracting bank details...
         </Text>
         <Text style={styles.processingSubtitle}>
-          Using AI + Local OCR for best results
+          Using AI for accurate results
         </Text>
       </View>
 
