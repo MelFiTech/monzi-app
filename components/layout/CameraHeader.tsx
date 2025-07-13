@@ -13,10 +13,11 @@ import { useAuth } from '@/hooks/useAuthService';
 import { fontFamilies } from '@/constants/fonts';
 import { useWalletBalance, useWalletDetails, useWalletAccessStatus } from '@/hooks';
 import { useNotificationService } from '@/hooks/useNotificationService';
-import { ArrowLeft, User, Copy, Check } from 'lucide-react-native';
+import { ArrowLeft, Copy, Check } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import Toast from '@/components/common/Toast';
+import { WalletHeaderSkeleton } from '@/components/common';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface CameraHeaderProps {
@@ -76,8 +77,8 @@ export function CameraHeader({
   const { hasWalletAccess, statusMessage } = useWalletAccessStatus();
 
   // Fetch wallet data only if user has access
-  const { data: balanceData } = useWalletBalance();
-  const { data: walletDetails } = useWalletDetails();
+  const { data: balanceData, isLoading: isBalanceLoading } = useWalletBalance();
+  const { data: walletDetails, isLoading: isWalletLoading } = useWalletDetails();
 
   // Real-time notifications for wallet updates
   const { 
@@ -94,71 +95,84 @@ export function CameraHeader({
     },
     {
       onWalletBalanceUpdate: (notification) => {
-        console.log('🔔 [CameraHeader] Real-time wallet update received:', {
+        console.log('🚨🚨🚨 [FRONTEND] WALLET BALANCE UPDATE RECEIVED 🚨🚨🚨');
+        console.log('📊 [CameraHeader] Raw notification data:', JSON.stringify(notification, null, 2));
+        
+        const balanceChange = {
+          oldBalance: notification.oldBalance,
+          newBalance: notification.newBalance,
+          changeAmount: notification.change, // Backend uses "change" not "amount"
+          isCredit: notification.change > 0,
+          isDebit: notification.change < 0,
+        };
+        
+        console.log('💰 [CameraHeader] BALANCE CHANGE DETAILS:', {
           component: 'CameraHeader',
           timestamp: new Date().toISOString(),
           eventType: 'wallet_balance_updated',
-          fullNotification: notification,
-          balanceChange: {
-            oldBalance: formatNotificationAmount(notification.data.oldBalance),
-            newBalance: formatNotificationAmount(notification.data.newBalance),
-            changeAmount: formatNotificationAmount(notification.data.amount),
-            isCredit: notification.data.amount > 0,
-            isDebit: notification.data.amount < 0,
-          },
+          userId: notification.userId,
+          balanceChange,
           transaction: {
-            reference: notification.data.transactionReference,
-            accountNumber: notification.data.accountNumber,
-            description: notification.data.description,
-            timestamp: notification.data.timestamp,
+            reference: notification.reference, // Backend uses "reference" not "transactionReference"
+            accountNumber: notification.accountNumber,
+            currency: notification.currency,
+            timestamp: notification.timestamp,
           }
         });
         
-        // Log balance comparison
-        if (notification.data.amount > 0) {
-          console.log(`💰 [CameraHeader] WALLET CREDITED: +${formatNotificationAmount(notification.data.amount)} | New Balance: ${formatNotificationAmount(notification.data.newBalance)}`);
-        } else if (notification.data.amount < 0) {
-          console.log(`💸 [CameraHeader] WALLET DEBITED: ${formatNotificationAmount(notification.data.amount)} | New Balance: ${formatNotificationAmount(notification.data.newBalance)}`);
+        // Prominent balance change log
+        if (notification.change > 0) {
+          console.log(`💰💰💰 [WALLET CREDITED] +₦${notification.change} | Old: ₦${notification.oldBalance} → New: ₦${notification.newBalance}`);
+        } else if (notification.change < 0) {
+          console.log(`💸💸💸 [WALLET DEBITED] ₦${notification.change} | Old: ₦${notification.oldBalance} → New: ₦${notification.newBalance}`);
         }
         
         // Invalidate wallet queries to refresh balance display
+        console.log('🔄 [CameraHeader] Invalidating React Query cache...');
         queryClient.invalidateQueries({ queryKey: ['wallet', 'balance'] });
         queryClient.invalidateQueries({ queryKey: ['wallet', 'details'] });
         queryClient.invalidateQueries({ queryKey: ['wallet', 'transactions'] });
         
-        console.log('🔄 [CameraHeader] React Query cache invalidated for wallet data');
+        console.log('✅ [CameraHeader] React Query cache invalidated - UI should refresh now');
       },
       onTransactionNotification: (notification) => {
-        console.log('💳 [CameraHeader] Real-time transaction notification received:', {
+        console.log('🚨🚨🚨 [FRONTEND] TRANSACTION NOTIFICATION RECEIVED 🚨🚨🚨');
+        console.log('📊 [CameraHeader] Raw transaction data:', JSON.stringify(notification, null, 2));
+        
+        console.log('💳 [CameraHeader] TRANSACTION DETAILS:', {
           component: 'CameraHeader',
           timestamp: new Date().toISOString(),
           eventType: 'transaction_notification',
-          fullNotification: notification,
+          userId: notification.userId,
           transaction: {
-            type: notification.data.type,
-            amount: formatNotificationAmount(notification.data.amount),
-            reference: notification.data.transactionReference,
-            accountNumber: notification.data.accountNumber,
-            description: notification.data.description,
-            status: notification.data.status,
-            timestamp: notification.data.timestamp,
+            type: notification.type,
+            amount: notification.amount,
+            reference: notification.reference, // Backend uses "reference" not "transactionReference"
+            currency: notification.currency,
+            description: notification.description,
+            status: notification.status,
+            timestamp: notification.timestamp,
           }
         });
         
-        console.log(`💳 [CameraHeader] TRANSACTION ${notification.data.type.toUpperCase()}: ${formatNotificationAmount(notification.data.amount)} | Status: ${notification.data.status}`);
+        console.log(`💳💳💳 [TRANSACTION ${notification.type?.toUpperCase()}] ₦${notification.amount} | Status: ${notification.status} | Ref: ${notification.reference}`);
         
         // Refresh wallet data for any transaction
+        console.log('🔄 [CameraHeader] Invalidating wallet queries for transaction...');
         queryClient.invalidateQueries({ queryKey: ['wallet'] });
         
-        console.log('🔄 [CameraHeader] React Query cache invalidated for all wallet data');
+        console.log('✅ [CameraHeader] Wallet data cache invalidated for transaction');
       },
       onConnect: () => {
+        console.log('🚨🚨🚨 [FRONTEND] SOCKET CONNECTED TO BACKEND 🚨🚨🚨');
         console.log('🔌 [CameraHeader] Real-time notifications connected:', {
           component: 'CameraHeader',
           timestamp: new Date().toISOString(),
           event: 'connected',
+          userId: user?.id,
           message: 'Successfully connected to Socket.IO notifications server'
         });
+        console.log('✅ [CameraHeader] Ready to receive wallet balance updates and transaction notifications');
       },
       onError: (error) => {
         console.error('❌ [CameraHeader] Real-time notification error:', {
@@ -194,12 +208,14 @@ export function CameraHeader({
   const walletBalance = formatBalance(rawBalance);
   const accountInfo = getAccountInfo();
 
+  // Check if we should show skeleton loader
+  const isWalletDataLoading = hasWalletAccess && (isBalanceLoading || isWalletLoading);
+
   const handleAddPress = () => {
     router.push('/profile');
   };
 
-  const handleProfilePress = () => {
-    // Navigate to profile modal
+  const handleModalPress = () => {
     router.push('/modal');
   };
 
@@ -212,31 +228,21 @@ export function CameraHeader({
   };
 
   const handleCopyAccount = async () => {
+    if (!hasWalletAccess || !walletDetails?.virtualAccountNumber) {
+      return;
+    }
+    
     try {
-      // Only allow copying if user has wallet access
-      if (!hasWalletAccess) {
-        setShowToast(true);
-        setTimeout(() => setShowToast(false), 2000);
-        return;
-      }
-
-      const accountNumber = walletDetails?.virtualAccountNumber || '';
-      if (accountNumber) {
-        Clipboard.setString(accountNumber);
-        setShowToast(true);
-        setCopied(true);
-        setTimeout(() => {
-          setCopied(false);
-        }, 2000);
-      }
-    } catch (error) {
-      console.warn('Failed to copy account number:', error);
-      // Show toast anyway for feedback
-      setShowToast(true);
+      await Clipboard.setStringAsync(walletDetails.virtualAccountNumber);
       setCopied(true);
+      setShowToast(true);
+      
+      // Reset copied state after 2 seconds
       setTimeout(() => {
         setCopied(false);
       }, 2000);
+    } catch (error) {
+      console.error('Failed to copy account number:', error);
     }
   };
 
@@ -246,7 +252,11 @@ export function CameraHeader({
 
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor="#000000" />
+      <StatusBar 
+        barStyle="light-content" 
+        backgroundColor="transparent" 
+        translucent 
+      />
       <Toast
         visible={showToast}
         message={`${walletDetails?.virtualAccountNumber || 'Account number'} copied`}
@@ -254,10 +264,8 @@ export function CameraHeader({
         onHide={() => setShowToast(false)}
       />
       <LinearGradient
-        colors={['rgba(0, 0, 0, 0.95)', 'rgba(0, 0, 0, 0.60)', 'rgba(0, 0, 0, 0)']}
+        colors={['rgba(0, 0, 0, 0.75)', 'rgba(0, 0, 0, 0)']}
         style={styles.header}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
       >
         {/* Left Circle */}
         <View style={styles.leftSection}>
@@ -266,7 +274,7 @@ export function CameraHeader({
               <ArrowLeft size={20} color="#FFFFFF" strokeWidth={2} />
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity style={styles.iconButton} onPress={handleProfilePress}>
+            <TouchableOpacity style={styles.iconButton} onPress={handleModalPress}>
               <View style={[styles.profileAvatar, {  backgroundColor: 'rgba(0, 0, 0, 0.28)' }]}>
                 <Image 
                   source={require('@/assets/icons/home/monzi.png')}
@@ -279,60 +287,64 @@ export function CameraHeader({
 
         {/* Center Section */}
         <View style={styles.centerSection}>
-          <View style={styles.walletInfoContainer}>
-            <View style={styles.walletLabelContainer}>
-              <Text style={styles.walletLabel}>Wallet Balance</Text>
-              {/* Real-time status indicator */}
-              {hasWalletAccess && (
-                <View style={[styles.statusIndicator, { 
-                  backgroundColor: isNotificationConnected ? '#10B981' : 'rgba(255, 255, 255, 0.3)' 
-                }]} />
-              )}
+          {isWalletDataLoading ? (
+            <WalletHeaderSkeleton />
+          ) : (
+            <View style={styles.walletInfoContainer}>
+              <View style={styles.walletLabelContainer}>
+                <Text style={styles.walletLabel}>Wallet Balance</Text>
+                {/* Real-time status indicator */}
+                {hasWalletAccess && (
+                  <View style={[styles.statusIndicator, { 
+                    backgroundColor: isNotificationConnected ? '#10B981' : 'rgba(255, 255, 255, 0.3)' 
+                  }]} />
+                )}
+              </View>
+              <TouchableOpacity onPress={toggleBalanceVisibility}>
+                {isBalanceHidden ? (
+                  <Text style={styles.walletAmount}>********</Text>
+                ) : (
+                  <View style={styles.balanceContainer}>
+                    {(() => {
+                      // Split balance into naira and kobo parts
+                      const balanceText = walletBalance;
+                      const decimalIndex = balanceText.indexOf('.');
+                      
+                      if (decimalIndex === -1) {
+                        // No decimal point, just show the full amount
+                        return <Text style={styles.walletAmount}>{balanceText}</Text>;
+                      }
+                      
+                      const nairapart = balanceText.substring(0, decimalIndex);
+                      const kobopart = balanceText.substring(decimalIndex);
+                      
+                      return (
+                        <>
+                          <Text style={styles.walletAmount}>{nairapart}</Text>
+                          <Text style={styles.koboAmount}>{kobopart}</Text>
+                        </>
+                      );
+                    })()}
+                  </View>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.accountPill}
+                onPress={handleCopyAccount}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.accountText}>{accountInfo}</Text>
+                {copied ? (
+                  <Check size={16} color="#10B981" strokeWidth={1.5} />
+                ) : (
+                  <Copy size={16} color="rgba(255, 255, 255, 0.6)" strokeWidth={1.5} />
+                )}
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={toggleBalanceVisibility}>
-              {isBalanceHidden ? (
-                <Text style={styles.walletAmount}>********</Text>
-              ) : (
-                <View style={styles.balanceContainer}>
-                  {(() => {
-                    // Split balance into naira and kobo parts
-                    const balanceText = walletBalance;
-                    const decimalIndex = balanceText.indexOf('.');
-                    
-                    if (decimalIndex === -1) {
-                      // No decimal point, just show the full amount
-                      return <Text style={styles.walletAmount}>{balanceText}</Text>;
-                    }
-                    
-                    const nairapart = balanceText.substring(0, decimalIndex);
-                    const kobopart = balanceText.substring(decimalIndex);
-                    
-                    return (
-                      <>
-                        <Text style={styles.walletAmount}>{nairapart}</Text>
-                        <Text style={styles.koboAmount}>{kobopart}</Text>
-                      </>
-                    );
-                  })()}
-                </View>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.accountPill}
-              onPress={handleCopyAccount}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.accountText}>{accountInfo}</Text>
-              {copied ? (
-                <Check size={16} color="#10B981" strokeWidth={1.5} />
-              ) : (
-                <Copy size={16} color="rgba(255, 255, 255, 0.6)" strokeWidth={1.5} />
-              )}
-            </TouchableOpacity>
-          </View>
+          )}
         </View>
 
-        {/* Right Circle */}
+        {/* Right Section */}
         <View style={styles.rightSection}>
           <TouchableOpacity style={styles.iconButton} onPress={handleAddPress}>
             <Image 
@@ -446,9 +458,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.97)',
     fontFamily: fontFamilies.sora.semiBold,
     letterSpacing: -0.3,
-  },
-  copyButton: {
-    padding: 4,
   },
 });
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -21,6 +21,22 @@ export default function PhotoReviewScreen() {
   const { photoUri } = useLocalSearchParams<{ photoUri: string }>();
   const uploadSelfieMutation = useUploadSelfie();
   const { logout } = useAuth();
+
+  // Handle upload errors - navigate back to camera with error message
+  useEffect(() => {
+    if (uploadSelfieMutation.isError) {
+      const errorMessage = uploadSelfieMutation.error?.message || 'Photo processing failed. Please try again.';
+      console.error('❌ Selfie upload failed:', errorMessage);
+      
+      // Navigate back to camera with error message
+      router.push({
+        pathname: '/(kyc)/camera',
+        params: { 
+          error: errorMessage 
+        }
+      });
+    }
+  }, [uploadSelfieMutation.isError, uploadSelfieMutation.error]);
 
   const handleRetake = () => {
     router.push('/(kyc)/camera');

@@ -100,8 +100,7 @@ export default function ProfileScreen() {
   };
 
   const handleSecurityPress = () => {
-    // TODO: Navigate to security settings
-    console.log('Security & Privacy pressed');
+    router.push('/security');
   };
 
   const handleAboutPress = () => {

@@ -1,3 +1,5 @@
+import SmartPromptService from './SmartPromptService';
+
 const GEMINI_API_KEY = 'AIzaSyDsKEEDirE1Y3QLkEZQ66-D-SFgvER-blA';
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
@@ -36,100 +38,10 @@ class GeminiService {
     }
   }
 
-  private createIntelligentPrompt(): string {
-    return `
-You are an EXPERT Nigerian bank document analyzer with 99%+ accuracy rate. 
-Your specialty is extracting data from bank cards, statements, and financial documents with ABSOLUTE ZERO tolerance for errors.
-
-CRITICAL MISSION: Extract bank information with surgical precision. If you're not 100% certain, return empty string.
-
-🏦 NIGERIAN BANK VISUAL SIGNATURES (Study these meticulously):
-
-TIER 1 BANKS:
-- GTBank/Guaranty Trust Bank: ORANGE/WHITE theme, "GTB" logo, Diamond-shaped logo, Unique font style
-- Access Bank: ORANGE/BLUE gradient, Diamond symbol, "ACCESS" text, Modern design
-- Zenith Bank: RED dominant color, "ZENITH" in white text, Red/White cards, Premium finish
-- UBA (United Bank for Africa): RED/BLACK theme, "UBA" logo, Pan-African branding, Lion symbol
-- First Bank: ROYAL BLUE/WHITE, Elephant logo/symbol, "FIRSTBANK" text, Heritage design
-- Fidelity Bank: GREEN primary color, "FIDELITY" text, Professional layout
-- Stanbic IBTC: BLUE/WHITE, "STANBIC IBTC" branding, Corporate style
-- Sterling Bank: GREEN/ORANGE combination, "STERLING" text, Modern aesthetic
-
-TIER 2 BANKS:
-- Union Bank: NAVY BLUE, "UNION BANK" text, Traditional design
-- Wema Bank: PURPLE/VIOLET branding, "WEMA" text, Digital-forward look
-- FCMB: YELLOW/BLUE combo, "FCMB" acronym, Corporate style
-- Ecobank: BLUE/GREEN, "ECOBANK" pan-African branding, Global look
-- Polaris Bank: BLUE theme, "POLARIS" text, Contemporary design
-- Keystone Bank: RED branding, "KEYSTONE" text, Bold typography
-- Unity Bank: GREEN, "UNITY BANK" text, Clean layout
-- Jaiz Bank: GREEN/GOLD, Islamic banking, "JAIZ" text, Unique identity
-- Providus Bank: BLUE/GOLD, "PROVIDUS" text, Premium banking style
-
-FINTECH/DIGITAL BANKS:
-- PalmPay: BRIGHT GREEN/WHITE, "PalmPay" text, Modern fintech styling
-- Opay: BLUE/CYAN, "Opay" modern font, Digital wallet aesthetic
-- Kuda: PURPLE/WHITE, "KUDA" minimalist design, Digital-first
-- VFD Microfinance: BLUE, "VFD" text, Professional fintech look
-- Moniepoint: GREEN, "Moniepoint" text, Modern banking design
-
-🔍 ENHANCED EXTRACTION RULES:
-
-1. ACCOUNT NUMBERS: 
-   - Nigerian NUBAN: STRICTLY 10 digits
-   - Pattern recognition: Look for consistent spacing, font style
-   - Context validation: Position on document/card
-   - STRICT REJECTION: Any number not exactly 10 digits
-   - Double verification against bank-specific patterns
-
-2. BANK NAMES:
-   - Multi-point verification:
-     * Visual branding match
-     * Color scheme confirmation
-     * Logo identification
-     * Text pattern recognition
-   - Advanced fuzzy matching with confidence threshold
-   - Cross-reference with official bank registry
-
-3. ACCOUNT HOLDER NAMES:
-   - Full name extraction (First + Last minimum)
-   - Advanced name cleaning:
-     * Remove all titles (MR/MRS/DR/PROF)
-     * Correct capitalization
-     * Remove special characters
-     * Validate against Nigerian name patterns
-
-4. AMOUNTS:
-   - Precision extraction:
-     * Remove all currency symbols
-     * Standardize number format
-     * Validate decimal places
-     * Context-aware amount recognition
-
-🎯 ENHANCED CONFIDENCE SCORING:
-- 95-100: Crystal clear data, multiple confirmation points
-- 90-94: Very clear data, single minor uncertainty
-- 85-89: Clear data with minimal ambiguity
-- Below 85: Return something close to the correct data, but not empty strings
--Be accurate
-
-Return ONLY this JSON (no explanation):
-{
-  "bankName": "exact bank name from approved list or empty string",
-  "accountNumber": "exactly 10 digits or empty string", 
-  "accountHolderName": "full clean name or empty string",
-  "amount": "numerical value only or empty string",
-  "confidence": number_between_0_and_100,
-  "extractedFields": {
-    "bankName": boolean,
-    "accountNumber": boolean, 
-    "accountHolderName": boolean,
-    "amount": boolean
-  }
-}
-
-CRITICAL: Accuracy is ABSOLUTE PRIORITY. Return empty string if 90% confidence cannot be achieved.
-`;
+  private async createIntelligentPrompt(): Promise<string> {
+    // Use smart prompt service with pattern learning
+    const smartPrompt = await SmartPromptService.generateGeminiPrompt();
+    return smartPrompt;
   }
 
   async extractBankData(imageUri: string): Promise<ExtractedBankData> {
@@ -142,7 +54,7 @@ CRITICAL: Accuracy is ABSOLUTE PRIORITY. Return empty string if 90% confidence c
         contents: [
           {
             parts: [
-              { text: this.createIntelligentPrompt() },
+              { text: await this.createIntelligentPrompt() },
               {
                 inline_data: {
                   mime_type: 'image/jpeg',

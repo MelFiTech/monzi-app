@@ -4307,7 +4307,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"expo-file-system@npm:~18.1.11":
+"expo-file-system@npm:^18.1.11, expo-file-system@npm:~18.1.11":
   version: 18.1.11
   resolution: "expo-file-system@npm:18.1.11"
   peerDependencies:
@@ -4335,6 +4335,17 @@ __metadata:
   peerDependencies:
     expo: "*"
   checksum: dafd182e9cea5c6b81202f62d4016be51e5669e13f76e0a514b58b9c502c7366e5b5df02d600897e0d302acd1823eb5b2ca23a2c3f7242f173d2414caed42e1a
+  languageName: node
+  linkType: hard
+
+"expo-image-manipulator@npm:^13.1.7":
+  version: 13.1.7
+  resolution: "expo-image-manipulator@npm:13.1.7"
+  dependencies:
+    expo-image-loader: ~5.1.0
+  peerDependencies:
+    expo: "*"
+  checksum: 54b31fce74bbafb8dc7134cd71e9d781de5916699138d423cd8c0281b281cbc8d8bca6e399d1c1e32e84dbe1848473ad74554e7b3b01ebf100d3a71ef7b9f26f
   languageName: node
   linkType: hard
 
@@ -4366,7 +4377,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"expo-linear-gradient@npm:^14.1.5":
+"expo-linear-gradient@npm:~14.1.5":
   version: 14.1.5
   resolution: "expo-linear-gradient@npm:14.1.5"
   peerDependencies:
@@ -7009,9 +7020,11 @@ __metadata:
     expo-constants: ^17.1.7
     expo-dev-client: ~5.2.4
     expo-device: ^7.1.4
+    expo-file-system: ^18.1.11
     expo-font: ^13.3.2
+    expo-image-manipulator: ^13.1.7
     expo-image-picker: ^16.1.4
-    expo-linear-gradient: ^14.1.5
+    expo-linear-gradient: ~14.1.5
     expo-linking: ~7.1.7
     expo-local-authentication: ^16.0.5
     expo-notifications: ^0.31.4

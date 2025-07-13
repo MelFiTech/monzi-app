@@ -16,40 +16,30 @@ export const useBiometricService = () => {
     return await biometricService.authenticate(reason);
   }, [biometricService]);
 
-  const isLoginEnabled = useCallback(async () => {
-    return await biometricService.isBiometricLoginEnabled();
+  const storePin = useCallback(async (pin: string): Promise<boolean> => {
+    return await biometricService.storePin(pin);
   }, [biometricService]);
 
-  const setLoginEnabled = useCallback(async (enabled: boolean) => {
-    return await biometricService.setBiometricLoginEnabled(enabled);
+  const getStoredPin = useCallback(async (): Promise<string | null> => {
+    return await biometricService.getStoredPin();
   }, [biometricService]);
 
-  const hasStoredAuth = useCallback(async () => {
-    return await biometricService.hasStoredAuth();
+  const isBiometricEnabled = useCallback(async (): Promise<boolean> => {
+    return await biometricService.isBiometricEnabled();
   }, [biometricService]);
 
-  const storeAuthToken = useCallback(async (token: string) => {
-    return await biometricService.storeAuthToken(token);
-  }, [biometricService]);
-
-  const getAuthToken = useCallback(async () => {
-    return await biometricService.getAuthToken();
-  }, [biometricService]);
-
-  const clearAuth = useCallback(async () => {
-    return await biometricService.clearAuth();
+  const clearBiometricData = useCallback(async (): Promise<boolean> => {
+    return await biometricService.clearBiometricData();
   }, [biometricService]);
 
   return {
     checkAvailability,
     getBiometricType,
     authenticate,
-    isLoginEnabled,
-    setLoginEnabled,
-    hasStoredAuth,
-    storeAuthToken,
-    getAuthToken,
-    clearAuth,
+    storePin,
+    getStoredPin,
+    isBiometricEnabled,
+    clearBiometricData,
   };
 };
 

@@ -96,24 +96,45 @@ export default function BridgeScreen() {
   const updateStepsFromKYCStatus = () => {
     if (!kycStatus) return;
 
+    console.log('🔄 Bridge screen updating steps from KYC status:', {
+      kycStatus: kycStatus.kycStatus,
+      bvnVerified: kycStatus.bvnVerified,
+      selfieVerified: kycStatus.selfieVerified,
+      isVerified: kycStatus.isVerified,
+      canProceedToSelfie,
+      isKYCComplete
+    });
+
     const updatedSteps = steps.map(step => {
       if (step.id === 'bvn') {
+        const newStatus = kycStatus.bvnVerified ? 'completed' as const : 
+                         kycStatus.kycStatus === 'PENDING' || !kycStatus.bvnVerified ? 'current' as const : 'pending' as const;
+        console.log('🔄 BVN step update:', { 
+          bvnVerified: kycStatus.bvnVerified, 
+          kycStatus: kycStatus.kycStatus, 
+          newStatus 
+        });
         return { 
           ...step, 
-          status: kycStatus.bvnVerified ? 'completed' as const : 
-                  kycStatus.kycStatus === 'PENDING' || !kycStatus.bvnVerified ? 'current' as const : 'pending' as const
+          status: newStatus
         };
       }
       if (step.id === 'biometrics') {
+        let newStatus: 'completed' | 'current' | 'pending' = 'pending';
         if (kycStatus.selfieVerified && (kycStatus.kycStatus === 'VERIFIED' || kycStatus.kycStatus === 'APPROVED')) {
-          return { ...step, status: 'completed' as const };
+          newStatus = 'completed';
         } else if (kycStatus.kycStatus === 'REJECTED') {
-          return { ...step, status: 'pending' as const }; // Keep it pending, user needs to contact support
+          newStatus = 'pending'; // Keep it pending, user needs to contact support
         } else if (kycStatus.bvnVerified && !kycStatus.selfieVerified && (kycStatus.kycStatus === 'IN_PROGRESS' || kycStatus.kycStatus === 'UNDER_REVIEW')) {
-          return { ...step, status: 'current' as const };
-        } else {
-          return { ...step, status: 'pending' as const };
+          newStatus = 'current';
         }
+        console.log('🔄 Biometrics step update:', { 
+          bvnVerified: kycStatus.bvnVerified, 
+          selfieVerified: kycStatus.selfieVerified, 
+          kycStatus: kycStatus.kycStatus, 
+          newStatus 
+        });
+        return { ...step, status: newStatus };
       }
       if (step.id === 'full-access') {
         // Full Access step should remain pending - it represents the action user needs to take

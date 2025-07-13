@@ -93,8 +93,19 @@ function RootLayoutNav() {
                 <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: false }} />
                 <Stack.Screen name="profile" options={{ headerShown: false }} />
                 <Stack.Screen name="transfer" options={{ headerShown: false }} />
-                <Stack.Screen name="(kyc)" options={{ headerShown: false, gestureEnabled: false }} />
                 <Stack.Screen name="transfer-success" options={{ headerShown: false }} />
+                <Stack.Screen name="transfer-loader" options={{ headerShown: false }} />
+                <Stack.Screen name="(kyc)" options={{ headerShown: false }} />
+                <Stack.Screen name="security" options={{ presentation: 'modal', headerShown: false }} />
+                <Stack.Screen name="change-pin" options={{ headerShown: false }} />
+                <Stack.Screen name="forgot-pin" options={{ headerShown: false }} />
+                <Stack.Screen name="reset-pin" options={{ headerShown: false }} />
+                <Stack.Screen name="change-passcode" options={{ headerShown: false }} />
+                <Stack.Screen name="forgot-passcode" options={{ headerShown: false }} />
+                <Stack.Screen name="delete-account" options={{ headerShown: false }} />
+                <Stack.Screen name="delete-reason" options={{ headerShown: false }} />
+                <Stack.Screen name="delete-success" options={{ headerShown: false }} />
+
               </Stack>
             </ThemeProvider>
           </ToastProvider>

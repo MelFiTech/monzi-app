@@ -1,3 +1,4 @@
-export { CameraButton } from './CameraButton';
-export { default as CameraButtonDefault } from './CameraButton';
-export { default as CaptureAnimation } from './CaptureAnimation'; 
+export { default as CameraPermissions } from './CameraPermissions';
+export { default as CameraInterface } from './CameraInterface';
+export { default as CameraControls } from './CameraControls';
+export { default as CameraModals } from './CameraModals'; 

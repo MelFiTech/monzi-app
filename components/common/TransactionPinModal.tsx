@@ -11,10 +11,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   PanResponder,
+  Image,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useTheme } from '@/providers/ThemeProvider';
 import { fontFamilies } from '@/constants/fonts';
+import { useBiometricService } from '@/hooks/useBiometricService';
 import RecipientDetailCard from './RecipientDetailCard';
 
 interface TransactionPinModalProps {
@@ -26,6 +28,7 @@ interface TransactionPinModalProps {
   bankName: string;
   amount: string;
   fee?: string;
+  pinError?: string;
 }
 
 export default function TransactionPinModal({
@@ -37,11 +40,26 @@ export default function TransactionPinModal({
   bankName,
   amount,
   fee = '10.00',
+  pinError,
 }: TransactionPinModalProps) {
   const { colors } = useTheme();
+  const { 
+    checkAvailability, 
+    getBiometricType, 
+    authenticate, 
+    storePin, 
+    getStoredPin, 
+    isBiometricEnabled 
+  } = useBiometricService();
+  
   const [slideAnim] = useState(new Animated.Value(0));
   const [pin, setPin] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricType, setBiometricType] = useState<string[]>([]);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [showPinInput, setShowPinInput] = useState(false);
+  const [currentError, setCurrentError] = useState<string | null>(null);
 
   const maxPinLength = 4;
   const panY = useRef(new Animated.Value(0)).current;
@@ -68,6 +86,79 @@ export default function TransactionPinModal({
     })
   ).current;
 
+  // Check biometric availability and enrollment status
+  useEffect(() => {
+    const checkBiometrics = async () => {
+      console.log('🔍 [TransactionModal] Starting biometric check...');
+      
+      const available = await checkAvailability();
+      setBiometricAvailable(available);
+      
+      console.log('🔍 [TransactionModal] Biometric check:', { available });
+      
+      if (available) {
+        const types = await getBiometricType();
+        setBiometricType(types);
+        
+        const enabled = await isBiometricEnabled();
+        setBiometricEnabled(enabled);
+        
+        console.log('🔍 [TransactionModal] Biometric status:', { 
+          types, 
+          enabled,
+          showPinInput: !enabled 
+        });
+        
+        // Set initial display mode
+        setShowPinInput(!enabled); // Show PIN input only if Face ID not enabled
+        
+        // Double-check: if enabled is true, make sure we have a stored PIN
+        if (enabled) {
+          const storedPin = await getStoredPin();
+          if (!storedPin) {
+            console.log('⚠️ [TransactionModal] Biometric enabled but no stored PIN found, resetting...');
+            setBiometricEnabled(false);
+            setShowPinInput(true);
+          } else {
+            console.log('✅ [TransactionModal] Biometric enabled and PIN confirmed stored');
+          }
+        }
+      } else {
+        // No biometric available, always show PIN input
+        setShowPinInput(true);
+        setBiometricEnabled(false);
+        
+        console.log('🔍 [TransactionModal] No biometric available, showing PIN input');
+      }
+    };
+    
+    if (visible) {
+      // Small delay to ensure modal is fully mounted
+      setTimeout(checkBiometrics, 100);
+    }
+  }, [visible]);
+
+  // Set error from props
+  useEffect(() => {
+    if (pinError) {
+      setCurrentError(pinError);
+      // If there's a PIN error, show PIN input for retry
+      setShowPinInput(true);
+      console.log('🔍 [TransactionModal] PIN error received, showing PIN input');
+    }
+  }, [pinError]);
+
+  // Debug: Log current state changes
+  useEffect(() => {
+    console.log('🔍 [TransactionModal] State update:', {
+      biometricAvailable,
+      biometricEnabled,
+      showPinInput,
+      isLoading,
+      hasError: !!currentError
+    });
+  }, [biometricAvailable, biometricEnabled, showPinInput, isLoading, currentError]);
+
   // Slide animation effect
   useEffect(() => {
     if (visible) {
@@ -81,16 +172,23 @@ export default function TransactionPinModal({
     }
   }, [visible, slideAnim]);
 
-  // Reset PIN when modal closes
+  // Reset state when modal closes
   useEffect(() => {
     if (!visible) {
       setPin('');
       setIsLoading(false);
+      setCurrentError(null);
+      setShowPinInput(false);
       panY.setValue(0);
     }
   }, [visible]);
 
   const handlePinChange = (text: string) => {
+    // Clear error when user starts typing
+    if (currentError) {
+      setCurrentError(null);
+    }
+    
     // Only allow numeric input and limit to maxPinLength
     const numericValue = text.replace(/[^\d]/g, '').slice(0, maxPinLength);
     setPin(numericValue);
@@ -105,12 +203,78 @@ export default function TransactionPinModal({
 
   const handleConfirm = async (pinToSubmit: string) => {
     setIsLoading(true);
+    setCurrentError(null);
     
-    // Simulate PIN verification
-    setTimeout(() => {
+    try {
+      // Store PIN for biometric authentication if available and not already enabled
+      if (biometricAvailable && !biometricEnabled) {
+        console.log('🔐 [TransactionModal] Storing PIN for biometric authentication...');
+        const stored = await storePin(pinToSubmit);
+        if (stored) {
+          setBiometricEnabled(true);
+          console.log('✅ [TransactionModal] PIN stored successfully for future biometric authentication');
+          
+          // Show success message for first-time setup
+          setTimeout(() => {
+            Alert.alert(
+              'Face ID Enabled',
+              `${biometricType[0] || 'Biometric'} authentication has been enabled for faster transactions.`,
+              [{ text: 'Great!' }]
+            );
+          }, 500);
+        } else {
+          console.error('❌ [TransactionModal] Failed to store PIN for biometric authentication');
+        }
+      }
+      
+      // Simulate verification delay
+      setTimeout(() => {
+        setIsLoading(false);
+        onConfirm(pinToSubmit);
+      }, 1000);
+      
+    } catch (error) {
+      console.error('❌ [TransactionModal] Error in handleConfirm:', error);
       setIsLoading(false);
-      onConfirm(pinToSubmit);
-    }, 1000);
+      setCurrentError('An error occurred. Please try again.');
+    }
+  };
+
+  const handleBiometricAuth = async () => {
+    try {
+      setIsLoading(true);
+      setCurrentError(null);
+      
+      console.log('🔐 [TransactionModal] Starting biometric authentication...');
+      const result = await authenticate('Authenticate to complete transfer');
+      
+      if (result.success) {
+        console.log('✅ [TransactionModal] Biometric authentication successful');
+        // Get stored PIN
+        const storedPin = await getStoredPin();
+        
+        if (storedPin) {
+          console.log('✅ [TransactionModal] Retrieved stored PIN successfully');
+          setIsLoading(false);
+          onConfirm(storedPin);
+        } else {
+          console.error('❌ [TransactionModal] No stored PIN found');
+          setIsLoading(false);
+          setCurrentError('Stored PIN not found. Please enter your PIN.');
+          setShowPinInput(true);
+        }
+      } else {
+        console.error('❌ [TransactionModal] Biometric authentication failed:', result.error);
+        setIsLoading(false);
+        setCurrentError(result.error || 'Biometric authentication failed');
+        setShowPinInput(true); // Fall back to PIN input
+      }
+    } catch (error) {
+      console.error('❌ [TransactionModal] Biometric authentication error:', error);
+      setIsLoading(false);
+      setCurrentError('Biometric authentication failed');
+      setShowPinInput(true); // Fall back to PIN input
+    }
   };
 
   const handleModalPress = (event: any) => {
@@ -149,6 +313,46 @@ export default function TransactionPinModal({
             ]}
           />
         ))}
+      </View>
+    );
+  };
+
+  const renderBiometricOnly = () => {
+    if (!biometricAvailable || !biometricEnabled) {
+      console.log('🔍 [TransactionModal] Not showing Face ID:', { biometricAvailable, biometricEnabled });
+      return null;
+    }
+    
+    const biometricName = biometricType[0] || 'Biometric';
+    console.log('✅ [TransactionModal] Showing Face ID button:', { biometricName });
+    
+    return (
+      <View style={styles.biometricOnlySection}>
+        <TouchableOpacity
+          style={styles.biometricOnlyButton}
+          onPress={handleBiometricAuth}
+          disabled={isLoading}
+        >
+          <Image
+            source={require('@/assets/icons/profile/face-id.png')}
+            style={[
+              styles.biometricOnlyIcon,
+              { opacity: isLoading ? 0.5 : 1 }
+            ]}
+          />
+        </TouchableOpacity>
+        <Text style={styles.biometricOnlyLabel}>
+          {isLoading ? 'Authenticating...' : `Tap to use ${biometricName}`}
+        </Text>
+        
+        {/* Manual PIN fallback */}
+        <TouchableOpacity
+          style={styles.fallbackButton}
+          onPress={() => setShowPinInput(true)}
+          disabled={isLoading}
+        >
+          <Text style={styles.fallbackText}>Use PIN instead</Text>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -203,26 +407,41 @@ export default function TransactionPinModal({
                     </View>
                   </View>
 
-                  {/* Transaction PIN Section */}
-                  <View style={styles.pinSection}>
-                    <Text style={styles.pinLabel}>Transaction PIN</Text>
-                    {renderPinDots()}
-                    {isLoading && (
-                      <Text style={styles.verifyingText}>Verifying PIN...</Text>
-                    )}
+                  {/* Authentication Section */}
+                  <View style={styles.authSection}>
+                    <Text style={styles.authTitle}>Authenticate Transaction</Text>
                     
-                    {/* Hidden TextInput for system keyboard */}
-                    <TextInput
-                      style={styles.hiddenInput}
-                      value={pin}
-                      onChangeText={handlePinChange}
-                      keyboardType="numeric"
-                      maxLength={maxPinLength}
-                      autoFocus={visible}
-                      secureTextEntry={false}
-                      selectionColor="transparent"
-                      caretHidden={true}
-                    />
+                    {/* Show error if any */}
+                    {currentError && (
+                      <Text style={styles.errorText}>{currentError}</Text>
+                    )}
+
+                    {/* Show either PIN input or Biometric only */}
+                    {showPinInput ? (
+                      // PIN Section
+                      <View style={styles.pinSection}>
+                        <Text style={styles.pinLabel}>Enter PIN</Text>
+                        {renderPinDots()}
+                        {isLoading && (
+                          <Text style={styles.verifyingText}>Verifying PIN...</Text>
+                        )}
+                        
+                        {/* Hidden TextInput for system keyboard */}
+                        <TextInput
+                          style={styles.hiddenInput}
+                          value={pin}
+                          onChangeText={handlePinChange}
+                          keyboardType="numeric"
+                          maxLength={maxPinLength}
+                          autoFocus={visible}
+                          selectionColor="transparent"
+                          caretHidden={true}
+                        />
+                      </View>
+                    ) : (
+                      // Biometric Only Section
+                      renderBiometricOnly()
+                    )}
                   </View>
 
                   <View style={styles.keyboardSpacer} />
@@ -257,7 +476,7 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingHorizontal: 24,
     paddingBottom: 40,
-    minHeight: '70%',
+    minHeight: '75%',
   },
   indicator: {
     width: 40,
@@ -291,9 +510,26 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.sora.bold,
     color: '#FFFFFF',
   },
-  pinSection: {
+  authSection: {
     alignItems: 'center',
     marginBottom: 32,
+  },
+  authTitle: {
+    fontSize: 18,
+    fontFamily: fontFamilies.sora.semiBold,
+    color: '#FFFFFF',
+    marginBottom: 24,
+  },
+  errorText: {
+    fontSize: 14,
+    fontFamily: fontFamilies.sora.regular,
+    color: '#FF6B6B',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  pinSection: {
+    alignItems: 'center',
+    marginBottom: 20,
   },
   pinLabel: {
     fontSize: 16,
@@ -322,6 +558,41 @@ const styles = StyleSheet.create({
     width: 0,
     height: 0,
     opacity: 0,
+  },
+  biometricOnlySection: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  biometricOnlyButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  biometricOnlyIcon: {
+    width: 40,
+    height: 40,
+    tintColor: '#FFFFFF',
+  },
+  biometricOnlyLabel: {
+    fontSize: 16,
+    fontFamily: fontFamilies.sora.medium,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  fallbackButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  fallbackText: {
+    fontSize: 14,
+    fontFamily: fontFamilies.sora.regular,
+    color: 'rgba(255, 255, 255, 0.6)',
+    textAlign: 'center',
   },
   keyboardAvoidingView: {
     flex: 1,

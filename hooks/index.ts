@@ -4,11 +4,19 @@ export * from './useAccountService';
 export * from './useBiometricService';
 export * from './useGeminiService';
 export * from './useCloudVisionService';
-export * from './useClaudeService';
 export * from './useHybridVisionService';
 
 export * from './useChatService';
 export * from './useKYCService';
 export * from './useWalletService';
 export * from './useNotificationService';
-export * from './usePushNotificationService'; 
+export * from './usePushNotificationService';
+export * from './useCameraLogic';
+export * from './useBackendChecks'; 
+
+// Explicitly export wallet hooks for easier access
+export { 
+  useWalletBalance, 
+  useWalletDetails, 
+  useWalletAccessStatus 
+} from './useWalletService';

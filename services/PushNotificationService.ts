@@ -336,4 +336,6 @@ export class PushNotificationService {
     
     // This will be handled by the useNotificationService hook
   }
-} 
+}
+
+export default PushNotificationService; 

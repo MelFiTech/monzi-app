@@ -18,8 +18,9 @@ export default function OnboardingScreen() {
     router.push('/(auth)/login');
     //router.push('/(auth)/verify-otp');
     //router.push('/test-push');
-    //router.push('/(kyc)/bvn');
+    //router.push('/(kyc)/camera');
     //router.push('/transfer-success');
+
   };
 
   return (

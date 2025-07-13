@@ -9,6 +9,8 @@ export interface BiometricResult {
 
 class BiometricService {
   private static instance: BiometricService;
+  private static readonly BIOMETRIC_PIN_KEY = 'biometric_stored_pin';
+  private static readonly BIOMETRIC_ENABLED_KEY = 'biometric_enabled';
 
   public static getInstance(): BiometricService {
     if (!BiometricService.instance) {
@@ -99,8 +101,61 @@ class BiometricService {
     }
   }
 
-  // Note: Auth storage methods moved to AuthStorageService
-  // This service now focuses purely on biometric authentication functionality
+  /**
+   * Store user's PIN securely for biometric authentication
+   */
+  async storePin(pin: string): Promise<boolean> {
+    try {
+      await SecureStore.setItemAsync(BiometricService.BIOMETRIC_PIN_KEY, pin);
+      await SecureStore.setItemAsync(BiometricService.BIOMETRIC_ENABLED_KEY, 'true');
+      console.log('✅ PIN stored securely for biometric authentication');
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to store PIN for biometric authentication:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Retrieve stored PIN after successful biometric authentication
+   */
+  async getStoredPin(): Promise<string | null> {
+    try {
+      const pin = await SecureStore.getItemAsync(BiometricService.BIOMETRIC_PIN_KEY);
+      return pin;
+    } catch (error) {
+      console.error('❌ Failed to retrieve stored PIN:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if biometric authentication is enabled (PIN stored)
+   */
+  async isBiometricEnabled(): Promise<boolean> {
+    try {
+      const enabled = await SecureStore.getItemAsync(BiometricService.BIOMETRIC_ENABLED_KEY);
+      return enabled === 'true';
+    } catch (error) {
+      console.error('❌ Failed to check biometric enabled status:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Clear stored PIN and disable biometric authentication
+   */
+  async clearBiometricData(): Promise<boolean> {
+    try {
+      await SecureStore.deleteItemAsync(BiometricService.BIOMETRIC_PIN_KEY);
+      await SecureStore.deleteItemAsync(BiometricService.BIOMETRIC_ENABLED_KEY);
+      console.log('✅ Biometric data cleared');
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to clear biometric data:', error);
+      return false;
+    }
+  }
 }
 
 export default BiometricService; 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
-import { PushNotificationService } from '@/services/PushNotificationService';
+import PushNotificationService from '@/services/PushNotificationService';
 import { ToastService } from '@/services';
 
 interface PushNotificationState {
@@ -53,8 +53,8 @@ export function usePushNotificationService(
   });
 
   // Refs for notification listeners
-  const notificationListener = useRef<Notifications.Subscription>();
-  const responseListener = useRef<Notifications.Subscription>();
+  const notificationListener = useRef<Notifications.Subscription | null>(null);
+  const responseListener = useRef<Notifications.Subscription | null>(null);
 
   // React Query for checking permissions
   const { data: permissionData, refetch: refetchPermissions } = useQuery({
@@ -65,14 +65,18 @@ export function usePushNotificationService(
     },
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: 30 * 1000, // Check every 30 seconds
-    onSuccess: (data) => {
+  });
+
+  // Handle permission data changes
+  useEffect(() => {
+    if (permissionData) {
       setState(prev => ({ 
         ...prev, 
-        permissionStatus: data.status,
-        hasRequestedPermission: data.status !== 'undetermined'
+        permissionStatus: permissionData.status,
+        hasRequestedPermission: permissionData.status !== 'undetermined'
       }));
-    },
-  });
+    }
+  }, [permissionData]);
 
   // React Query mutation for backend registration
   const registerTokenMutation = useMutation({
@@ -87,9 +91,7 @@ export function usePushNotificationService(
     retryDelay: (attemptIndex) => Math.min(2000 * 2 ** attemptIndex, 10000),
     onSuccess: () => {
       setState(prev => ({ ...prev, hasAttemptedRegistration: true }));
-      if (showToasts) {
-        ToastService.success('Push notifications enabled');
-      }
+      console.log('✅ Push notifications enabled');
     },
     onError: (error: any) => {
       setState(prev => ({ 
@@ -141,9 +143,7 @@ export function usePushNotificationService(
       refetchPermissions();
 
       if (status === 'granted') {
-        if (showToasts) {
-          ToastService.success('Push notifications enabled');
-        }
+        console.log('✅ Push notifications enabled');
         return true;
       } else {
         if (showToasts) {

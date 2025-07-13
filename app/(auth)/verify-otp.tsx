@@ -81,13 +81,13 @@ export default function VerifyOTPScreen() {
 
   async function handleVerify(otpValue?: string) {
     const otpToVerify = otpValue || otp;
-    if (otpToVerify.length !== 6 || verifyOtpMutation.isPending || hasNavigated || !phone) return;
+    if (otpToVerify.length !== 6 || verifyOtpMutation.isPending || hasNavigated || !email) return;
 
     setHasNavigated(true);
     
     try {
       const result = await verifyOtpMutation.mutateAsync({
-        phone: phone,
+        phone: email, // Use email as phone parameter since backend expects phone field
         otp: otpToVerify,
       });
 
@@ -114,16 +114,16 @@ export default function VerifyOTPScreen() {
   }
 
   async function handleResendOtp() {
-    if (resendOtpMutation.isPending || !phone) return;
+    if (resendOtpMutation.isPending || !email) return;
     
     try {
       const result = await resendOtpMutation.mutateAsync({
-        phone: phone,
+        phone: email, // Use email as phone parameter since backend expects phone field
       });
 
       if (result.success) {
         setCountdown(60); // Reset countdown
-        Alert.alert('OTP Sent', 'A new verification code has been sent to your phone');
+        Alert.alert('OTP Sent', 'A new verification code has been sent to your email');
       } else {
         Alert.alert('Resend Failed', result.message || 'Failed to resend OTP');
       }
@@ -150,7 +150,7 @@ export default function VerifyOTPScreen() {
       {/* Main Content */}
       <View style={containerStyles.content}>
         <Text style={textStyles.title}>
-          Enter code sent{'\n'}to your phone no.
+          Enter code sent{'\n'}to your email
         </Text>
 
         <View style={containerStyles.inputContainer}>

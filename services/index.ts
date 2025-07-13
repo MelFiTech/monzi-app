@@ -1,8 +1,11 @@
 export { default as ChatService } from './ChatService';
 export { default as GeminiService } from './GeminiService';
 export { default as CloudVisionService } from './CloudVisionService';
-export { default as ClaudeService } from './ClaudeService';
 export { default as HybridVisionService } from './HybridVisionService';
+export { default as ImageOptimizationService } from './ImageOptimizationService';
+export { default as SmartPromptService } from './SmartPromptService';
+export { default as SmartCacheService } from './SmartCacheService';
+export { default as PatternLearningService } from './PatternLearningService';
 
 export { default as CacheService } from './CacheService';
 export { default as AccountService } from './AccountService';
@@ -14,7 +17,7 @@ export { default as KYCService } from './KYCService';
 export { default as WalletService } from './WalletService';
 export { default as ToastService } from './ToastService';
 export { default as NotificationService } from './NotificationService';
-export { PushNotificationService } from './PushNotificationService';
+export { default as PushNotificationService } from './PushNotificationService';
 export type { Message, UserData, AuthFlowStep } from './ChatService';
 export type { ExtractedBankData } from './GeminiService';
 

@@ -41,8 +41,8 @@ export interface LoginResponse {
 }
 
 export interface VerifyOtpRequest {
-  phone: string; // +234XXXXXXXXXX format
-  otpCode: string; // 6-digit SMS OTP
+  phone: string; // Email address (keeping phone field name for backend compatibility)
+  otpCode: string; // 6-digit Email OTP
 }
 
 export interface VerifyOtpResponse {
@@ -59,7 +59,7 @@ export interface VerifyOtpResponse {
 }
 
 export interface ResendOtpRequest {
-  phone: string; // +234XXXXXXXXXX format
+  phone: string; // Email address (keeping phone field name for backend compatibility)
 }
 
 export interface ResendOtpResponse {
@@ -292,13 +292,13 @@ class AuthService {
   }
 
   /**
-   * Verify SMS OTP
+   * Verify Email OTP
    */
   async verifyOtp(data: VerifyOtpRequest): Promise<VerifyOtpResponse> {
     try {
       // Validate input data
-      if (!this.validatePhoneNumber(data.phone)) {
-        throw new Error('Invalid Nigerian phone number format');
+      if (!this.validateEmail(data.phone)) {
+        throw new Error('Invalid email format');
       }
 
       if (!/^[0-9]{6}$/.test(data.otpCode)) {
@@ -306,7 +306,7 @@ class AuthService {
       }
 
       const formattedData = {
-        phone: this.formatPhoneNumber(data.phone),
+        email: data.phone.trim().toLowerCase(), // Send email field instead of phone
         otpCode: data.otpCode,
       };
 
@@ -354,17 +354,17 @@ class AuthService {
   }
 
   /**
-   * Resend SMS OTP
+   * Resend Email OTP
    */
   async resendOtp(data: ResendOtpRequest): Promise<ResendOtpResponse> {
     try {
       // Validate input data
-      if (!this.validatePhoneNumber(data.phone)) {
-        throw new Error('Invalid Nigerian phone number format');
+      if (!this.validateEmail(data.phone)) {
+        throw new Error('Invalid email format');
       }
 
       const formattedData = {
-        phone: this.formatPhoneNumber(data.phone),
+        email: data.phone.trim().toLowerCase(), // Send email field instead of phone
       };
 
       const response = await fetch(`${this.baseUrl}/auth/resend-otp`, {

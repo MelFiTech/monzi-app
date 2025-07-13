@@ -14,8 +14,8 @@ export interface NotificationState {
   isConnected: boolean;
   isConnecting: boolean;
   connectionError: string | null;
-  lastWalletUpdate: NotificationPayload<WalletBalanceUpdateData> | null;
-  lastTransaction: NotificationPayload<TransactionNotificationData> | null;
+  lastWalletUpdate: WalletBalanceUpdateData | null;
+  lastTransaction: TransactionNotificationData | null;
   lastNotification: NotificationPayload<GeneralNotificationData> | null;
   reconnectAttempts: number;
 }
@@ -29,8 +29,8 @@ export interface NotificationHookOptions extends NotificationServiceOptions {
 }
 
 export interface NotificationCallbacks {
-  onWalletBalanceUpdate?: (notification: NotificationPayload<WalletBalanceUpdateData>) => void;
-  onTransactionNotification?: (notification: NotificationPayload<TransactionNotificationData>) => void;
+  onWalletBalanceUpdate?: (notification: WalletBalanceUpdateData) => void;
+  onTransactionNotification?: (notification: TransactionNotificationData) => void;
   onGeneralNotification?: (notification: NotificationPayload<GeneralNotificationData>) => void;
   onConnect?: () => void;
   onDisconnect?: (reason: string) => void;
@@ -178,14 +178,13 @@ export const useNotificationService = (
     };
 
     // Wallet balance update
-    const handleWalletBalanceUpdate = (notification: NotificationPayload<WalletBalanceUpdateData>) => {
+    const handleWalletBalanceUpdate = (notification: WalletBalanceUpdateData) => {
       setState(prev => ({ ...prev, lastWalletUpdate: notification }));
       
       if (enableBalanceUpdates) {
-        const { data } = notification;
         showToast(
           'Wallet Updated',
-          `Your wallet has been ${data.amount > 0 ? 'credited' : 'debited'} with ${formatAmount(Math.abs(data.amount))}. New balance: ${formatAmount(data.newBalance)}`,
+          `Your wallet has been ${notification.change > 0 ? 'credited' : 'debited'} with ${formatAmount(Math.abs(notification.change))}. New balance: ${formatAmount(notification.newBalance)}`,
           'success'
         );
       }
@@ -194,15 +193,18 @@ export const useNotificationService = (
     };
 
     // Transaction notification
-    const handleTransactionNotification = (notification: NotificationPayload<TransactionNotificationData>) => {
+    const handleTransactionNotification = (notification: TransactionNotificationData) => {
       setState(prev => ({ ...prev, lastTransaction: notification }));
       
       if (enableTransactionNotifications) {
-        const { data } = notification;
+        const message = notification.type === 'FUNDING' 
+          ? `Wallet funded - NGN${notification.amount}`
+          : `Wallet debited - NGN${notification.amount}`;
+        
         showToast(
           'Transaction Update',
-          `${data.type === 'credit' ? 'Received' : 'Sent'} ${formatAmount(data.amount)} - ${data.description}`,
-          data.status === 'COMPLETED' ? 'success' : data.status === 'FAILED' ? 'error' : 'info'
+          message,
+          notification.status === 'COMPLETED' ? 'success' : notification.status === 'FAILED' ? 'error' : 'info'
         );
       }
       

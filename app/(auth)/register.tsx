@@ -168,8 +168,8 @@ export default function RegisterScreen() {
       const result = await registerMutation.mutateAsync(registrationData);
       
       if (result.success) {
-        // Navigate to OTP verification with phone number for SMS
-        router.push(`/(auth)/verify-otp?phone=${encodeURIComponent(formData.phone)}&email=${encodeURIComponent(formData.email)}`);
+        // Navigate to OTP verification with email (backend now sends OTP to email)
+        router.push(`/(auth)/verify-otp?phone=${encodeURIComponent(formData.email)}&email=${encodeURIComponent(formData.email)}`);
       } else {
         Alert.alert('Registration Failed', result.message || 'Failed to create account');
       }

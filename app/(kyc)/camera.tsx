@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -7,13 +7,14 @@ import {
   TouchableOpacity,
   Alert,
   Dimensions,
-  ActivityIndicator
+  ActivityIndicator,
+  Animated
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
 import { useAuth } from '@/hooks/useAuthService';
-import { X, RotateCcw } from 'lucide-react-native';
+import { X, RotateCcw, AlertCircle } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -23,8 +24,38 @@ export default function CameraScreen() {
   const [facing, setFacing] = useState<'front' | 'back'>('front');
   const [permission, requestPermission] = useCameraPermissions();
   const [isCapturing, setIsCapturing] = useState(false);
+  const [showErrorOverlay, setShowErrorOverlay] = useState(false);
   const cameraRef = useRef<CameraView>(null);
   const { logout } = useAuth();
+  const params = useLocalSearchParams();
+  const overlayAnimation = useRef(new Animated.Value(0)).current;
+
+  // Handle error overlay when returning from failed processing
+  useEffect(() => {
+    if (params.error) {
+      setShowErrorOverlay(true);
+      
+      // Show overlay with fade-in animation
+      Animated.timing(overlayAnimation, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+
+      // Hide overlay after 4 seconds
+      const timer = setTimeout(() => {
+        Animated.timing(overlayAnimation, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => {
+          setShowErrorOverlay(false);
+        });
+      }, 4000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [params.error, overlayAnimation]);
 
   const handleSignOut = async () => {
     try {
@@ -125,6 +156,19 @@ export default function CameraScreen() {
           <View style={styles.circle} />
         </View>
       </View>
+      
+      {/* Error Overlay */}
+      {showErrorOverlay && (
+        <Animated.View style={[styles.errorOverlay, { opacity: overlayAnimation }]}>
+          <View style={styles.errorContainer}>
+            <AlertCircle size={24} color="#FF4444" />
+            <Text style={styles.errorTitle}>Photo Processing Failed</Text>
+            <Text style={styles.errorMessage}>
+              {params.error || 'Please ensure your face is clearly visible with good lighting and try again'}
+            </Text>
+          </View>
+        </Animated.View>
+      )}
       
       {/* Instructions */}
       <View style={styles.instructionsContainer}>
@@ -315,5 +359,44 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     marginRight: 16,
+  },
+  errorOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.71)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2000,
+  },
+  errorContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    marginHorizontal: 24,
+    alignItems: 'center',
+    maxWidth: screenWidth * 0.9,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  errorTitle: {
+    fontSize: fontSizes.lg,
+    fontFamily: fontFamilies.sora.bold,
+    color: '#FF4444',
+    marginTop: 12,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    fontSize: fontSizes.base,
+    fontFamily: fontFamilies.sora.regular,
+    color: '#666666',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

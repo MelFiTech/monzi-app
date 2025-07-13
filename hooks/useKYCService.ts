@@ -95,9 +95,18 @@ export const useVerifyBVN = () => {
               bvnVerified: true,
               kycStatus: data.kycStatus,
               message: data.message || oldData.message,
+              nextStep: data.kycStatus === 'IN_PROGRESS' ? 'selfie_upload' as const : oldData.nextStep,
             };
           }
-          return oldData;
+          // If no old data, create minimal status from response
+          return {
+            kycStatus: data.kycStatus,
+            bvnVerified: true,
+            selfieVerified: false,
+            isVerified: false,
+            message: data.message || 'BVN verified successfully',
+            nextStep: data.kycStatus === 'IN_PROGRESS' ? 'selfie_upload' as const : null,
+          };
         });
       } else {
         // Only invalidate if we don't have success data to update cache
@@ -132,15 +141,9 @@ export const useVerifyBVN = () => {
         // Handle different failure scenarios
         console.error('❌ BVN Verification failed:', data.message, 'Error:', data.error);
         
-        // Check if BVN is already verified - route to bridge for biometrics
-        if (data.message && data.message.toLowerCase().includes('bvn already verified')) {
-          console.log('✅ BVN already verified, routing to bridge for biometrics');
-          ToastService.success('BVN verified');
-          router.push('/(kyc)/bridge' as never);
-        }
         // Check if BVN already exists for another user or needs contact support
-        else if (data.error === 'BVN_ALREADY_EXISTS' || 
-                (data.message && data.message.toLowerCase().includes('contact support'))) {
+        if (data.error === 'BVN_ALREADY_EXISTS' || 
+            (data.message && data.message.toLowerCase().includes('contact support'))) {
           console.log('🚨 BVN requires contact support, setting flag and routing to bridge');
           // Set flag for bridge screen to show contact support
           AsyncStorage.setItem('kyc_requires_support', 'true');
@@ -156,6 +159,37 @@ export const useVerifyBVN = () => {
     },
     onError: (error: Error) => {
       console.error('🚨 BVN Verification Error:', error);
+      
+      // Check if BVN is already verified - treat as success
+      if (error.message.includes('BVN already verified') || error.message.includes('BVN_ALREADY_VERIFIED')) {
+        console.log('✅ BVN already verified, treating as success and updating cache');
+        
+        // Update cache to mark BVN as verified
+        queryClient.setQueryData(KYC_QUERY_KEYS.status, (oldData: KYCStatusResponse | undefined) => {
+          if (oldData) {
+            return {
+              ...oldData,
+              bvnVerified: true,
+              kycStatus: 'IN_PROGRESS', // BVN done, selfie needed
+              message: 'BVN verified successfully',
+            };
+          }
+          // If no old data, create minimal status
+          return {
+            kycStatus: 'IN_PROGRESS' as const,
+            bvnVerified: true,
+            selfieVerified: false,
+            isVerified: false,
+            message: 'BVN verified successfully',
+            nextStep: 'selfie_upload' as const,
+          };
+        });
+        
+        ToastService.success('BVN verified');
+        console.log('➡️ Navigating to bridge for biometrics (BVN already verified)');
+        router.push('/(kyc)/bridge' as never);
+        return;
+      }
       
       // Check if it's a network error
       if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {

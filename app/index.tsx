@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/hooks/useAuthService';
 import { useKYCStatus } from '@/hooks/useKYCService';
+import { CustomLoader } from '@/components/common';
 
 export default function AppIndex() {
   const { colors } = useTheme();
@@ -18,32 +19,39 @@ export default function AppIndex() {
         if (!kycLoading && kycStatus) {
           console.log('📋 KYC Status:', kycStatus);
           
-          // Navigate based on KYC status - strict verification flow
-          if ((kycStatus.kycStatus === 'VERIFIED' || kycStatus.kycStatus === 'APPROVED') && kycStatus.isVerified && kycStatus.bvnVerified && kycStatus.selfieVerified) {
-            // Only fully verified/approved users can access home screen
-            router.replace('/(tabs)');
-          } else if (kycStatus.kycStatus === 'IN_PROGRESS' && kycStatus.bvnVerified && !kycStatus.selfieVerified) {
-            // BVN verified but selfie needed - go to bridge to continue
-            router.replace('/(kyc)/bridge');
-          } else if (kycStatus.kycStatus === 'UNDER_REVIEW') {
-            // Under review - go to bridge
-            router.replace('/(kyc)/bridge');
-          } else if (kycStatus.kycStatus === 'REJECTED') {
-            // Rejected - go to bridge with error messaging
-            router.replace('/(kyc)/bridge');
-          } else {
-            // User needs to start/complete KYC - start with BVN
-            router.replace('/(kyc)/bvn');
-          }
+          // Add small delay to ensure navigation stack is ready
+          setTimeout(() => {
+            // Navigate based on KYC status - strict verification flow
+            if ((kycStatus.kycStatus === 'VERIFIED' || kycStatus.kycStatus === 'APPROVED') && kycStatus.isVerified && kycStatus.bvnVerified && kycStatus.selfieVerified) {
+              // Only fully verified/approved users can access home screen
+              router.replace('/(tabs)');
+            } else if (kycStatus.kycStatus === 'IN_PROGRESS' && kycStatus.bvnVerified && !kycStatus.selfieVerified) {
+              // BVN verified but selfie needed - go to bridge to continue
+              router.replace('/(kyc)/bridge');
+            } else if (kycStatus.kycStatus === 'UNDER_REVIEW') {
+              // Under review - go to bridge
+              router.replace('/(kyc)/bridge');
+            } else if (kycStatus.kycStatus === 'REJECTED') {
+              // Rejected - go to bridge with error messaging
+              router.replace('/(kyc)/bridge');
+            } else {
+              // User needs to start/complete KYC - start with BVN
+              router.replace('/(kyc)/bvn');
+            }
+          }, 100); // Small delay to ensure navigation stack is ready
         } else if (!kycLoading && !kycStatus && isAuthenticated) {
           // KYC status failed to load (network error) - default to BVN
           console.log('❌ KYC Status failed to load, defaulting to BVN screen');
-          router.replace('/(kyc)/bvn');
+          setTimeout(() => {
+            router.replace('/(kyc)/bvn');
+          }, 100);
         }
       } else {
         // User is not authenticated, start auth flow
         console.log('🚪 User not authenticated, redirecting to auth flow');
-        router.replace('/(auth)/splash');
+        setTimeout(() => {
+          router.replace('/(auth)/splash');
+        }, 100);
       }
     }
   }, [authLoading, isAuthenticated, kycLoading, kycStatus]);
@@ -52,7 +60,7 @@ export default function AppIndex() {
   if (authLoading || (isAuthenticated && kycLoading)) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <CustomLoader size="large" color={colors.primary} />
       </View>
     );
   }
@@ -67,4 +75,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-}); 
+});

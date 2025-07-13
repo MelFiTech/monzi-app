@@ -19,6 +19,7 @@ import RecipientDetailCard from '@/components/common/RecipientDetailCard';
 import AmountPill from '@/components/common/AmountPill';
 import Button from '@/components/common/Button';
 import TransactionPinModal from '@/components/common/TransactionPinModal';
+import { PulsatingGlow } from '@/components/common';
 import { useWalletBalance, useRefreshWallet, useOptimisticBalance, useTransferFunds, useWalletAccessStatus } from '@/hooks/useWalletService';
 import { useNotificationService } from '@/hooks/useNotificationService';
 import { useQueryClient } from '@tanstack/react-query';
@@ -35,6 +36,8 @@ export default function TransferScreen() {
   const extractedAccountNumber = params.accountNumber as string || '';
   const extractedAccountHolderName = params.accountHolderName as string || '';
   const extractedAmount = params.amount as string || '';
+  const pinError = params.pinError as string || '';
+  const transferError = params.transferError as string || '';
 
   // Set initial states based on extracted data
   const [amount, setAmount] = useState(extractedAmount || '');
@@ -73,17 +76,17 @@ export default function TransferScreen() {
           eventType: 'wallet_balance_updated',
           fullNotification: notification,
           balanceChange: {
-            oldBalance: formatNotificationAmount(notification.data.oldBalance),
-            newBalance: formatNotificationAmount(notification.data.newBalance),
-            changeAmount: formatNotificationAmount(notification.data.amount),
-            isCredit: notification.data.amount > 0,
-            isDebit: notification.data.amount < 0,
+            oldBalance: formatNotificationAmount(notification.oldBalance),
+            newBalance: formatNotificationAmount(notification.newBalance),
+            changeAmount: formatNotificationAmount(notification.change), // Backend uses "change" not "amount"
+            isCredit: notification.change > 0,
+            isDebit: notification.change < 0,
           },
           transaction: {
-            reference: notification.data.transactionReference,
-            accountNumber: notification.data.accountNumber,
-            description: notification.data.description,
-            timestamp: notification.data.timestamp,
+            reference: notification.reference, // Backend uses "reference" not "transactionReference"
+            accountNumber: notification.accountNumber,
+            currency: notification.currency,
+            timestamp: notification.timestamp,
           },
           transferScreenState: {
             currentAmount: amount,
@@ -93,10 +96,10 @@ export default function TransferScreen() {
         });
         
         // Log balance comparison
-        if (notification.data.amount > 0) {
-          console.log(`💰 [TransferScreen] WALLET CREDITED: +${formatNotificationAmount(notification.data.amount)} | New Balance: ${formatNotificationAmount(notification.data.newBalance)}`);
-        } else if (notification.data.amount < 0) {
-          console.log(`💸 [TransferScreen] WALLET DEBITED: ${formatNotificationAmount(notification.data.amount)} | New Balance: ${formatNotificationAmount(notification.data.newBalance)}`);
+        if (notification.change > 0) {
+          console.log(`💰 [TransferScreen] WALLET CREDITED: +${formatNotificationAmount(notification.change)} | New Balance: ${formatNotificationAmount(notification.newBalance)}`);
+        } else if (notification.change < 0) {
+          console.log(`💸 [TransferScreen] WALLET DEBITED: ${formatNotificationAmount(notification.change)} | New Balance: ${formatNotificationAmount(notification.newBalance)}`);
         }
         
         // Invalidate wallet queries to refresh balance display in real-time
@@ -107,7 +110,7 @@ export default function TransferScreen() {
         console.log('🔄 [TransferScreen] React Query cache invalidated for wallet data');
         
         // Clear any amount errors if balance increased
-        if (notification.data.amount > 0 && amountError?.includes('balance')) {
+        if (notification.change > 0 && amountError?.includes('balance')) {
           setAmountError(null);
           console.log('✅ [TransferScreen] Amount error cleared due to balance increase');
         }
@@ -119,13 +122,13 @@ export default function TransferScreen() {
           eventType: 'transaction_notification',
           fullNotification: notification,
           transaction: {
-            type: notification.data.type,
-            amount: formatNotificationAmount(notification.data.amount),
-            reference: notification.data.transactionReference,
-            accountNumber: notification.data.accountNumber,
-            description: notification.data.description,
-            status: notification.data.status,
-            timestamp: notification.data.timestamp,
+            type: notification.type,
+            amount: formatNotificationAmount(notification.amount),
+            reference: notification.reference, // Backend uses "reference" not "transactionReference"
+            currency: notification.currency,
+            description: notification.description,
+            status: notification.status,
+            timestamp: notification.timestamp,
           },
           transferScreenState: {
             currentAmount: amount,
@@ -134,7 +137,7 @@ export default function TransferScreen() {
           }
         });
         
-        console.log(`💳 [TransferScreen] TRANSACTION ${notification.data.type.toUpperCase()}: ${formatNotificationAmount(notification.data.amount)} | Status: ${notification.data.status}`);
+        console.log(`💳 [TransferScreen] TRANSACTION ${notification.type?.toUpperCase()}: ${formatNotificationAmount(notification.amount)} | Status: ${notification.status}`);
         
         // Refresh wallet data for any transaction
         queryClient.invalidateQueries({ queryKey: ['wallet'] });
@@ -189,6 +192,20 @@ export default function TransferScreen() {
   const recipientName = extractedAccountHolderName || '';
   const accountNumber = extractedAccountNumber || '';
   const bankName = extractedBankName || '';
+
+  // Show transfer error if any
+  useEffect(() => {
+    if (transferError) {
+      Alert.alert('Transfer Error', transferError, [{ text: 'OK' }]);
+    }
+  }, [transferError]);
+
+  // Show PIN modal with error if redirected from loader
+  useEffect(() => {
+    if (pinError) {
+      setShowPinModal(true);
+    }
+  }, [pinError]);
 
   // Validate required transfer data
   useEffect(() => {
@@ -325,64 +342,33 @@ export default function TransferScreen() {
         return;
       }
 
-      console.log('🚀 Initiating transfer with:', {
+      console.log('🚀 [TransferScreen] Navigating to loader with PIN:', {
         amount: transferAmount,
         accountNumber,
         bankName,
         accountName: recipientName,
-        pin
+        pin: '****'
       });
 
-      // Execute transfer using React Query mutation
-      const transferResult = await transferFundsMutation.mutateAsync({
-        amount: transferAmount,
-        accountNumber,
-        bankName,
-        accountName: recipientName,
-        description: `Transfer to ${recipientName}`,
-        pin
-      });
-
-      console.log('✅ Transfer successful:', transferResult);
-
-             // Close PIN modal
-       setShowPinModal(false);
-       
-       // Navigate to success screen with transfer details
-       router.push({
-         pathname: '/transfer-success',
-         params: {
-           amount: transferAmount.toLocaleString(),
-           recipientName: transferResult.recipientName,
-           reference: transferResult.reference,
-           newBalance: transferResult.newBalance.toLocaleString(),
-         }
-       });
-      
-    } catch (error: any) {
-      console.error('❌ Transfer failed:', error);
-      
       // Close PIN modal
       setShowPinModal(false);
       
-      // Show appropriate error message
-      let errorMessage = 'Transfer failed. Please try again.';
-      
-      if (error?.message) {
-        if (error.message.includes('PIN')) {
-          errorMessage = 'Invalid PIN. Please check and try again.';
-        } else if (error.message.includes('balance') || error.message.includes('insufficient')) {
-          errorMessage = 'Insufficient balance for this transfer.';
-        } else if (error.message.includes('account')) {
-          errorMessage = 'Invalid account details. Please verify and try again.';
-        } else {
-          errorMessage = error.message;
+      // Navigate to loader screen with transfer details
+      router.push({
+        pathname: '/transfer-loader',
+        params: {
+          amount: transferAmount.toString(),
+          accountNumber,
+          bankName,
+          accountName: recipientName,
+          pin
         }
-      }
+      });
       
-      Alert.alert('Transfer Failed', errorMessage, [
-        { text: 'OK' }
-      ]);
+    } catch (error: any) {
+      console.error('❌ [TransferScreen] Error preparing transfer:', error);
+      setShowPinModal(false);
+      Alert.alert('Error', 'Failed to prepare transfer. Please try again.');
     }
   };
 
@@ -393,6 +379,13 @@ export default function TransferScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
+      
+      {/* Show Pulsating Glow during transfer processing */}
+      {transferFundsMutation.isPending && (
+        <View style={styles.processingOverlay}>
+          <PulsatingGlow size={146} />
+        </View>
+      )}
       
       <KeyboardAvoidingView 
         style={styles.keyboardAvoidingView}
@@ -519,6 +512,7 @@ export default function TransferScreen() {
         bankName={bankName}
         amount={formatAmount(amount)}
         fee="10.00"
+        pinError={pinError}
       />
     </SafeAreaView>
   );
@@ -653,5 +647,16 @@ const styles = StyleSheet.create({
   payButtonContainer: {
     paddingHorizontal: 20,
     marginBottom: 16,
-  }
+  },
+  processingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
 });

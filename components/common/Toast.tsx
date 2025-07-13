@@ -117,7 +117,7 @@ export default function Toast({
           <View style={styles.iconContainer}>
             {getIcon()}
           </View>
-          <Text style={styles.message}>{message}</Text>
+          <Text style={styles.message} numberOfLines={1} ellipsizeMode="tail">{message}</Text>
         </View>
       </BlurView>
     </Animated.View>
@@ -127,7 +127,7 @@ export default function Toast({
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 100,
+    top: 60,
     left: 20,
     right: 20,
     zIndex: 9999,

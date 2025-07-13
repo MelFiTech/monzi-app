@@ -6,19 +6,19 @@ import AuthStorageService from './AuthStorageService';
 export interface WalletBalanceUpdateData {
   oldBalance: number;
   newBalance: number;
-  amount: number;
-  transactionReference: string;
+  change: number; // Backend uses "change" not "amount"
+  currency: string;
   accountNumber: string;
-  description: string;
+  reference: string; // Backend uses "reference" not "transactionReference"
   timestamp: string;
 }
 
 export interface TransactionNotificationData {
-  type: 'credit' | 'debit';
+  type: 'FUNDING' | 'DEBIT' | 'TRANSFER';
   amount: number;
-  transactionReference: string;
-  accountNumber: string;
+  currency: string;
   description: string;
+  reference: string; // Backend uses "reference" not "transactionReference"
   status: 'COMPLETED' | 'PENDING' | 'FAILED';
   timestamp: string;
 }
@@ -52,8 +52,8 @@ export type NotificationEventType =
   | 'connect_error';
 
 export interface NotificationEventHandlers {
-  wallet_balance_updated: (notification: NotificationPayload<WalletBalanceUpdateData>) => void;
-  transaction_notification: (notification: NotificationPayload<TransactionNotificationData>) => void;
+  wallet_balance_updated: (notification: WalletBalanceUpdateData) => void;
+  transaction_notification: (notification: TransactionNotificationData) => void;
   notification: (notification: NotificationPayload<GeneralNotificationData>) => void;
   joined_room: (data: { userId: string; message: string; timestamp: string }) => void;
   connect: () => void;
@@ -123,11 +123,6 @@ class NotificationService {
       const token = authData?.accessToken;
 
       this.socket = io(wsUrl, {
-        cors: {
-          origin: '*',
-          methods: ['GET', 'POST'],
-          credentials: true,
-        },
         extraHeaders: {
           'ngrok-skip-browser-warning': 'true',
           ...(token && { 'Authorization': `Bearer ${token}` }),
@@ -171,6 +166,9 @@ class NotificationService {
           // Join user-specific notification room
           this.joinUserRoom(userId);
           
+          // Emit connect event to notify hook
+          this.emit('connect');
+          
           resolve(true);
         });
 
@@ -185,6 +183,9 @@ class NotificationService {
             url: this.getWebSocketUrl(),
             reconnectAttempt: this.reconnectAttempts
           });
+          
+          // Emit connect_error event to notify hook
+          this.emit('connect_error', error);
           
           reject(error);
         });
@@ -201,6 +202,9 @@ class NotificationService {
           });
           
           this.isConnected = false;
+          
+          // Emit disconnect event to notify hook
+          this.emit('disconnect', reason);
           
           // Handle reconnection for unexpected disconnections
           if (reason === 'io server disconnect' || reason === 'io client disconnect') {
@@ -295,48 +299,63 @@ class NotificationService {
 
     // Wallet balance updates
     this.socket.on('wallet_balance_updated', (notification) => {
-      console.log('🔔 [NotificationService] Raw wallet balance update received from server:', {
+      console.log('🚨🚨🚨 [NOTIFICATION SERVICE] WALLET BALANCE EVENT RECEIVED FROM BACKEND 🚨🚨🚨');
+      console.log('📡 [NotificationService] Raw socket event data:', JSON.stringify(notification, null, 2));
+      console.log('🏦 [NotificationService] Balance update details:', {
         service: 'NotificationService',
         timestamp: new Date().toISOString(),
         event: 'wallet_balance_updated',
         userId: this.currentUserId,
         socketId: this.socket?.id,
-        rawNotification: notification,
         balanceData: {
-          oldBalance: notification.data?.oldBalance,
-          newBalance: notification.data?.newBalance,
-          amount: notification.data?.amount,
-          transactionReference: notification.data?.transactionReference,
-          description: notification.data?.description,
+          oldBalance: notification.oldBalance,
+          newBalance: notification.newBalance,
+          changeAmount: notification.change, // Backend uses "change" not "amount"
+          transactionReference: notification.reference, // Backend uses "reference" not "transactionReference"
+          accountNumber: notification.accountNumber,
+          currency: notification.currency,
+          timestamp: notification.timestamp,
         }
       });
       
+      // Prominent balance change log  
+      if (notification.change > 0) {
+        console.log(`💰💰💰 [SOCKET] WALLET CREDITED: +₦${notification.change} | ₦${notification.oldBalance} → ₦${notification.newBalance}`);
+      } else if (notification.change < 0) {
+        console.log(`💸💸💸 [SOCKET] WALLET DEBITED: ₦${notification.change} | ₦${notification.oldBalance} → ₦${notification.newBalance}`);
+      }
+      
       this.emit('wallet_balance_updated', notification);
       
-      console.log('📢 [NotificationService] Wallet balance update event emitted to components');
+      console.log('📢 [NotificationService] Wallet balance update event emitted to CameraHeader component');
     });
 
     // Transaction notifications
     this.socket.on('transaction_notification', (notification) => {
-      console.log('💳 [NotificationService] Raw transaction notification received from server:', {
+      console.log('🚨🚨🚨 [NOTIFICATION SERVICE] TRANSACTION EVENT RECEIVED FROM BACKEND 🚨🚨🚨');
+      console.log('📡 [NotificationService] Raw transaction event data:', JSON.stringify(notification, null, 2));
+      console.log('💳 [NotificationService] Transaction details:', {
         service: 'NotificationService',
         timestamp: new Date().toISOString(),
         event: 'transaction_notification',
         userId: this.currentUserId,
         socketId: this.socket?.id,
-        rawNotification: notification,
         transactionData: {
-          type: notification.data?.type,
-          amount: notification.data?.amount,
-          reference: notification.data?.transactionReference,
-          status: notification.data?.status,
-          description: notification.data?.description,
+          type: notification.type,
+          amount: notification.amount,
+          reference: notification.reference, // Backend uses "reference" not "transactionReference"
+          currency: notification.currency,
+          description: notification.description,
+          status: notification.status,
+          timestamp: notification.timestamp,
         }
       });
       
+      console.log(`💳💳💳 [SOCKET] TRANSACTION ${notification.type?.toUpperCase()}: ₦${notification.amount} | Status: ${notification.status} | Ref: ${notification.reference}`);
+      
       this.emit('transaction_notification', notification);
       
-      console.log('📢 [NotificationService] Transaction notification event emitted to components');
+      console.log('📢 [NotificationService] Transaction notification event emitted to CameraHeader component');
     });
 
     // General notifications
@@ -388,7 +407,7 @@ class NotificationService {
           this.handleReconnection();
         }
       }
-    }, delay);
+    }, delay) as unknown as NodeJS.Timeout;
   }
 
   /**
@@ -426,13 +445,27 @@ class NotificationService {
   ): void {
     const handlers = this.eventHandlers.get(event);
     if (handlers) {
+      console.log(`📡 [NotificationService] Emitting '${event}' to ${handlers.size} registered handlers`);
+      let handlerIndex = 0;
       handlers.forEach((handler) => {
         try {
+          console.log(`🎯 [NotificationService] Calling handler #${handlerIndex + 1} for '${event}'`);
           (handler as any)(...args);
+          console.log(`✅ [NotificationService] Handler #${handlerIndex + 1} for '${event}' completed successfully`);
         } catch (error) {
-          console.error(`❌ Error in ${event} handler:`, error);
+          console.error(`❌ [NotificationService] Error in handler #${handlerIndex + 1} for '${event}':`, error);
+          console.error(`🔍 [NotificationService] Failed handler details:`, {
+            event,
+            handlerIndex: handlerIndex + 1,
+            totalHandlers: handlers.size,
+            error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined
+          });
         }
+        handlerIndex++;
       });
+    } else {
+      console.log(`📡 [NotificationService] No handlers registered for '${event}'`);
     }
   }
 
