@@ -242,21 +242,28 @@ export const useUploadSelfie = () => {
       } else {
         console.error('❌ Selfie Upload failed:', data.message, 'Error:', data.error);
         
-        // Check if it requires contact support
-        if (data.error === 'AI_VERIFICATION_FAILED' || 
+        // Check if it requires contact support (only for specific errors)
+        if (data.error === 'INVALID_DOCUMENT' || 
+            data.error === 'DOCUMENT_EXPIRED' ||
             (data.message && data.message.toLowerCase().includes('contact support'))) {
           console.log('🚨 Selfie upload requires contact support, setting flag and routing to bridge');
           // Set flag for bridge screen to show contact support
           AsyncStorage.setItem('kyc_requires_support', 'true');
           ToastService.error('Contact support');
+          router.push('/(kyc)/bridge' as never);
         } else {
-          ToastService.error('Upload failed');
+          // For AI verification failures, allow retry with better guidance
+          console.log('⚠️ AI verification failed, allowing retry with better guidance');
+          ToastService.error('Verification failed. Please ensure good lighting and try again.');
+          
+          // Navigate back to camera with specific error message for retry
+          router.push({
+            pathname: '/(kyc)/camera',
+            params: { 
+              error: 'Face verification failed. Please ensure:\n• Good lighting\n• Face is clearly visible\n• No shadows or glare\n• Try again' 
+            }
+          });
         }
-        
-        // Always navigate to bridge regardless of error type
-        // Bridge will show appropriate button based on KYC status or support flag
-        console.log('➡️ Navigating to bridge after selfie upload failure');
-        router.push('/(kyc)/bridge' as never);
       }
     },
     onError: (error: Error) => {
@@ -264,9 +271,21 @@ export const useUploadSelfie = () => {
       
       // Check if it's a network error
       if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
-        ToastService.error('Connection failed');
+        ToastService.error('Connection failed. Please check your internet and try again.');
+        router.push({
+          pathname: '/(kyc)/camera',
+          params: { 
+            error: 'Connection failed. Please check your internet connection and try again.' 
+          }
+        });
       } else {
-        ToastService.error('Upload failed');
+        ToastService.error('Upload failed. Please try again.');
+        router.push({
+          pathname: '/(kyc)/camera',
+          params: { 
+            error: 'Upload failed. Please try again with better lighting.' 
+          }
+        });
       }
     },
   });

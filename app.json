@@ -18,8 +18,9 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Monzi uses the camera to capture selfies for KYC verification and to scan payment account numbers for quick and accurate money transfers.",
-        "NSPhotoLibraryUsageDescription": "Monzi needs access to your photo library to allow you to select and upload identity documents for account verification.",
-        "NSFaceIDUsageDescription": "Monzi uses Face ID to provide secure and convenient access to your financial account."
+        "NSPhotoLibraryUsageDescription": "Monzi needs access to your photo library to allow you to select and upload written or typed account details for easy payment.",
+        "NSFaceIDUsageDescription": "Monzi uses Face ID to provide secure and convenient access to your financial account.",
+        "NSLocationWhenInUseUsageDescription": "Monzi may access location data to enhance security features and provide location-based services for your financial transactions."
       }
     },
     "android": {
@@ -32,7 +33,12 @@
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
-        "WAKE_LOCK"
+        "WAKE_LOCK",
+        "android.permission.CAMERA",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "WAKE_LOCK",
+        "android.permission.CAMERA"
       ]
     },
     "web": {
@@ -71,6 +77,9 @@
       "eas": {
         "projectId": "467a0d00-c4c0-4dbc-9b77-bfcc3cc5e1c4"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
     }
   }
 }

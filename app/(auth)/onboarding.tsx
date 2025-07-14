@@ -18,7 +18,7 @@ export default function OnboardingScreen() {
     router.push('/(auth)/login');
     //router.push('/(auth)/verify-otp');
     //router.push('/test-push');
-    //router.push('/(kyc)/camera');
+    // router.push('/(kyc)/camera');
     //router.push('/transfer-success');
     // router.push('/(auth)/passcode-lock');
 

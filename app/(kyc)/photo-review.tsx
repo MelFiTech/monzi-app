@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -13,6 +13,8 @@ import { fontFamilies, fontSizes } from '@/constants/fonts';
 import Button from '@/components/common/Button';
 import { useUploadSelfie } from '@/hooks/useKYCService';
 import { useAuth } from '@/hooks/useAuthService';
+import { ImageOptimizationService } from '@/services';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: screenWidth } = Dimensions.get('window');
 const CIRCLE_SIZE = screenWidth * 0.85;
@@ -21,12 +23,21 @@ export default function PhotoReviewScreen() {
   const { photoUri } = useLocalSearchParams<{ photoUri: string }>();
   const uploadSelfieMutation = useUploadSelfie();
   const { logout } = useAuth();
+  const [retryCount, setRetryCount] = useState(0);
 
   // Handle upload errors - navigate back to camera with error message
   useEffect(() => {
     if (uploadSelfieMutation.isError) {
       const errorMessage = uploadSelfieMutation.error?.message || 'Photo processing failed. Please try again.';
       console.error('❌ Selfie upload failed:', errorMessage);
+      
+      // Check retry count - after 3 attempts, go to contact support
+      if (retryCount >= 2) {
+        console.log('🚨 Max retries reached, routing to contact support');
+        AsyncStorage.setItem('kyc_requires_support', 'true');
+        router.push('/(kyc)/bridge');
+        return;
+      }
       
       // Navigate back to camera with error message
       router.push({
@@ -36,7 +47,7 @@ export default function PhotoReviewScreen() {
         }
       });
     }
-  }, [uploadSelfieMutation.isError, uploadSelfieMutation.error]);
+  }, [uploadSelfieMutation.isError, uploadSelfieMutation.error, retryCount]);
 
   const handleRetake = () => {
     router.push('/(kyc)/camera');
@@ -59,20 +70,41 @@ export default function PhotoReviewScreen() {
     }
 
     try {
-      // For React Native, create a file object that FormData can handle
+      console.log('🖼️ Starting image optimization for KYC selfie...');
+      
+      // Optimize image for KYC upload
+      const optimizedImage = await ImageOptimizationService.fastOptimize(photoUri);
+      console.log(`📊 Image optimized: ${optimizedImage.compressionRatio.toFixed(1)}x smaller`);
+      
+      // Create file object with optimized image
+      const fileObject = {
+        uri: optimizedImage.uri,
+        type: 'image/jpeg',
+        name: 'selfie.jpg',
+      };
+      
+      console.log('📤 Preparing optimized selfie upload:', fileObject);
+      
+      // Increment retry count
+      setRetryCount(prev => prev + 1);
+      
+      // Upload using React Query
+      uploadSelfieMutation.mutate(fileObject);
+    } catch (error) {
+      console.error('Error optimizing or preparing selfie for upload:', error);
+      
+      // Fallback to original image if optimization fails
+      console.log('🔄 Falling back to original image due to optimization error');
       const fileObject = {
         uri: photoUri,
         type: 'image/jpeg',
         name: 'selfie.jpg',
       };
       
-      console.log('📤 Preparing selfie upload:', fileObject);
+      // Increment retry count
+      setRetryCount(prev => prev + 1);
       
-      // Upload using React Query
       uploadSelfieMutation.mutate(fileObject);
-    } catch (error) {
-      console.error('Error preparing selfie for upload:', error);
-      router.replace('/(kyc)/selfie-loader');
     }
   };
 
@@ -90,9 +122,6 @@ export default function PhotoReviewScreen() {
             style={styles.photoImage}
             resizeMode="cover"
           />
-        </View>
-        <View style={styles.instructionsContainer}>
-          <Text style={styles.instructionText}>Ensure your face is clearly visible and lightening is good</Text>
         </View>
       </View>
       <View style={styles.controlsContainer}>

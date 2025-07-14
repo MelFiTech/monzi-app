@@ -98,9 +98,10 @@ export default function CameraScreen() {
       try {
         setIsCapturing(true);
         const photo = await cameraRef.current.takePictureAsync({
-          quality: 1,
+          quality: 0.9, // Higher quality for KYC verification
           base64: false,
-          exif: false
+          exif: false,
+          skipProcessing: false // Enable processing for better quality
         });
         
         if (photo && photo.uri) {
@@ -166,6 +167,15 @@ export default function CameraScreen() {
             <Text style={styles.errorMessage}>
               {params.error || 'Please ensure your face is clearly visible with good lighting and try again'}
             </Text>
+            <TouchableOpacity 
+              style={styles.retryButton}
+              onPress={() => {
+                setShowErrorOverlay(false);
+                overlayAnimation.setValue(0);
+              }}
+            >
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </TouchableOpacity>
           </View>
         </Animated.View>
       )}
@@ -173,7 +183,9 @@ export default function CameraScreen() {
       {/* Instructions */}
       <View style={styles.instructionsContainer}>
         <Text style={styles.instructionText}>
-          Position your face within the circle and ensure good lighting
+          Position your face within the circle{'\n'}
+          Ensure good lighting and clear visibility{'\n'}
+          Remove glasses if possible
         </Text>
       </View>
       
@@ -296,7 +308,7 @@ const styles = StyleSheet.create({
   },
   instructionsContainer: {
     position: 'absolute',
-    bottom: 140,
+    bottom: 180,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -398,5 +410,17 @@ const styles = StyleSheet.create({
     color: '#666666',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  retryButton: {
+    backgroundColor: Colors.colors.primary[400],
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  retryButtonText: {
+    color: '#000000',
+    fontSize: fontSizes.base,
+    fontFamily: fontFamilies.sora.bold,
   },
 });

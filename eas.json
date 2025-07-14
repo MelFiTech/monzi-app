@@ -9,13 +9,15 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_ENV": "development"
-      }
+      },
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_ENV": "preview"
-      }
+      },
+      "channel": "preview"
     },
     "production": {
       "autoIncrement": true,
@@ -25,7 +27,8 @@
       },
       "env": {
         "EXPO_PUBLIC_ENV": "production"
-      }
+      },
+      "channel": "production"
     }
   },
   "submit": {
