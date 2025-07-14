@@ -35,6 +35,7 @@ export default function CameraScreen() {
   const backendChecks = useBackendChecks({
     isFreshRegistration: cameraLogic.isFreshRegistration,
     showVerificationModal: cameraLogic.showVerificationModal,
+    showSetPinModal: cameraLogic.showSetPinModal,
     setIsFreshRegistration: cameraLogic.setIsFreshRegistration,
     setIsWalletActivationMode: cameraLogic.setIsWalletActivationMode,
     setIsPendingVerification: cameraLogic.setIsPendingVerification,

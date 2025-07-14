@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/providers/AuthProvider';
 import { useKYCStatus } from '@/hooks/useKYCService';
@@ -9,6 +9,7 @@ import ToastService from '@/services/ToastService';
 interface BackendChecksProps {
   isFreshRegistration: boolean;
   showVerificationModal: boolean;
+  showSetPinModal: boolean;
   setIsFreshRegistration: (value: boolean) => void;
   setIsWalletActivationMode: (value: boolean) => void;
   setIsPendingVerification: (value: boolean) => void;
@@ -16,6 +17,7 @@ interface BackendChecksProps {
   setShowSetPinModal: (value: boolean) => void;
   setAreAllChecksComplete: (value: boolean) => void;
   setShowPulsatingGlow: (value: boolean) => void;
+  onSetPinModalClose?: () => void;
 }
 
 export function useBackendChecks(props: BackendChecksProps) {
@@ -24,6 +26,16 @@ export function useBackendChecks(props: BackendChecksProps) {
   const { data: walletDetails, error: walletDetailsError, isLoading: walletDetailsLoading, isError: walletDetailsIsError } = useWalletDetails();
   const { data: walletBalance, error: walletBalanceError, isLoading: walletBalanceLoading, isError: walletBalanceIsError } = useWalletBalance();
   const { data: pinStatus } = usePinStatus();
+
+  // Track if PIN modal has been shown to prevent duplicates
+  const [pinModalShown, setPinModalShown] = useState(false);
+  const [pinModalDebounce, setPinModalDebounce] = useState(false);
+
+  // Function to reset PIN modal shown flag
+  const resetPinModalShown = () => {
+    console.log('🔄 Resetting PIN modal shown flag');
+    setPinModalShown(false);
+  };
 
   // Debug authentication state
   useEffect(() => {
@@ -385,10 +397,17 @@ export function useBackendChecks(props: BackendChecksProps) {
           props.setIsWalletActivationMode(false);
           props.setShowVerificationModal(false);
         } else if (hasWalletDetailsError || hasWalletBalanceError) {
-          console.log('⚠️ User missing wallet data, showing activation modal');
-          props.setIsWalletActivationMode(true);
-          props.setIsPendingVerification(false);
-          props.setShowVerificationModal(true);
+          // For APPROVED users, don't show activation modal - wallet will be created automatically
+          if (statusData?.kycStatus === 'APPROVED') {
+            console.log('✅ APPROVED user - wallet will be created automatically, no activation modal needed');
+            props.setIsWalletActivationMode(false);
+            props.setShowVerificationModal(false);
+          } else {
+            console.log('⚠️ VERIFIED user missing wallet data, showing activation modal');
+            props.setIsWalletActivationMode(true);
+            props.setIsPendingVerification(false);
+            props.setShowVerificationModal(true);
+          }
         } else if (!walletDetails && !walletBalance && !walletDetailsError && !walletBalanceError) {
           console.log('⏳ Wallet data still loading, waiting...');
         }
@@ -423,20 +442,40 @@ export function useBackendChecks(props: BackendChecksProps) {
         console.log('🔑 Checking PIN status for user with wallet access:', {
           hasPinSet: pinStatus.hasPinSet,
           walletExists: pinStatus.walletExists,
-          message: pinStatus.message
+          message: pinStatus.message,
+          pinModalShown
         });
 
-        if (pinStatus.walletExists && !pinStatus.hasPinSet) {
+        if (pinStatus.walletExists && !pinStatus.hasPinSet && !pinModalShown && !pinModalDebounce) {
           console.log('⚠️ Wallet exists but no PIN set, showing PIN setup modal');
+          setPinModalShown(true);
+          setPinModalDebounce(true);
           props.setShowSetPinModal(true);
+          
+          // Reset debounce after 2 seconds
+          setTimeout(() => {
+            setPinModalDebounce(false);
+          }, 2000);
         } else if (pinStatus.hasPinSet) {
           console.log('✅ PIN is already set, user can proceed with transfers');
+          // Reset PIN modal shown flag when PIN is set
+          setPinModalShown(false);
+          setPinModalDebounce(false);
         } else if (!pinStatus.walletExists) {
           console.log('❌ Wallet does not exist, should show wallet activation');
         }
       }
     }
-  }, [kycStatus, walletDetails, walletBalance, pinStatus]);
+  }, [kycStatus, walletDetails, walletBalance, pinStatus, pinModalShown]);
+
+  // Reset PIN modal shown flag when modal is closed
+  useEffect(() => {
+    if (!props.showSetPinModal && pinModalShown) {
+      console.log('🔄 PIN modal closed, resetting shown flag');
+      setPinModalShown(false);
+      setPinModalDebounce(false);
+    }
+  }, [props.showSetPinModal, pinModalShown]);
 
   return {
     isAuthenticated,
@@ -449,5 +488,6 @@ export function useBackendChecks(props: BackendChecksProps) {
     walletBalance,
     walletBalanceError,
     pinStatus,
+    resetPinModalShown,
   };
 } 

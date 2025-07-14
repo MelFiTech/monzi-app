@@ -279,7 +279,7 @@ export function useCameraLogic() {
 
   const handleVerifyID = async () => {
     if (isWalletActivationMode) {
-      console.log('🔄 Activating wallet for APPROVED user...');
+      console.log('🔄 Activating wallet for VERIFIED user...');
       
       try {
         await walletRecoveryMutation.mutateAsync();
@@ -316,6 +316,7 @@ export function useCameraLogic() {
   };
 
   const handleSetPinModalClose = () => {
+    console.log('🔒 PIN modal closed by user');
     setShowSetPinModal(false);
   };
 

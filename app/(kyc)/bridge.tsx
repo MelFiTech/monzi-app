@@ -51,14 +51,12 @@ const initialSteps: VerificationStep[] = [
 
 export default function BridgeScreen() {
   const [steps, setSteps] = useState<VerificationStep[]>(initialSteps);
-  const [walletRecoveryFailed, setWalletRecoveryFailed] = useState(false);
   const [requiresSupport, setRequiresSupport] = useState(false);
 
   // React Query hooks
   const { data: kycStatus, isLoading } = useKYCStatus();
   const { currentStep, isKYCComplete, canProceedToSelfie } = useKYCStep();
   const { logout } = useAuth();
-  const walletRecoveryMutation = useWalletRecovery();
 
   useEffect(() => {
     if (kycStatus) {
@@ -170,35 +168,17 @@ export default function BridgeScreen() {
 
   const completeVerification = async () => {
     try {
-      // For APPROVED users, try wallet recovery first
+      // For APPROVED users, proceed directly to home (wallet will be created automatically)
       if ((kycStatus as any)?.kycStatus === 'APPROVED') {
-        console.log('🔄 APPROVED user - attempting wallet recovery...');
+        console.log('🔄 APPROVED user - proceeding to home (wallet will be created automatically)');
         
-        try {
-          await walletRecoveryMutation.mutateAsync();
-          console.log('✅ Wallet recovery successful');
-          ToastService.success('Wallet activated');
-          
-          // Set verification flags and navigate to home
-          await AsyncStorage.setItem('user_verified', 'true');
-          await AsyncStorage.setItem('biometrics_completed', 'true');
-          router.replace('/(tabs)');
-        } catch (walletError: any) {
-          console.error('❌ Wallet recovery failed:', walletError);
-          
-          // Check if it's a KYC verification error
-          if (walletError.message?.includes('complete KYC verification first') || 
-              walletError.statusCode === 400) {
-            console.log('❌ KYC error for APPROVED user - showing contact support');
-            setWalletRecoveryFailed(true);
-            ToastService.error('Contact support');
-          } else {
-            // Other errors, show generic message
-            console.log('❌ Other wallet error - showing contact support');
-            setWalletRecoveryFailed(true);
-            ToastService.error('Contact support');
-          }
-        }
+        // Set verification flags and navigate to home
+        await AsyncStorage.setItem('user_verified', 'true');
+        await AsyncStorage.setItem('biometrics_completed', 'true');
+        
+        // Don't try to activate wallet here - let the backend create it automatically
+        ToastService.success('Verification complete');
+        router.replace('/(tabs)');
       } else {
         // For VERIFIED users, proceed normally
         await AsyncStorage.setItem('user_verified', 'true');
@@ -366,31 +346,16 @@ export default function BridgeScreen() {
               />
             );
           } else if ((kycStatus as any)?.kycStatus === 'APPROVED' && (kycStatus as any)?.isVerified && (kycStatus as any)?.bvnVerified && (kycStatus as any)?.selfieVerified) {
-            // If wallet recovery failed for APPROVED user, show Contact Support
-            if (walletRecoveryFailed) {
-              console.log('🔄 Bridge button: Contact Support (APPROVED - wallet recovery failed)');
-              return (
-                <Button
-                  title="Contact Support"
-                  variant="primary"
-                  size="lg"
-                  fullWidth
-                  onPress={handleContactSupport}
-                />
-              );
-            } else {
-              console.log('🔄 Bridge button: Get full access (APPROVED)');
-              return (
-                <Button
-                  title="Get full access"
-                  variant="primary"
-                  size="lg"
-                  fullWidth
-                  loading={walletRecoveryMutation.isPending}
-                  onPress={completeVerification}
-                />
-              );
-            }
+            console.log('🔄 Bridge button: Verification Complete (APPROVED)');
+            return (
+              <Button
+                title="Verification Complete"
+                variant="primary"
+                size="lg"
+                fullWidth
+                onPress={completeVerification}
+              />
+            );
           } else if ((kycStatus as any)?.kycStatus === 'VERIFIED' && (kycStatus as any)?.isVerified && (kycStatus as any)?.bvnVerified && (kycStatus as any)?.selfieVerified) {
             console.log('🔄 Bridge button: Verification Complete (VERIFIED)');
             return (
