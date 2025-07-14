@@ -133,11 +133,8 @@ export default function ProfileScreen() {
               router.replace('/(auth)/login');
             } catch (error) {
               console.error('Logout error:', error);
-              Alert.alert(
-                'Error',
-                'Failed to sign out. Please try again.',
-                [{ text: 'OK' }]
-              );
+              // Navigate to login screen even if logout fails
+              router.replace('/(auth)/login');
             }
           },
         },
@@ -157,7 +154,7 @@ export default function ProfileScreen() {
   // Format user name with proper capitalization
   const userName = user?.firstName && user?.lastName 
     ? capitalizeWords(`${user.firstName} ${user.lastName}`)
-    : user?.email?.split('@')[0] || 'User';
+    : user?.firstName || '';
 
   const userEmail = user?.email || 'user@example.com';
   const userPhone = user?.phone || '+234XXXXXXXXXX';

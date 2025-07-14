@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -12,20 +12,23 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/providers/AuthProvider';
 import { CameraHeader } from '@/components/layout';
-import { PulsatingGlow } from '@/components/common';
+import { PulsatingGlow, Transaction } from '@/components/common';
 import { CameraPermissions, CameraInterface, CameraControls, CameraModals } from '@/components/camera';
 import { useCameraLogic } from '@/hooks/useCameraLogic';
 import { useBackendChecks } from '@/hooks/useBackendChecks';
 import { useNotificationService } from '@/hooks/useNotificationService';
 import { fontFamilies } from '@/constants/fonts';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 
 export default function CameraScreen() {
   const { logout, user } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
+  const queryClient = useQueryClient();
   
   // Use custom hooks for logic separation
   const cameraLogic = useCameraLogic();
@@ -41,6 +44,39 @@ export default function CameraScreen() {
     setShowPulsatingGlow: cameraLogic.setShowPulsatingGlow,
   });
 
+  // Memoized notification callbacks to prevent reconnection cycles
+  const handleNotificationConnect = useCallback(() => {
+    console.log('🔌 [CameraScreen] Real-time notifications connected');
+  }, []);
+
+  const handleNotificationDisconnect = useCallback(() => {
+    console.log('🔌 [CameraScreen] Real-time notifications disconnected');
+  }, []);
+
+  const handleNotificationError = useCallback((error: any) => {
+    console.log('❌ [CameraScreen] Real-time notification error:', error?.message);
+  }, []);
+
+  // Handle transaction notifications to refresh transaction history
+  const handleTransactionNotification = useCallback((transaction: any) => {
+    console.log('💰 [CameraScreen] New transaction received:', transaction);
+    
+    // Invalidate and refetch transaction queries to get updated list
+    queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    
+    // If transaction history is currently open, the list will auto-refresh
+    // due to React Query's cache invalidation
+  }, [queryClient]);
+
+  // Handle wallet balance updates to refresh transaction history
+  const handleWalletBalanceUpdate = useCallback((balanceUpdate: any) => {
+    console.log('💰 [CameraScreen] Wallet balance updated:', balanceUpdate);
+    
+    // Invalidate and refetch transaction queries when balance changes
+    // (indicates a transaction has occurred)
+    queryClient.invalidateQueries({ queryKey: ['transactions'] });
+  }, [queryClient]);
+
   // Real-time notification connection status
   const { 
     isConnected: isNotificationConnected,
@@ -48,22 +84,34 @@ export default function CameraScreen() {
     {
       autoConnect: true,
       showToasts: false, // Don't show toasts on main screen to avoid overlap with header
-      enableBalanceUpdates: false, // Header handles balance updates
-      enableTransactionNotifications: false, // Header handles transaction notifications
+      enableBalanceUpdates: true, // Enable to refresh transaction history on balance changes
+      enableTransactionNotifications: true, // Enable to refresh transaction history
       enableGeneralNotifications: false, // Header handles general notifications
     },
     {
-      onConnect: () => {
-        console.log('🔌 [CameraScreen] Real-time notifications connected');
-      },
-      onDisconnect: () => {
-        console.log('🔌 [CameraScreen] Real-time notifications disconnected');
-      },
-      onError: (error) => {
-        console.log('❌ [CameraScreen] Real-time notification error:', error?.message);
-      }
+      onConnect: handleNotificationConnect,
+      onDisconnect: handleNotificationDisconnect,
+      onError: handleNotificationError,
+      onTransactionNotification: handleTransactionNotification,
+      onWalletBalanceUpdate: handleWalletBalanceUpdate,
     }
   );
+
+  // Auto-lock polling effect
+  useEffect(() => {
+    let isActive = true;
+    const interval = setInterval(async () => {
+      const requireReauth = await AsyncStorage.getItem('requireReauth');
+      if (requireReauth === 'true' && isActive) {
+        clearInterval(interval);
+        router.replace('/(auth)/splash');
+      }
+    }, 1000);
+    return () => {
+      isActive = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   // Request camera permissions on component mount
   useEffect(() => {
@@ -84,8 +132,8 @@ export default function CameraScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <CameraHeader />
+      {/* Header - Hide when transaction history is open */}
+      {!cameraLogic.showTransactionHistory && <CameraHeader />}
       
       {/* Camera Interface - Always show for immediate feedback */}
       <CameraInterface
@@ -97,6 +145,7 @@ export default function CameraScreen() {
         showInstructions={cameraLogic.showInstructions}
         instructionAnimation={cameraLogic.instructionAnimation}
         isProcessing={cameraLogic.isProcessing}
+        dimViewfinderRings={cameraLogic.showTransactionHistory}
       />
 
       {/* Show Pulsating Glow if checks are not complete - overlay on camera */}
@@ -106,17 +155,7 @@ export default function CameraScreen() {
         </View>
       )}
 
-      {/* Connection Overlay - Show when notifications are disconnected */}
-      {!isNotificationConnected && cameraLogic.areAllChecksComplete && !cameraLogic.showPulsatingGlow && (
-        <View style={styles.connectionOverlay}>
-          <View style={styles.connectionMessageContainer}>
-            <Text style={styles.connectionMessageTitle}>Connection Required</Text>
-            <Text style={styles.connectionMessage}>
-              Please check your connection.
-            </Text>
-          </View>
-        </View>
-      )}
+
 
       {/* Extracting Overlay - Show during capture/processing */}
       {(cameraLogic.isCapturing || cameraLogic.isProcessing) && (
@@ -154,7 +193,23 @@ export default function CameraScreen() {
           onCapture={cameraLogic.handleCapture}
           onOpenGallery={cameraLogic.openGallery}
           onViewHistory={cameraLogic.handleViewHistory}
-          isConnectionDisabled={!isNotificationConnected || !cameraLogic.areAllChecksComplete}
+          isConnectionDisabled={!cameraLogic.areAllChecksComplete}
+          showTransactionHistory={cameraLogic.showTransactionHistory}
+          transactions={cameraLogic.transactionsData.transactions}
+          onTransactionPress={(transaction: Transaction) => {
+            console.log('Transaction pressed:', transaction);
+            // TODO: Navigate to transaction details
+          }}
+          loading={cameraLogic.transactionsData.loading}
+          refreshing={cameraLogic.transactionsData.refreshing}
+          onRefresh={cameraLogic.transactionsData.onRefresh}
+          onEndReached={cameraLogic.transactionsData.onEndReached}
+          hasMoreData={cameraLogic.transactionsData.hasMoreData}
+          onRequestStatement={() => {
+            console.log('Request statement');
+            // TODO: Handle statement request
+            cameraLogic.setShowTransactionHistory(false);
+          }}
         />
       )}
 
@@ -201,35 +256,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
     zIndex: 250,
   },
-  connectionOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 300,
-  },
-  connectionMessageContainer: {
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  connectionMessageTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontFamily: fontFamilies.clashDisplay.semibold,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  connectionMessage: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 16,
-    fontFamily: fontFamilies.sora.medium,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
+
   extractingOverlay: {
     position: 'absolute',
     top: 0,

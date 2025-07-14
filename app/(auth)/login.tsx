@@ -18,6 +18,7 @@ import Button from '@/components/common/Button';
 import { AuthHeader } from '@/components/auth/AuthHeader';
 import RegisterAuthInput from '@/components/auth/Register-AuthInput';
 import { useLogin } from '@/hooks';
+import { useAuth } from '@/providers/AuthProvider';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -25,6 +26,7 @@ export default function LoginScreen() {
   const [isValid, setIsValid] = useState(false);
   const emailRef = useRef<TextInput>(null);
   const loginMutation = useLogin();
+  const { checkAuthState } = useAuth();
 
   useEffect(() => {
     // Auto focus email input on mount
@@ -54,7 +56,7 @@ export default function LoginScreen() {
       });
       
       if (result.success) {
-        // Navigation is handled automatically in the mutation's onSuccess callback
+        await checkAuthState();
         router.replace('/(tabs)');
       } else {
         Alert.alert('Login Failed', result.message || 'Invalid credentials');

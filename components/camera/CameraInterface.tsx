@@ -14,6 +14,7 @@ interface CameraInterfaceProps {
   showInstructions: boolean;
   instructionAnimation: Animated.Value;
   isProcessing: boolean;
+  dimViewfinderRings?: boolean;
 }
 
 export default function CameraInterface({
@@ -25,7 +26,9 @@ export default function CameraInterface({
   showInstructions,
   instructionAnimation,
   isProcessing,
+  dimViewfinderRings = false,
 }: CameraInterfaceProps) {
+  const ringOpacity = dimViewfinderRings ? 0.1 : 1;
   return (
     <>
       {/* Camera View */}
@@ -44,11 +47,13 @@ export default function CameraInterface({
       <View style={styles.overlay}>
         {/* Circular Viewfinder */}
         <View style={styles.viewfinderContainer}>
-          <View style={styles.viewfinder}>
-            <View style={styles.viewfinderRing} />
-            <View style={styles.viewfinderRing2} />
-            <View style={styles.viewfinderRing3} />
-          </View>
+          { !dimViewfinderRings && (
+            <View style={styles.viewfinder}>
+              <View style={styles.viewfinderRing} />
+              <View style={styles.viewfinderRing2} />
+              <View style={styles.viewfinderRing3} />
+            </View>
+          )}
         </View>
       </View>
 

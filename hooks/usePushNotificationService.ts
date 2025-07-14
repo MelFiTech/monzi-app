@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
 import PushNotificationService from '@/services/PushNotificationService';
-import { ToastService } from '@/services';
+import { ToastService, AuthStorageService } from '@/services';
 
 interface PushNotificationState {
   expoPushToken: string | null;
@@ -80,8 +80,10 @@ export function usePushNotificationService(
 
   // React Query mutation for backend registration
   const registerTokenMutation = useMutation({
-    mutationFn: async ({ token, authToken }: { token: string; authToken: string }) => {
-      const success = await PushNotificationService.registerTokenWithBackend(token, authToken);
+    mutationFn: async ({ token, authToken, isLogin = false }: { token: string; authToken: string; isLogin?: boolean }) => {
+      const success = isLogin 
+        ? await PushNotificationService.updateDeviceTokenForLogin(token, authToken)
+        : await PushNotificationService.registerTokenWithBackend(token, authToken);
       if (!success) {
         throw new Error('Failed to register push token with backend');
       }
@@ -195,7 +197,7 @@ export function usePushNotificationService(
   }, [hasPermissions]);
 
   // Register for push notifications (with permission check)
-  const registerForPushNotifications = useCallback(async (): Promise<boolean> => {
+  const registerForPushNotifications = useCallback(async (isLogin = false): Promise<boolean> => {
     if (!authToken) {
       setState(prev => ({ ...prev, error: 'Cannot register without auth token' }));
       return false;
@@ -229,7 +231,7 @@ export function usePushNotificationService(
       }
 
       // Register with backend using React Query mutation
-      await registerTokenMutation.mutateAsync({ token, authToken });
+      await registerTokenMutation.mutateAsync({ token, authToken, isLogin });
       return true;
     } catch (error) {
       return false;
@@ -354,8 +356,13 @@ export function usePushNotificationService(
         !state.hasAttemptedRegistration && 
         !registerTokenMutation.isPending
       ) {
-        console.log('📱 Auto-registering for push notifications...');
-        await registerForPushNotifications();
+        // Check if this is a login scenario by checking for existing auth data
+        const authStorageService = AuthStorageService.getInstance();
+        const existingAuthData = await authStorageService.getAuthData();
+        const isLoginScenario = !!existingAuthData;
+        
+        console.log(`📱 Auto-registering for push notifications (${isLoginScenario ? 'login' : 'registration'} scenario)...`);
+        await registerForPushNotifications(isLoginScenario);
       }
     };
 
@@ -374,8 +381,13 @@ export function usePushNotificationService(
         !registerTokenMutation.isPending &&
         !isRegistered // Only if not currently registered
       ) {
-        console.log('📱 Token detected but not registered - re-registering...');
-        await registerForPushNotifications();
+        // Check if this is a login scenario
+        const authStorageService = AuthStorageService.getInstance();
+        const existingAuthData = await authStorageService.getAuthData();
+        const isLoginScenario = !!existingAuthData;
+        
+        console.log(`📱 Token detected but not registered - re-registering (${isLoginScenario ? 'login' : 'registration'} scenario)...`);
+        await registerForPushNotifications(isLoginScenario);
       }
     };
 

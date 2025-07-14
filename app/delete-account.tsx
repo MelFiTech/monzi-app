@@ -23,7 +23,7 @@ export default function DeleteAccountScreen() {
   };
 
   // Get user's first name or fallback
-  const userName = user?.firstName || user?.email?.split('@')[0] || 'User';
+  const userName = user?.firstName || '';
 
   return (
     <>
@@ -34,7 +34,7 @@ export default function DeleteAccountScreen() {
         
         {/* Title */}
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>Delete {userName} Account</Text>
+          <Text style={styles.title}>Delete {userName || ''} Account</Text>
         </View>
 
         {/* Content */}

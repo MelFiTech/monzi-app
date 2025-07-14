@@ -83,6 +83,15 @@ export default function AuthLayout() {
           gestureEnabled: false,
         }} 
       />
+ <Stack.Screen 
+        name="passcode-lock" 
+        options={{ 
+          title: 'Passcode Lock',
+          headerShown: false,
+          gestureEnabled: false,
+        }} 
+      />
+
     </Stack>
   );
 } 

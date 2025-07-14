@@ -44,6 +44,7 @@
       "expo-router",
       "expo-splash-screen",
       "expo-notifications",
+      "expo-updates",
       [
         "react-native-vision-camera",
         {
@@ -59,6 +60,11 @@
     },
     "experiments": {
       "typedRoutes": true
+    },
+    "updates": {
+      "enabled": true,
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/467a0d00-c4c0-4dbc-9b77-bfcc3cc5e1c4"
     },
     "extra": {
       "router": {},

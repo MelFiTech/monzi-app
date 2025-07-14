@@ -3,7 +3,10 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
+import { AppState, TouchableWithoutFeedback } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { updateLastActivity, shouldRequireReauth, INACTIVITY_TIMEOUT_MS } from '@/hooks/useInactivityService';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/common/useColorScheme';
@@ -70,11 +73,63 @@ export default function RootLayout() {
     }
   }, [loaded]);
 
+  const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Helper to clear and restart inactivity timer
+  const resetInactivityTimer = async () => {
+    if (inactivityTimer.current) {
+      clearTimeout(inactivityTimer.current);
+    }
+    inactivityTimer.current = setTimeout(async () => {
+      await AsyncStorage.setItem('requireReauth', 'true');
+    }, INACTIVITY_TIMEOUT_MS);
+  };
+
+  useEffect(() => {
+    // Listen for app state changes
+    const handleAppStateChange = async (nextAppState: string) => {
+      if (nextAppState === 'active') {
+        // On resume, check inactivity
+        const requireReauth = await shouldRequireReauth();
+        if (requireReauth) {
+          await AsyncStorage.setItem('requireReauth', 'true');
+        }
+        // Always update last activity on resume
+        await updateLastActivity();
+        resetInactivityTimer();
+      } else if (nextAppState === 'background') {
+        if (inactivityTimer.current) {
+          clearTimeout(inactivityTimer.current);
+        }
+      }
+    };
+    const sub = AppState.addEventListener('change', handleAppStateChange);
+    // Start timer on mount
+    resetInactivityTimer();
+    return () => {
+      sub.remove();
+      if (inactivityTimer.current) {
+        clearTimeout(inactivityTimer.current);
+      }
+    };
+  }, []);
+
+  // Global touch handler to update last activity and reset timer
+  const handleGlobalTouch = async () => {
+    await updateLastActivity();
+    await AsyncStorage.setItem('requireReauth', 'false');
+    resetInactivityTimer();
+  };
+
   if (!loaded) {
     return null;
   }
 
-  return <RootLayoutNav />;
+  return (
+    <TouchableWithoutFeedback onPress={handleGlobalTouch}>
+      <RootLayoutNav />
+    </TouchableWithoutFeedback>
+  );
 }
 
 function RootLayoutNav() {

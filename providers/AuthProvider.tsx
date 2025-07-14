@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { usePushNotificationService } from '../hooks/usePushNotificationService';
-import { AuthStorageService } from '../services';
+import { AuthStorageService, AuthService } from '../services';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface User {
@@ -131,6 +131,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = async (): Promise<void> => {
     try {
       console.log('🚪 Logging out user...');
+      
+      // Notify backend about sign-out to disable transaction notifications
+      if (authToken) {
+        try {
+          const authService = AuthService.getInstance();
+          await authService.signOut(authToken);
+          console.log('✅ Backend sign-out notification sent successfully');
+        } catch (error) {
+          console.log('⚠️ Failed to notify backend about sign-out:', error);
+          // Continue with local cleanup even if backend notification fails
+        }
+      }
       
       // Unregister push notifications if registered
       if (isPushRegistered && expoPushToken && authToken) {

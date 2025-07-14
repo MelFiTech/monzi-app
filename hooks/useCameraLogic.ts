@@ -8,6 +8,8 @@ import { ExtractedBankData, CacheService } from '@/services';
 import { useHybridVisionExtractBankDataMutation } from '@/hooks';
 import { useResolveAccountMutation } from '@/hooks/useAccountService';
 import { useWalletRecovery } from '@/hooks/useWalletService';
+import { useTransactionsList } from '@/hooks/useTransactionService';
+import { Transaction } from '@/components/common';
 import ToastService from '@/services/ToastService';
 
 type FlashMode = 'off' | 'on' | 'auto';
@@ -32,6 +34,7 @@ export function useCameraLogic() {
   const [isWalletActivationMode, setIsWalletActivationMode] = useState(false);
   const [areAllChecksComplete, setAreAllChecksComplete] = useState(false);
   const [showPulsatingGlow, setShowPulsatingGlow] = useState(true);
+  const [showTransactionHistory, setShowTransactionHistory] = useState(false);
 
   // Refs and Animations
   const cameraRef = useRef<CameraView>(null);
@@ -43,6 +46,7 @@ export function useCameraLogic() {
   const extractBankDataMutation = useHybridVisionExtractBankDataMutation();
   const resolveAccountMutation = useResolveAccountMutation();
   const walletRecoveryMutation = useWalletRecovery();
+  const transactionsData = useTransactionsList();
 
   // Hide instructions after 3 seconds
   useEffect(() => {
@@ -206,7 +210,7 @@ export function useCameraLogic() {
   };
 
   const handleViewHistory = () => {
-    Alert.alert('View History', 'Transaction history feature coming soon!');
+    setShowTransactionHistory(prev => !prev);
   };
 
   const openGallery = async () => {
@@ -339,6 +343,10 @@ export function useCameraLogic() {
     isWalletActivationMode,
     areAllChecksComplete,
     showPulsatingGlow,
+    showTransactionHistory,
+    
+    // Transaction data
+    transactionsData,
     
     // Refs
     cameraRef,
@@ -372,5 +380,6 @@ export function useCameraLogic() {
     setShowSetPinModal,
     setAreAllChecksComplete,
     setShowPulsatingGlow,
+    setShowTransactionHistory,
   };
 } 

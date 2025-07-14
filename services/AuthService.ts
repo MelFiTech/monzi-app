@@ -441,6 +441,48 @@ class AuthService {
       throw error;
     }
   }
+
+  /**
+   * Sign out user (requires authentication)
+   * Uses default notification settings (transaction notifications disabled, promotional notifications enabled)
+   */
+  async signOut(
+    accessToken: string
+  ): Promise<{ success: boolean; message: string; transactionNotificationsDisabled: boolean; promotionalNotificationsDisabled: boolean }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/auth/sign-out`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: JSON.stringify({}),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw {
+          error: 'Failed to sign out',
+          message: result.message || 'Failed to sign out',
+          statusCode: response.status,
+          details: result.details,
+        } as AuthError;
+      }
+
+      return result;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw {
+          error: 'Failed to sign out',
+          message: error.message,
+          statusCode: 400,
+        } as AuthError;
+      }
+      throw error;
+    }
+  }
 }
 
 export default AuthService; 

@@ -34,6 +34,7 @@ export default function ToastProvider({ children }: ToastProviderProps) {
   });
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    if (!message || message.trim() === '') return;
     setToastState({
       visible: true,
       message,

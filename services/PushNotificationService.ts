@@ -239,6 +239,90 @@ export class PushNotificationService {
     }
   }
 
+  static async updateDeviceTokenForLogin(token: string, authToken: string): Promise<boolean> {
+    try {
+      console.log('🔄 Updating device token for login (single device mode)...');
+      console.log('📱 Token preview:', token.substring(0, 30) + '...');
+      
+      // For login/device switching, send only the required fields
+      const deviceInfo = {
+        deviceToken: token, // Backend expects 'deviceToken' not 'token'
+        deviceId: Device.modelId || 'unknown',
+        deviceName: Device.deviceName || 'unknown',
+        platform: Platform.OS,
+        osVersion: Platform.Version,
+        appVersion: Constants.expoConfig?.version || '1.0.0',
+        buildVersion: Constants.expoConfig?.ios?.buildNumber || Constants.expoConfig?.android?.versionCode || 'unknown',
+        appOwnership: Constants.appOwnership, // 'expo', 'standalone', etc.
+        executionEnvironment: Constants.executionEnvironment, // 'storeClient', 'standalone', etc.
+        isDevice: Device.isDevice,
+        brand: Device.brand,
+        manufacturer: Device.manufacturer,
+      };
+      
+      console.log('📱 Device update info:', {
+        platform: deviceInfo.platform,
+        deviceName: deviceInfo.deviceName,
+        appOwnership: deviceInfo.appOwnership,
+        executionEnvironment: deviceInfo.executionEnvironment,
+        isDevice: deviceInfo.isDevice,
+      });
+      
+      const baseUrl = Config.API.getBaseUrl();
+      const endpoint = `${baseUrl}/auth/update-device-token`;
+      
+      console.log('📡 Device update endpoint:', endpoint);
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+          'User-Agent': `MonziApp/${deviceInfo.appVersion} (${deviceInfo.platform})`,
+        },
+        body: JSON.stringify(deviceInfo),
+      });
+
+      console.log('📨 Device update response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Device update failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        });
+        return false;
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('✅ Device token updated successfully for login:', {
+          tokenId: result.data?.tokenId || 'No ID returned',
+          deviceId: result.data?.deviceId || deviceInfo.deviceId,
+          platform: result.data?.platform || deviceInfo.platform
+        });
+        this.isRegistered = true;
+        return true;
+      } else {
+        console.error('❌ Failed to update device token:', {
+          error: result.error || 'Unknown error',
+          message: result.message || 'No message',
+          details: result.details || 'No details'
+        });
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Error updating device token:', error);
+      console.error('❌ Device update error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      return false;
+    }
+  }
+
   static async unregisterToken(token: string, authToken: string): Promise<boolean> {
     try {
       console.log('🔄 Unregistering push token from backend...');

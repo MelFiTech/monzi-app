@@ -9,6 +9,7 @@ export * from './useHybridVisionService';
 export * from './useChatService';
 export * from './useKYCService';
 export * from './useWalletService';
+export * from './useTransactionService';
 export * from './useNotificationService';
 export * from './usePushNotificationService';
 export * from './useCameraLogic';

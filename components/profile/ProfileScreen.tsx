@@ -117,7 +117,8 @@ export function ProfileScreen() {
     );
   };
 
-  const userName = user?.email?.split('@')[0].replace(/\b\w/g, l => l.toUpperCase()) || 'User';
+  // Use firstName with proper fallback
+  const userName = user?.firstName || '';
   const userEmail = user?.email || 'user@example.com';
 
   return (

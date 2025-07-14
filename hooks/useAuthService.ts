@@ -209,6 +209,20 @@ export const useLogout = () => {
 
   return useMutation<void, Error, { clearAllData?: boolean }>({
     mutationFn: async ({ clearAllData = false }) => {
+      // First, try to notify the backend about the sign-out
+      try {
+        const authData = await authStorageService.getAuthData();
+        if (authData?.accessToken) {
+          const authService = AuthService.getInstance();
+          await authService.signOut(authData.accessToken);
+          console.log('✅ Backend sign-out notification sent successfully');
+        }
+      } catch (error) {
+        console.log('⚠️ Failed to notify backend about sign-out:', error);
+        // Continue with local cleanup even if backend notification fails
+      }
+
+      // Then clear local data
       if (clearAllData) {
         await authStorageService.clearAllData();
       } else {

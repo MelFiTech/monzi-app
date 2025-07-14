@@ -23,7 +23,7 @@ export default function NetworkDiagnosticTool() {
   const { data: banksData, isLoading: isQueryLoading, error: queryError, refetch } = useBanks();
   
   // Auth context for push notifications
-  const { 
+  const {
     authToken, 
     expoPushToken, 
     isPushRegistered, 
@@ -163,7 +163,7 @@ export default function NetworkDiagnosticTool() {
       {/* Network Connectivity Test */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>1. Network Connectivity Test</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.button} 
           onPress={runNetworkDiagnostic}
           disabled={isRunningDiagnostic}
@@ -174,7 +174,7 @@ export default function NetworkDiagnosticTool() {
             <Text style={styles.buttonText}>Test Network</Text>
           )}
         </TouchableOpacity>
-        
+
         {diagnosticResult && (
           <View style={styles.result}>
             <Text style={styles.resultTitle}>Network Test Result:</Text>
@@ -193,7 +193,7 @@ export default function NetworkDiagnosticTool() {
       {/* SME Plug Direct Test */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>2. SME Plug Banks (Direct Test)</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.button, { backgroundColor: '#4CAF50' }]} 
           onPress={testSMEPlugDirect}
           disabled={isLoadingSMEPlug}
@@ -204,7 +204,7 @@ export default function NetworkDiagnosticTool() {
             <Text style={styles.buttonText}>Test SME Plug</Text>
           )}
         </TouchableOpacity>
-        
+
         {smePlugResult && (
           <View style={styles.result}>
             <Text style={styles.resultTitle}>SME Plug Direct Result:</Text>
@@ -229,7 +229,7 @@ export default function NetworkDiagnosticTool() {
       {/* Push Notifications Test */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>3. Push Notifications (Full Test)</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.button, { backgroundColor: '#9C27B0' }]} 
           onPress={testPushNotifications}
           disabled={isTestingPush}
@@ -253,8 +253,8 @@ export default function NetworkDiagnosticTool() {
           {pushError && (
             <Text style={[styles.resultText, { color: '#F44336' }]}>Error: {pushError}</Text>
           )}
-        </View>
-        
+      </View>
+
         {pushResult && (
           <View style={styles.result}>
             <Text style={styles.resultTitle}>Push Test Result:</Text>
@@ -312,7 +312,7 @@ export default function NetworkDiagnosticTool() {
             </Text>
           )}
         </View>
-      </View>
+        </View>
 
       {/* Hybrid Banks Test */}
       <View style={styles.section}>
@@ -334,7 +334,7 @@ export default function NetworkDiagnosticTool() {
             <Text style={styles.resultTitle}>Hybrid Fetch Result:</Text>
             <Text style={[styles.resultText, { color: manualBanksResult.success ? '#4CAF50' : '#F44336' }]}>
               Status: {manualBanksResult.success ? 'Success ✅' : 'Failed ❌'}
-            </Text>
+        </Text>
             {manualBanksResult.success ? (
               <>
                 <Text style={styles.resultText}>Banks Count: {manualBanksResult.count}</Text>

@@ -67,7 +67,6 @@ export function useBackendChecks(props: BackendChecksProps) {
       walletDetailsComplete,
       walletBalanceComplete,
       allChecksComplete,
-      showPulsatingGlow: props.showPulsatingGlow
     });
 
     if (allChecksComplete) {

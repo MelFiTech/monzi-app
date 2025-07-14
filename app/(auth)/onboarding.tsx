@@ -20,6 +20,7 @@ export default function OnboardingScreen() {
     //router.push('/test-push');
     //router.push('/(kyc)/camera');
     //router.push('/transfer-success');
+    // router.push('/(auth)/passcode-lock');
 
   };
 
