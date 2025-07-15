@@ -308,6 +308,16 @@ class WalletService {
         bank: data.bankName
       });
 
+      // Debug: Log the exact payload being sent to the API
+      console.log('📤 [WalletService] Transfer API payload:', {
+        amount: data.amount,
+        accountNumber: data.accountNumber,
+        bankName: data.bankName,
+        accountName: data.accountName,
+        description: data.description,
+        pin: '****'  // Don't log actual PIN
+      });
+
       const response = await fetch(`${this.baseUrl}/wallet/transfer`, {
         method: 'POST',
         headers,

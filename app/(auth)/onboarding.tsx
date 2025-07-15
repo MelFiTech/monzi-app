@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, ImageBackground, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { fontFamilies } from '@/constants/fonts';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -8,6 +8,7 @@ import { Button } from '@/components/common';
 export default function OnboardingScreen() {
   const router = useRouter();
   const { colors } = useTheme();
+  const { height } = useWindowDimensions();
 
   const handleContinue = () => {
     router.push('/(auth)/register');
@@ -24,17 +25,28 @@ export default function OnboardingScreen() {
 
   };
 
+  // Calculate responsive font size and line height
+  const titleFontSize = Math.min(height * 0.055, 45); // Cap at original 44
+  const titleLineHeight = titleFontSize + 2; // Ensure line height is slightly larger than font size
+
   return (
     <ImageBackground 
       source={require('@/assets/images/onboarding/intro-bg.png')}
       style={[styles.container, { backgroundColor: '#000000' }]}
       resizeMode="cover"
     >
-      <View style={styles.content}>
-        <Text style={styles.title}>
+      <View style={[styles.content, { paddingTop: height * 0.65 }]}>
+        <Text style={[
+          styles.title, 
+          { 
+            fontSize: titleFontSize,
+            lineHeight: titleLineHeight,
+            height: titleLineHeight * 2.2 // Ensure space for two lines
+          }
+        ]}>
           Snap bank{'\n'}info to Pay
         </Text>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.subtitle, { fontSize: Math.min(height * 0.022, 18) }]}>
           No typing, no errors. Just snap and{'\n'}send money in seconds.
         </Text>
       </View>
@@ -68,25 +80,22 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 580,
     paddingBottom: 40,
   },
   title: {
-    fontSize: 44,
     fontFamily: fontFamilies.clashDisplay.bold,
     color: '#FFFFFF',
     marginBottom: 8,
-    lineHeight: 46,
     letterSpacing: -0.3,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 18,
     fontFamily: fontFamilies.sora.regular,
     color: 'rgb(255, 255, 255)',
     lineHeight: 24,
     textAlign: 'center',
     letterSpacing: -1,
+    marginBottom: 20,
   },
   bottomSection: {
     paddingBottom: 48,

@@ -4,10 +4,9 @@ export { default as CloudVisionService } from './CloudVisionService';
 export { default as HybridVisionService } from './HybridVisionService';
 export { default as ImageOptimizationService } from './ImageOptimizationService';
 export { default as SmartPromptService } from './SmartPromptService';
-export { default as SmartCacheService } from './SmartCacheService';
 export { default as PatternLearningService } from './PatternLearningService';
+export { BankCorrectionService } from './BankCorrectionService';
 
-export { default as CacheService } from './CacheService';
 export { default as AccountService } from './AccountService';
 export { default as SMEPlugBanksService } from './SMEPlugBanksService';
 export { default as BiometricService } from './BiometricService';

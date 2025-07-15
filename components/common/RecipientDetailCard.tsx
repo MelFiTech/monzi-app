@@ -29,7 +29,7 @@ export default function RecipientDetailCard({
         <Text numberOfLines={1} style={styles.nameText}>
           {name || 'Resolving account name...'}
         </Text>
-        <Text style={styles.accountText}>
+        <Text numberOfLines={1} style={styles.accountText}>
           {accountNumber} • {bankName}
         </Text>
       </View>

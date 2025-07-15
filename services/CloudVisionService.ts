@@ -26,7 +26,8 @@ class CloudVisionService {
 
   async extractBankData(imageUri: string): Promise<ExtractedBankData> {
     try {
-      console.log('🔍 CloudVision: Starting optimized bank data extraction...');
+      console.log('🔍 CloudVision: Starting FRESH optimized bank data extraction...');
+      console.log('🔄 CloudVision: Processing new image data - NO CACHE USED');
       
       const base64Image = await this.convertImageToBase64(imageUri);
       
@@ -45,6 +46,10 @@ class CloudVisionService {
               {
                 type: 'TEXT_DETECTION',
                 maxResults: 50
+              },
+              {
+                type: 'LOGO_DETECTION', // Add logo detection for bank recognition
+                maxResults: 10
               }
             ],
             imageContext: {
@@ -80,30 +85,31 @@ class CloudVisionService {
       
       const textAnnotations = data.responses?.[0]?.textAnnotations;
       const fullTextAnnotation = data.responses?.[0]?.fullTextAnnotation;
-      
+      const logoAnnotations = data.responses?.[0]?.logoAnnotations;
+
       if (!textAnnotations || textAnnotations.length === 0) {
-        console.warn('⚠️ CloudVision: No text detected in image');
-        throw new Error('No text detected in image');
+        console.log('❌ CloudVision: No text detected in image');
+        throw new Error('No text detected in the image');
       }
 
-      // Use both text annotations and full text for better accuracy
+      // Enhanced Nigerian bank detection with visual intelligence
+      console.log('🔍 CloudVision: Analyzing text and visual patterns for Nigerian banks...');
+      
       const fullText = textAnnotations[0]?.description || '';
-      const structuredText = fullTextAnnotation?.text || '';
-      const individualTexts = textAnnotations.slice(1).map((annotation: any) => ({
-        text: annotation.description,
-        confidence: annotation.confidence || 0,
-        boundingPoly: annotation.boundingPoly
-      }));
-
-      console.log('🔤 CloudVision: Detected text:', fullText);
-
-      // Use optimized parsing with context awareness
-      const extractedData = this.parseTextForBankDataOptimized(fullText, structuredText, individualTexts);
-      const validatedData = this.validateExtractedData(extractedData);
+      console.log('📝 CloudVision: Full detected text:', fullText);
       
-      console.log('✅ CloudVision: Validated data:', validatedData);
+      // Log detected logos if any
+      if (logoAnnotations && logoAnnotations.length > 0) {
+        console.log('🏦 CloudVision: Detected logos:', logoAnnotations.map((logo: any) => logo.description));
+      }
+
+      let extractedData = this.parseTextForBankDataOptimized(fullText, fullText, []);
       
-      return validatedData;
+      // Enhance with visual pattern analysis
+      extractedData = this.enhanceWithVisualIntelligence(extractedData, fullText, logoAnnotations);
+      
+      console.log('✅ CloudVision: Enhanced extraction result:', extractedData);
+      return this.validateExtractedData(extractedData);
       
     } catch (error) {
       console.error('❌ CloudVision: Error extracting bank data:', error);
@@ -177,7 +183,15 @@ class CloudVisionService {
     for (const bank of nigerianBanks) {
       const bankRegex = new RegExp(bank, 'gi');
       if (bankRegex.test(text)) {
-        bankName = this.correctBankName(bank);
+                    // Apply basic OCR corrections only
+            const basicCorrections: { [key: string]: string } = {
+              'opay': 'OPAY',
+              'palmpay': 'PALMPAY',
+              'gtb': 'GTBank',
+              'gtbank': 'GTBank'
+            };
+            const normalized = bank.toLowerCase();
+            bankName = basicCorrections[normalized] || bank;
         confidence += 25;
         console.log('✅ CloudVision: Found bank:', bankName);
         break;
@@ -243,19 +257,32 @@ class CloudVisionService {
     let confidence = 0;
 
     // Enhanced Nigerian bank patterns with variations and common OCR mistakes
+    // PRIORITY ORDER: Fintech banks first (more specific), then traditional banks
     const nigerianBanks = [
-      { names: ['GTBank', 'GTB', 'Guaranty Trust', 'GT Bank', 'G T Bank'], canonical: 'GTBank' },
-      { names: ['Access Bank', 'Access', 'ACCESS BANK', 'ACCES BANK'], canonical: 'Access Bank' },
-      { names: ['Zenith Bank', 'Zenith', 'ZENITH BANK', 'ZEN1TH'], canonical: 'Zenith Bank' },
-      { names: ['UBA', 'United Bank for Africa', 'United Bank', 'U.B.A'], canonical: 'United Bank for Africa' },
-      { names: ['First Bank', 'FirstBank', 'FIRST BANK', '1st Bank'], canonical: 'First Bank' },
-      { names: ['Fidelity Bank', 'Fidelity', 'FIDELITY BANK'], canonical: 'Fidelity Bank' },
-      { names: ['Sterling Bank', 'Sterling', 'STERLING BANK'], canonical: 'Sterling Bank' },
-      { names: ['Stanbic IBTC', 'Stanbic', 'STANBIC IBTC BANK'], canonical: 'Stanbic IBTC Bank' },
-      { names: ['Union Bank', 'UNION BANK'], canonical: 'Union Bank' },
-      { names: ['Wema Bank', 'Wema', 'WEMA BANK'], canonical: 'Wema Bank' },
-      { names: ['FCMB', 'First City Monument Bank', 'First City Monument'], canonical: 'FCMB' },
-      { names: ['Ecobank', 'ECO BANK', 'ECOBANK'], canonical: 'Ecobank' }
+      // FINTECH BANKS (Higher priority - more specific names)
+      { names: ['OPAY', 'Opay', 'OPay', 'O PAY', 'OPAY DIGITAL SERVICES LIMITED'], canonical: 'Opay Digital Services Limited', priority: 1 },
+      { names: ['PALMPAY', 'PalmPay', 'Palm Pay', 'PALM PAY'], canonical: 'PalmPay', priority: 1 },
+      { names: ['KUDA', 'Kuda', 'KUDA BANK'], canonical: 'Kuda Bank', priority: 1 },
+      { names: ['MONIEPOINT', 'Moniepoint', 'MONIE POINT'], canonical: 'Moniepoint MFB', priority: 1 },
+      { names: ['VFD', 'VFD MICROFINANCE BANK', 'VFD MFB'], canonical: 'VFD Microfinance Bank', priority: 1 },
+      { names: ['PROVIDUS', 'Providus Bank', 'PROVIDUS BANK'], canonical: 'Providus Bank', priority: 1 },
+      
+      // TRADITIONAL BANKS (Lower priority - more generic terms)
+      { names: ['GTBank', 'GTB', 'Guaranty Trust', 'GT Bank', 'G T Bank', 'GUARANTY TRUST BANK'], canonical: 'GTBank', priority: 2 },
+      { names: ['Access Bank', 'ACCESS BANK', 'ACCES BANK'], canonical: 'Access Bank', priority: 2 },
+      { names: ['Zenith Bank', 'Zenith', 'ZENITH BANK', 'ZEN1TH'], canonical: 'Zenith Bank', priority: 2 },
+      { names: ['UBA', 'United Bank for Africa', 'United Bank', 'U.B.A', 'UNITED BANK FOR AFRICA'], canonical: 'United Bank for Africa', priority: 2 },
+      { names: ['First Bank', 'FirstBank', 'FIRST BANK', '1st Bank', 'FIRSTBANK OF NIGERIA'], canonical: 'First Bank', priority: 2 },
+      { names: ['Fidelity Bank', 'Fidelity', 'FIDELITY BANK'], canonical: 'Fidelity Bank', priority: 2 },
+      { names: ['Sterling Bank', 'Sterling', 'STERLING BANK'], canonical: 'Sterling Bank', priority: 2 },
+      { names: ['Stanbic IBTC', 'Stanbic', 'STANBIC IBTC BANK'], canonical: 'Stanbic IBTC Bank', priority: 2 },
+      { names: ['Union Bank', 'UNION BANK'], canonical: 'Union Bank', priority: 2 },
+      { names: ['Wema Bank', 'Wema', 'WEMA BANK'], canonical: 'Wema Bank', priority: 2 },
+      { names: ['FCMB', 'First City Monument Bank', 'First City Monument'], canonical: 'FCMB', priority: 2 },
+      { names: ['Ecobank', 'ECO BANK', 'ECOBANK'], canonical: 'Ecobank', priority: 2 },
+      
+      // GENERIC TERMS (Lowest priority - only exact word matches)
+      { names: ['Access'], canonical: 'Access Bank', priority: 3 }, // Generic "access" gets lowest priority
     ];
 
     // Enhanced account number pattern with context
@@ -294,33 +321,53 @@ class CloudVisionService {
       console.log('✅ CloudVision: Found account number with context:', accountNumber);
     }
 
-    // Extract bank name with fuzzy matching and confidence scoring
+    // Extract bank name with PRIORITY-BASED matching and confidence scoring
+    let bestBankMatch = null;
+    let bestBankConfidence = 0;
+    let bestBankPriority = 99;
+    
     for (const bankGroup of nigerianBanks) {
-      let found = false;
-      let bestConfidence = 0;
-      
       for (const bankVariant of bankGroup.names) {
-        // Check both exact and fuzzy matches
-        const exactRegex = new RegExp(`\\b${bankVariant}\\b`, 'gi');
-        const fuzzyRegex = new RegExp(bankVariant.replace(/\s+/g, '\\s*'), 'gi');
+        let matchConfidence = 0;
+        let matchType = '';
         
+        // Check exact word boundary match (highest confidence)
+        const exactRegex = new RegExp(`\\b${bankVariant}\\b`, 'gi');
         if (exactRegex.test(allText)) {
-          bankName = bankGroup.canonical;
-          bestConfidence = 30;
-          found = true;
-          break;
-        } else if (fuzzyRegex.test(allText)) {
-          bankName = bankGroup.canonical;
-          bestConfidence = 20;
-          found = true;
+          matchConfidence = 35;
+          matchType = 'exact';
+        }
+        // Check fuzzy match (lower confidence)  
+        else {
+          const fuzzyRegex = new RegExp(bankVariant.replace(/\s+/g, '\\s*'), 'gi');
+          if (fuzzyRegex.test(allText)) {
+            matchConfidence = 20;
+            matchType = 'fuzzy';
+          }
+        }
+        
+        // Apply priority bonus/penalty
+        if (matchConfidence > 0) {
+          const priorityBonus = bankGroup.priority === 1 ? 15 : bankGroup.priority === 2 ? 5 : 0;
+          const totalConfidence = matchConfidence + priorityBonus;
+          
+          // Choose this match if it has higher priority or higher confidence
+          if (bankGroup.priority < bestBankPriority || 
+              (bankGroup.priority === bestBankPriority && totalConfidence > bestBankConfidence)) {
+            bestBankMatch = bankGroup.canonical;
+            bestBankConfidence = totalConfidence;
+            bestBankPriority = bankGroup.priority;
+            
+            console.log(`🏆 CloudVision: Found bank "${bankVariant}" -> ${bankGroup.canonical} (${matchType} match, priority ${bankGroup.priority}, confidence ${totalConfidence})`);
+          }
         }
       }
-      
-      if (found) {
-        confidence += bestConfidence;
-        console.log('✅ CloudVision: Found bank:', bankName);
-        break;
-      }
+    }
+    
+    if (bestBankMatch) {
+      bankName = bestBankMatch;
+      confidence += bestBankConfidence;
+      console.log('✅ CloudVision: Selected best bank match:', bankName, `(priority ${bestBankPriority})`);
     }
 
     // Extract amount with enhanced pattern matching
@@ -396,75 +443,7 @@ class CloudVisionService {
     };
   }
 
-  private correctBankName(bankName: string): string {
-    if (!bankName) return '';
-    
-    const normalizedName = bankName.toLowerCase().trim();
-    
-    const bankCorrections: { [key: string]: string } = {
-      'gtb': 'GTBank',
-      'gtbank': 'GTBank',
-      'guaranty trust': 'GTBank',
-      'guaranty trust bank': 'GTBank',
-      'access': 'Access Bank',
-      'access bank': 'Access Bank',
-      'zenith': 'Zenith Bank',
-      'zenith bank': 'Zenith Bank',
-      'uba': 'United Bank for Africa',
-      'united bank': 'United Bank for Africa',
-      'united bank for africa': 'United Bank for Africa',
-      'first bank': 'First Bank',
-      'firstbank': 'First Bank',
-      'fidelity': 'Fidelity Bank',
-      'fidelity bank': 'Fidelity Bank',
-      'stanbic': 'Stanbic IBTC Bank',
-      'stanbic ibtc': 'Stanbic IBTC Bank',
-      'stanbic ibtc bank': 'Stanbic IBTC Bank',
-      'sterling': 'Sterling Bank',
-      'sterling bank': 'Sterling Bank',
-      'union bank': 'Union Bank',
-      'wema': 'Wema Bank',
-      'wema bank': 'Wema Bank',
-      'fcmb': 'FCMB',
-      'first city monument bank': 'FCMB',
-      'ecobank': 'Ecobank',
-      'polaris': 'Polaris Bank',
-      'polaris bank': 'Polaris Bank',
-      'keystone': 'Keystone Bank',
-      'keystone bank': 'Keystone Bank',
-      'unity': 'Unity Bank',
-      'unity bank': 'Unity Bank',
-      'jaiz': 'Jaiz Bank',
-      'jaiz bank': 'Jaiz Bank',
-      'palmpay': 'PalmPay',
-      'palm pay': 'PalmPay',
-      'opay': 'Opay',
-      'kuda': 'Kuda',
-      'vfd': 'VFD Microfinance Bank',
-      'vfd microfinance': 'VFD Microfinance Bank',
-      'moniepoint': 'Moniepoint',
-      'providus': 'Providus Bank',
-      'providus bank': 'Providus Bank',
-    };
 
-    if (bankCorrections[normalizedName]) {
-      return bankCorrections[normalizedName];
-    }
-
-    for (const [key, value] of Object.entries(bankCorrections)) {
-      if (normalizedName.includes(key) || key.includes(normalizedName)) {
-        return value;
-      }
-    }
-
-    // If no exact match, return the original bank name if it contains banking keywords
-    const bankKeywords = ['bank', 'microfinance', 'pay', 'finance'];
-    if (bankKeywords.some(keyword => normalizedName.includes(keyword))) {
-      return bankName;
-    }
-
-    return '';
-  }
 
   private validateExtractedData(data: any): ExtractedBankData {
     const accountNumber = data.accountNumber?.replace(/\D/g, '') || '';
@@ -472,7 +451,29 @@ class CloudVisionService {
 
     const amount = data.amount?.replace(/[^\d.]/g, '') || '';
 
-    const correctedBankName = this.correctBankName(data.bankName);
+    // Only apply basic OCR error corrections, don't restrict to known banks
+    const rawBankName = data.bankName?.trim() || '';
+    let correctedBankName = rawBankName;
+    
+    // Apply only obvious OCR corrections (very limited)
+    const basicOCRCorrections: { [key: string]: string } = {
+      'opay': 'OPAY',
+      'palmpay': 'PALMPAY', 
+      'gtb': 'GTBank',
+      'gtbank': 'GTBank',
+      'uba': 'UBA',
+      'fcmb': 'FCMB'
+    };
+    
+    const normalizedName = rawBankName.toLowerCase();
+    if (basicOCRCorrections[normalizedName]) {
+      correctedBankName = basicOCRCorrections[normalizedName];
+      console.log(`[CloudVision] Basic OCR correction: "${rawBankName}" → "${correctedBankName}"`);
+    } else {
+      // Trust the extracted text - let resolve service handle validation
+      correctedBankName = rawBankName;
+      console.log(`[CloudVision] Using extracted bank name as-is: "${correctedBankName}"`);
+    }
 
     const accountHolderName = data.accountHolderName?.replace(/^(MR|MRS|DR|PROF|MS)\.?\s+/i, '').trim() || '';
 
@@ -481,7 +482,7 @@ class CloudVisionService {
       accountNumber: isValidAccountNumber ? accountNumber : '',
       accountHolderName: accountHolderName,
       amount: amount,
-      confidence: Math.min(Math.max(data.confidence || 0, 0), 100),
+      confidence: Math.min(data.confidence || 50, 95),
       extractedFields: {
         bankName: Boolean(correctedBankName),
         accountNumber: isValidAccountNumber,
@@ -502,6 +503,68 @@ class CloudVisionService {
     return data.extractedFields.bankName && 
            data.extractedFields.accountNumber && 
            data.confidence >= 80; // Slightly lower threshold than Gemini
+  }
+
+  private enhanceWithVisualIntelligence(extractedData: any, fullText: string, logoAnnotations: any[]): any {
+    console.log('🎨 CloudVision: Applying visual intelligence for bank recognition...');
+    
+    // Enhanced bank recognition using visual patterns and logos
+    let enhancedBankName = extractedData.bankName;
+    
+    // Logo-based recognition
+    if (logoAnnotations && logoAnnotations.length > 0) {
+      for (const logo of logoAnnotations) {
+        const logoName = logo.description?.toLowerCase() || '';
+        console.log(`🏦 Detected logo: ${logoName}`);
+        
+        // Map logo names to bank names
+        if (logoName.includes('gtbank') || logoName.includes('guaranty')) {
+          enhancedBankName = 'GTBank';
+          console.log('✅ Logo recognition: GTBank identified');
+        } else if (logoName.includes('access')) {
+          enhancedBankName = 'Access Bank';
+          console.log('✅ Logo recognition: Access Bank identified');
+        }
+      }
+    }
+    
+    // Text pattern enhancement with visual context
+    const textLower = fullText.toLowerCase();
+    
+    // Enhanced pattern matching with visual intelligence
+    const visualPatterns = [
+      // Fintech patterns (often have distinctive UI)
+      { patterns: ['opay', 'o-pay', 'o pay'], name: 'OPAY', type: 'fintech' },
+      { patterns: ['palmpay', 'palm pay', 'palm-pay'], name: 'PALMPAY', type: 'fintech' },
+      { patterns: ['kuda', 'kuda bank'], name: 'Kuda', type: 'fintech' },
+      { patterns: ['moniepoint', 'monie point'], name: 'Moniepoint', type: 'fintech' },
+      
+      // Traditional banks (formal interfaces)
+      { patterns: ['gtbank', 'gt bank', 'guaranty trust'], name: 'GTBank', type: 'traditional' },
+      { patterns: ['access bank', 'access'], name: 'Access Bank', type: 'traditional' },
+      { patterns: ['zenith bank', 'zenith'], name: 'Zenith Bank', type: 'traditional' },
+      { patterns: ['uba', 'united bank'], name: 'United Bank for Africa', type: 'traditional' },
+      { patterns: ['first bank', 'firstbank'], name: 'First Bank', type: 'traditional' },
+    ];
+    
+    // Find best pattern match
+    for (const pattern of visualPatterns) {
+      for (const p of pattern.patterns) {
+        if (textLower.includes(p)) {
+          console.log(`🎯 Visual pattern match: "${p}" → ${pattern.name} (${pattern.type})`);
+          enhancedBankName = pattern.name;
+          extractedData.confidence += 10; // Boost confidence for visual match
+          break;
+        }
+      }
+    }
+    
+    // Return enhanced data
+    return {
+      ...extractedData,
+      bankName: enhancedBankName,
+      confidence: Math.min(extractedData.confidence, 95)
+    };
   }
 }
 

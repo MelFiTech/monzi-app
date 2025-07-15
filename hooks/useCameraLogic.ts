@@ -4,7 +4,7 @@ import { CameraView } from 'expo-camera';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
-import { ExtractedBankData, CacheService } from '@/services';
+import { ExtractedBankData } from '@/services';
 import { useHybridVisionExtractBankDataMutation } from '@/hooks';
 import { useResolveAccountMutation } from '@/hooks/useAccountService';
 import { useWalletRecovery } from '@/hooks/useWalletService';
@@ -146,7 +146,7 @@ export function useCameraLogic() {
       setIsProcessing(true);
       
       // Process image with AI
-      console.log('🎯 Starting AI extraction...');
+      console.log('🎯 Starting FRESH AI extraction - NO CACHED DATA...');
       const result = await extractBankDataMutation.mutateAsync(photo.uri);
       
       console.log('🎯 AI extraction completed:', result);
@@ -175,11 +175,10 @@ export function useCameraLogic() {
 
       const extractedBankData = await extractBankDataMutation.mutateAsync(imageUri);
       
-      console.log('🎯 AI extraction completed:', extractedBankData);
+      console.log('🎯 FRESH AI extraction completed:', extractedBankData);
 
       const compatibleData: ExtractedBankData = extractedBankData;
 
-      await CacheService.cacheData(compatibleData);
       setExtractedData(compatibleData);
       setShowBankTransferModal(true);
       
@@ -251,13 +250,13 @@ export function useCameraLogic() {
     setExtractedData(null);
   };
 
-  const handleBankModalConfirm = (resolvedAccountName?: string) => {
+  const handleBankModalConfirm = (resolvedAccountName?: string, selectedBankName?: string, accountNumber?: string) => {
     if (extractedData) {
       router.push({
         pathname: '/transfer',
         params: {
-          bankName: extractedData.bankName,
-          accountNumber: extractedData.accountNumber,
+          bankName: selectedBankName || extractedData.bankName,
+          accountNumber: accountNumber || extractedData.accountNumber,
           accountHolderName: resolvedAccountName || extractedData.accountHolderName || '',
           amount: extractedData.amount || '',
         }

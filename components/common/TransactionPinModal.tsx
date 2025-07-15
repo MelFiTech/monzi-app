@@ -121,6 +121,12 @@ export default function TransactionPinModal({
             setShowPinInput(true);
           } else {
             console.log('✅ [TransactionModal] Biometric enabled and PIN confirmed stored');
+            
+            // AUTO-SCAN: Try Face ID immediately when modal opens
+            console.log('🔄 [TransactionModal] Auto-starting Face ID scan...');
+            setTimeout(() => {
+              handleBiometricAuth(true);
+            }, 500); // Small delay to ensure modal is fully visible
           }
         }
       } else {
@@ -240,12 +246,12 @@ export default function TransactionPinModal({
     }
   };
 
-  const handleBiometricAuth = async () => {
+  const handleBiometricAuth = async (isAutoScan = false) => {
     try {
       setIsLoading(true);
       setCurrentError(null);
       
-      console.log('🔐 [TransactionModal] Starting biometric authentication...');
+      console.log('🔐 [TransactionModal] Starting biometric authentication...', isAutoScan ? '(auto-scan)' : '(manual)');
       const result = await authenticate('Authenticate to complete transfer');
       
       if (result.success) {
@@ -266,15 +272,35 @@ export default function TransactionPinModal({
       } else {
         console.error('❌ [TransactionModal] Biometric authentication failed:', result.error);
         setIsLoading(false);
-        setCurrentError(result.error || 'Biometric authentication failed');
-        setShowPinInput(true); // Fall back to PIN input
+        
+        if (isAutoScan) {
+          // For auto-scan failures, just show the Face ID button for manual retry
+          console.log('🔄 [TransactionModal] Auto-scan failed, showing Face ID button for manual retry');
+          setCurrentError(null); // Don't show error for auto-scan failure
+          // Keep showPinInput as false to show Face ID button
+        } else {
+          // For manual failures, show error and allow PIN fallback
+          setCurrentError(result.error || 'Face ID authentication failed');
+          // Keep showPinInput as false initially, user can tap "Use PIN instead" if needed
+        }
       }
     } catch (error) {
       console.error('❌ [TransactionModal] Biometric authentication error:', error);
       setIsLoading(false);
-      setCurrentError('Biometric authentication failed');
-      setShowPinInput(true); // Fall back to PIN input
+      
+      if (isAutoScan) {
+        // For auto-scan errors, just show the Face ID button for manual retry
+        console.log('🔄 [TransactionModal] Auto-scan error, showing Face ID button for manual retry');
+        setCurrentError(null); // Don't show error for auto-scan failure
+      } else {
+        // For manual errors, show error message
+        setCurrentError('Face ID authentication failed');
+      }
     }
+  };
+
+  const handleBiometricButtonPress = () => {
+    handleBiometricAuth(false);
   };
 
   const handleModalPress = (event: any) => {
@@ -330,7 +356,7 @@ export default function TransactionPinModal({
       <View style={styles.biometricOnlySection}>
         <TouchableOpacity
           style={styles.biometricOnlyButton}
-          onPress={handleBiometricAuth}
+          onPress={handleBiometricButtonPress}
           disabled={isLoading}
         >
           <Image

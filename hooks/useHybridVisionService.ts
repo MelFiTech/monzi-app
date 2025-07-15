@@ -44,42 +44,25 @@ export function useHybridVisionBankDataExtraction(imageUri: string, enabled = fa
 }
 
 // Bank Data Extraction Mutation Hook (for new processing) - This is the main one to use
+// NO CACHING - Always fresh data on every scan
 export function useHybridVisionExtractBankDataMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (imageUri: string) => HybridVisionService.extractBankData(imageUri),
+    mutationFn: (imageUri: string) => {
+      console.log('🔄 HybridVision: Processing fresh scan - NO CACHING');
+      return HybridVisionService.extractBankData(imageUri);
+    },
     onSuccess: (data, imageUri) => {
-      // Cache the successful extraction
-      queryClient.setQueryData(hybridVisionQueryKeys.bankDataExtraction(imageUri), data);
-      
-      // If we have valid data, also store in a recent extractions cache
-      if (HybridVisionService.isExtractionValid(data)) {
-        const recentExtractions = queryClient.getQueryData(['hybridVision', 'recentExtractions']) as ExtractedBankData[] || [];
-        const updated = [data, ...recentExtractions.slice(0, 9)]; // Keep last 10
-        queryClient.setQueryData(['hybridVision', 'recentExtractions'], updated);
-        
-        // Update performance stats
-        const metadata = HybridVisionService.getExtractionMetadata(data);
-        if (metadata) {
-          const currentStats = queryClient.getQueryData(['hybridVision', 'performanceStats']) || {
-            totalExtractions: 0,
-            cloudVisionSuccess: 0,
-            geminiSuccess: 0,
-            fallbackUsage: 0,
-            averageCloudVisionTime: 0,
-            averageGeminiTime: 0,
-            averageConfidence: 0
-          };
-          
-          const newStats = updatePerformanceStats(currentStats, metadata, data.confidence);
-          queryClient.setQueryData(['hybridVision', 'performanceStats'], newStats);
-        }
-      }
+      console.log('✅ HybridVision: Fresh extraction completed - NOT CACHING RESULT');
+      // DO NOT CACHE - Always fresh data on every scan
+      // Remove any existing cached data for this image
+      queryClient.removeQueries({ queryKey: hybridVisionQueryKeys.bankDataExtraction(imageUri) });
     },
     onError: (error, imageUri) => {
       console.error('HybridVision: Bank data extraction failed:', error);
-      // Don't cache error results
+      // Clear any cached data on error
+      queryClient.removeQueries({ queryKey: hybridVisionQueryKeys.bankDataExtraction(imageUri) });
     },
     retry: false, // Don't retry - HybridVision already handles retries internally
   });

@@ -39,14 +39,22 @@ export default function TransferLoaderScreen() {
         pin: '****'
       });
 
-      const transferResult = await transferFundsMutation.mutateAsync({
+      // Debug: Log exact transfer parameters being sent
+      const transferParams = {
         amount,
         accountNumber,
         bankName,
         accountName,
         description: `Transfer to ${accountName}`,
         pin
+      };
+      
+      console.log('📤 [TransferLoader] Transfer parameters:', {
+        ...transferParams,
+        pin: '****'  // Don't log actual PIN
       });
+
+      const transferResult = await transferFundsMutation.mutateAsync(transferParams);
 
       console.log('✅ [TransferLoader] Transfer successful:', transferResult);
 

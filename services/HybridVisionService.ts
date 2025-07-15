@@ -1,8 +1,8 @@
 import CloudVisionService from './CloudVisionService';
-import GeminiService, { type ExtractedBankData } from './GeminiService';
+import GeminiService from './GeminiService';
+import { type ExtractedBankData } from './GeminiService';
 import ImageOptimizationService from './ImageOptimizationService';
 import SmartPromptService from './SmartPromptService';
-import SmartCacheService from './SmartCacheService';
 import PatternLearningService from './PatternLearningService';
 
 interface ExtractionAttempt {
@@ -22,40 +22,35 @@ interface ExtractionResult {
 
 class HybridVisionService {
   private readonly CONFIDENCE_THRESHOLD = 85;
-  private readonly PARALLEL_TIMEOUT = 8000; // 8 seconds for parallel processing
-  private readonly FALLBACK_TIMEOUT = 12000; // 12 seconds for individual fallback
+  private readonly PARALLEL_TIMEOUT = 15000; // 15 seconds for CloudVision processing
+  private readonly FALLBACK_TIMEOUT = 20000; // 20 seconds for individual fallback
+  private geminiService: GeminiService;
+
+  constructor() {
+    this.geminiService = new GeminiService();
+  }
 
   /**
-   * Main extraction method with smart caching
+   * Main extraction method - ALWAYS FRESH DATA, NO CACHING
    */
   async extractBankDataWithCache(imageUri: string, bankName?: string, accountNumber?: string): Promise<ExtractedBankData> {
-    // Check cache first if we have bank details
-    if (bankName && accountNumber) {
-      console.log('🔍 HybridVision: Checking smart cache first...');
-      const cached = await SmartCacheService.get(bankName, accountNumber);
-      if (cached) {
-        console.log('⚡ HybridVision: Using cached result - ultra fast!');
-        return cached;
-      }
-    }
-    
-    // Fallback to full extraction
+    console.log('🔄 HybridVision: ALWAYS FRESH EXTRACTION - NO CACHE USED');
+    // Always do full fresh extraction
     return this.extractBankData(imageUri);
   }
 
   /**
-   * Extract bank data using optimized parallel processing for maximum speed
-   * 1. Run CloudVision and Gemini in parallel (fastest approach)
-   * 2. Use the first high-quality result or best available
-   * 3. Implement smart caching and pattern learning
+   * Extract bank data using CloudVision OCR and parsing logic
+   * ALWAYS FRESH EXTRACTION - NO CACHING, NO OLD DATA
+   * Optimized for Nigerian bank document extraction
    */
   async extractBankData(imageUri: string): Promise<ExtractedBankData> {
-    console.log('🚀 HybridVision: Starting super-optimized parallel bank data extraction...');
+    console.log('🚀 HybridVision: Starting FRESH bank data extraction - NO CACHED DATA USED...');
+    console.log('🔄 FRESH DATA GUARANTEE: Every scan processes new data, no old values returned');
     
     const startTime = Date.now();
     const attempts: ExtractionAttempt[] = [];
     let bestResult: ExtractedBankData | null = null;
-    let fallbackUsed = false;
 
     try {
       // STEP 1: Optimize image for faster processing
@@ -71,26 +66,14 @@ class HybridVisionService {
         // Continue with original image
       }
       
-      // STEP 2: Run CloudVision and Gemini in parallel for maximum speed
-      console.log('⚡ HybridVision: Running CloudVision + Gemini in parallel...');
+      // STEP 2: Run CloudVision extraction (primary)
+      console.log('⚡ HybridVision: Running CloudVision extraction...');
       
-      const parallelResults = await Promise.allSettled([
-        this.tryWithTimeout(
-          () => CloudVisionService.extractBankData(optimizedImageUri),
-          this.PARALLEL_TIMEOUT,
-          'CloudVision'
-        ),
-        this.tryWithTimeout(
-          () => GeminiService.extractBankData(optimizedImageUri),
-          this.PARALLEL_TIMEOUT,
-          'Gemini'
-        )
-      ]);
-
-      // Process CloudVision result
-      const cloudVisionResult = parallelResults[0].status === 'fulfilled' 
-        ? parallelResults[0].value 
-        : { data: {} as ExtractedBankData, duration: 0, success: false, error: 'Promise rejected' };
+      const cloudVisionResult = await this.tryWithTimeout(
+        () => CloudVisionService.extractBankData(optimizedImageUri),
+        this.PARALLEL_TIMEOUT,
+        'CloudVision'
+      );
 
       const cloudVisionAttempt: ExtractionAttempt = {
         service: 'cloudVision',
@@ -100,83 +83,71 @@ class HybridVisionService {
       };
       attempts.push(cloudVisionAttempt);
 
-      // Process Gemini result
-      const geminiResult = parallelResults[1].status === 'fulfilled' 
-        ? parallelResults[1].value 
-        : { data: {} as ExtractedBankData, duration: 0, success: false, error: 'Promise rejected' };
-
-      const geminiAttempt: ExtractionAttempt = {
-        service: 'gemini',
-        data: geminiResult.data,
-        duration: geminiResult.duration,
-        success: geminiResult.success
-      };
-      attempts.push(geminiAttempt);
-
-      // Analyze parallel results and choose the best
-      const validResults: { service: string; data: ExtractedBankData; duration: number }[] = [];
-
-      if (cloudVisionResult.success) {
-        console.log('✅ CloudVision extraction successful');
+      // Process CloudVision result
+      if (cloudVisionResult.success && this.isHighQualityResult(cloudVisionResult.data)) {
+        console.log('✅ CloudVision extraction successful with high quality');
         console.log(`📊 CloudVision confidence: ${cloudVisionResult.data.confidence}%`);
-        validResults.push({ service: 'CloudVision', data: cloudVisionResult.data, duration: cloudVisionResult.duration });
+        bestResult = cloudVisionResult.data;
       } else {
-        console.warn('❌ CloudVision extraction failed:', cloudVisionResult.error);
-      }
-
-      if (geminiResult.success) {
-        console.log('✅ Gemini extraction successful');
-        console.log(`📊 Gemini confidence: ${geminiResult.data.confidence}%`);
-        validResults.push({ service: 'Gemini', data: geminiResult.data, duration: geminiResult.duration });
-      } else {
-        console.warn('❌ Gemini extraction failed:', geminiResult.error);
-      }
-
-      // Choose the best result from parallel processing
-      if (validResults.length > 0) {
-        // First, check if any result meets the high quality threshold
-        const highQualityResults = validResults.filter(r => this.isHighQualityResult(r.data));
-        
-        if (highQualityResults.length > 0) {
-          // Use the fastest high-quality result
-          const fastestGoodResult = highQualityResults.reduce((fastest, current) => 
-            current.duration < fastest.duration ? current : fastest
-          );
-          bestResult = fastestGoodResult.data;
-          console.log(`🎉 Using high-quality result from ${fastestGoodResult.service} (${fastestGoodResult.duration}ms)`);
+        if (cloudVisionResult.success) {
+          console.log(`⚠️ CloudVision extraction successful but low quality (confidence: ${cloudVisionResult.data.confidence}%)`);
+          bestResult = cloudVisionResult.data; // Keep as fallback
         } else {
-          // No high-quality results, choose the best available
-          bestResult = validResults.reduce((best, current) => 
-            this.compareResults(current.data, best.data) > 0 ? current : best
-          ).data;
-          console.log('⚠️ No high-quality results from parallel processing, using best available');
+          console.warn('❌ CloudVision extraction failed:', cloudVisionResult.error);
+        }
+
+        // STEP 3: Try Gemini as fallback/refinement using CloudVision context
+        console.log('🤖 HybridVision: Running Gemini context-aware refinement...');
+        console.log('📋 Passing CloudVision result to Gemini for context:', cloudVisionResult.data);
+        
+        const geminiResult = await this.tryWithTimeout(
+          () => this.geminiService.extractBankDataWithContext(optimizedImageUri, cloudVisionResult.data),
+          this.FALLBACK_TIMEOUT,
+          'Gemini'
+        );
+
+        const geminiAttempt: ExtractionAttempt = {
+          service: 'gemini',
+          data: geminiResult.data as ExtractedBankData,
+          duration: geminiResult.duration,
+          success: geminiResult.success
+        };
+        attempts.push(geminiAttempt);
+
+        // Compare Gemini result with CloudVision result
+        if (geminiResult.success) {
+          const geminiData = geminiResult.data as ExtractedBankData;
+          console.log('✅ Gemini extraction successful');
+          console.log(`📊 Gemini confidence: ${geminiData.confidence}%`);
+          
+          // Use the better result
+          if (!bestResult || this.compareResults(geminiData, bestResult) > 0) {
+            console.log('🏆 Gemini result is better, using Gemini data');
+            bestResult = geminiData;
+          } else {
+            console.log('🏆 CloudVision result is better, keeping CloudVision data');
+          }
+        } else {
+          console.warn('❌ Gemini extraction failed:', geminiResult.error);
         }
       }
 
-      // STEP 3: Smart caching and pattern learning
+      // STEP 4: Return results
       const totalDuration = Date.now() - startTime;
       
       if (bestResult) {
+        const fallbackUsed = attempts.length > 1;
+        const primaryService = attempts.find(a => a.success)?.service || 'cloudVision';
+        
         console.log('🎉 HybridVision: Extraction completed successfully');
         console.log(`📊 Final result confidence: ${bestResult.confidence}%`);
         console.log(`⏱️ Total extraction time: ${totalDuration}ms`);
         console.log(`🔧 Services used: ${attempts.map(a => a.service).join(', ')}`);
-        
-        // Cache the successful result
-        const winningAttempt = attempts.find(a => a.success && a.data.confidence === bestResult.confidence);
-        if (winningAttempt) {
-          await SmartCacheService.set(
-            bestResult.bankName,
-            bestResult.accountNumber,
-            bestResult,
-            winningAttempt.duration,
-            winningAttempt.service
-          );
-        }
+        console.log(`🔄 Fallback used: ${fallbackUsed ? 'Yes' : 'No'}`);
         
         return this.enhanceResultWithMetadata(bestResult, {
           attempts,
-          primaryService: attempts.find(a => a.success)?.service || 'cloudVision',
+          primaryService,
           fallbackUsed,
           totalDuration
         });
@@ -202,16 +173,23 @@ class HybridVisionService {
     const startTime = Date.now();
     
     try {
+      console.log(`⏱️ ${serviceName}: Starting with ${timeout}ms timeout...`);
+      
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`${serviceName} timeout after ${timeout}ms`)), timeout)
+        setTimeout(() => {
+          console.warn(`⚠️ ${serviceName}: Timeout after ${timeout}ms`);
+          reject(new Error(`${serviceName} timeout after ${timeout}ms`));
+        }, timeout)
       );
 
       const data = await Promise.race([fn(), timeoutPromise]);
       const duration = Date.now() - startTime;
       
+      console.log(`✅ ${serviceName}: Completed in ${duration}ms`);
       return { data, duration, success: true };
     } catch (error) {
       const duration = Date.now() - startTime;
+      console.error(`❌ ${serviceName}: Failed after ${duration}ms:`, error);
       return { data: {} as T, duration, success: false, error };
     }
   }
@@ -296,18 +274,25 @@ class HybridVisionService {
    * Format extracted amount for display
    */
   formatExtractedAmount(amount: string): string {
-    // Delegate to the same logic as individual services
-    return CloudVisionService.formatExtractedAmount(amount) || 
-           GeminiService.formatExtractedAmount(amount);
+    if (!amount) return '';
+    
+    // Remove currency symbols and extra spaces
+    const cleaned = amount.replace(/[₦$€£¥₹,]/g, '').trim();
+    
+    // Extract numeric value
+    const numericMatch = cleaned.match(/[\d,]+\.?\d*/);
+    if (numericMatch) {
+      return numericMatch[0].replace(/,/g, '');
+    }
+    
+    return '';
   }
 
   /**
-   * Check if extraction result is valid (combines both services' validation)
+   * Check if extraction result is valid
    */
   isExtractionValid(data: ExtractedBankData): boolean {
-    // Use the more lenient validation between the two services
-    return CloudVisionService.isExtractionValid(data) || 
-           GeminiService.isExtractionValid(data);
+    return data.extractedFields.bankName && data.extractedFields.accountNumber && data.confidence > 0;
   }
 
   /**
@@ -327,7 +312,7 @@ class HybridVisionService {
   /**
    * Get the primary service used for extraction
    */
-  getPrimaryService(data: ExtractedBankData): 'cloudVision' | 'gemini' | null {
+  getPrimaryService(data: ExtractedBankData): 'cloudVision' | null {
     return (data as any)._extractionMetadata?.primaryService || null;
   }
 }

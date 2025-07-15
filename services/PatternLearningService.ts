@@ -81,6 +81,7 @@ class PatternLearningService {
 
   /**
    * Learn from successful extraction
+   * DISABLED FOR FRESH DATA - NO PATTERN CACHING
    */
   async learnFromSuccess(
     extractedData: ExtractedBankData,
@@ -88,13 +89,8 @@ class PatternLearningService {
     service: 'cloudVision' | 'gemini',
     imageCharacteristics?: any
   ): Promise<void> {
-    await this.initialize();
-
-    // Only learn from high-confidence extractions
-    if (extractedData.confidence < this.MIN_CONFIDENCE_TO_LEARN) {
-      console.log(`⚠️ PatternLearning: Confidence too low (${extractedData.confidence}%), skipping learning`);
-      return;
-    }
+    console.log('🚫 PatternLearning: DISABLED - Always use fresh data, no pattern caching');
+    return; // Early return - no learning/caching
 
     const patternId = this.generatePatternId(extractedData);
     const existingPattern = this.patterns.get(patternId);
@@ -220,11 +216,11 @@ class PatternLearningService {
 
   /**
    * Check if we've seen this pattern before (for caching)
+   * DISABLED FOR FRESH DATA - ALWAYS RETURN FALSE
    */
   async hasSeenPattern(bankName: string, accountNumber: string): Promise<boolean> {
-    await this.initialize();
-    const patternId = this.generatePatternId({ bankName, accountNumber } as ExtractedBankData);
-    return this.patterns.has(patternId);
+    console.log('🚫 PatternLearning: Pattern checking DISABLED - Always return false for fresh data');
+    return false; // Always return false - no pattern caching
   }
 
   /**

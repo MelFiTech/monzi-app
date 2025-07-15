@@ -108,22 +108,18 @@ class SmartPromptService {
     if (this.initialized) return;
 
     try {
-      console.log('🧠 SmartPrompts: Initializing bank patterns...');
+      console.log('🧠 SmartPrompts: Initializing with FRESH patterns only - NO CACHING...');
       
-      // Load cached patterns
-      const cachedPatterns = await AsyncStorage.getItem(this.PATTERN_CACHE_KEY);
-      if (cachedPatterns) {
-        const parsed = JSON.parse(cachedPatterns);
-        this.bankPatterns = new Map(parsed.map((p: any) => [p.bankName.toLowerCase(), p]));
-        console.log(`📚 Loaded ${this.bankPatterns.size} cached bank patterns`);
-      } else {
-        // Initialize with default patterns
-        Object.entries(this.NIGERIAN_BANKS_DB).forEach(([key, pattern]) => {
-          this.bankPatterns.set(key, pattern);
-        });
-        await this.savePatterns();
-        console.log('📚 Initialized with default Nigerian bank patterns');
-      }
+      // DO NOT load cached patterns - always use fresh default patterns
+      console.log('🚫 SmartPrompts: Skipping cached patterns for fresh data');
+      
+      // Always initialize with fresh default patterns
+      Object.entries(this.NIGERIAN_BANKS_DB).forEach(([key, pattern]) => {
+        this.bankPatterns.set(key, pattern);
+      });
+      
+      // DO NOT save patterns - no caching
+      console.log('📚 Initialized with fresh default Nigerian bank patterns - NO CACHING');
 
       this.initialized = true;
     } catch (error) {

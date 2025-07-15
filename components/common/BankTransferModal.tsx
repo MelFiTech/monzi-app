@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Modal, Alert, Animated } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Modal, Alert, Animated, TextInput, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useTheme } from '@/providers/ThemeProvider';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
 import Button from './Button';
 import BankSelectionModal from './BankSelectionModal';
-import { Copy, X, Check, ChevronDown } from 'lucide-react-native';
+import { Copy, X, Check, ChevronDown, Edit3, Save } from 'lucide-react-native';
 import { ExtractedBankData } from '@/services';
 import { useResolveAccountMutation } from '@/hooks/useAccountService';
 import { ToastService } from '@/services';
@@ -14,7 +14,7 @@ import { router } from 'expo-router';
 interface BankTransferModalProps {
   visible: boolean;
   onClose: () => void;
-  onConfirmTransfer: (resolvedAccountName?: string) => void;
+  onConfirmTransfer: (resolvedAccountName?: string, selectedBankName?: string, accountNumber?: string) => void;
   onSuccess: () => void;
   amount: string;
   nairaAmount: string;
@@ -42,12 +42,15 @@ export default function BankTransferModal({
   const [resolvedAccountName, setResolvedAccountName] = useState<string | null>(null);
   const [isResolvingAccount, setIsResolvingAccount] = useState(false);
   const [hasResolutionFailed, setHasResolutionFailed] = useState(false);
+  const [isEditingAccountNumber, setIsEditingAccountNumber] = useState(false);
+  const [editedAccountNumber, setEditedAccountNumber] = useState('');
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   const resolveAccountMutation = useResolveAccountMutation();
 
   // Use extracted data or selected bank name
   const bankName = extractedData?.bankName || selectedBankName || '';
-  const accountNumber = extractedData?.accountNumber || '';
+  const accountNumber = editedAccountNumber || extractedData?.accountNumber || '';
   const accountHolderName = resolvedAccountName || extractedData?.accountHolderName || '';
   const extractedAmount = extractedData?.amount || amount;
 
@@ -94,6 +97,24 @@ export default function BankTransferModal({
       });
     }
   }, [visible, hasRequiredData, resolvedAccountName, hasResolutionFailed, accountNumber, bankName]);
+
+  // Keyboard visibility listeners
+  useEffect(() => {
+    const keyboardWillShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setIsKeyboardVisible(true)
+    );
+    
+    const keyboardWillHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setIsKeyboardVisible(false)
+    );
+
+    return () => {
+      keyboardWillShowListener?.remove();
+      keyboardWillHideListener?.remove();
+    };
+  }, []);
 
   // Slide animation effect
   useEffect(() => {
@@ -158,6 +179,31 @@ export default function BankTransferModal({
     }
   };
 
+  const handleEditAccountNumber = () => {
+    setEditedAccountNumber(accountNumber);
+    setIsEditingAccountNumber(true);
+  };
+
+  const handleSaveAccountNumber = () => {
+    // Validate account number (10 digits)
+    if (editedAccountNumber.length !== 10 || !/^\d{10}$/.test(editedAccountNumber)) {
+      Alert.alert('Invalid Account Number', 'Account number must be exactly 10 digits.');
+      return;
+    }
+    
+    setIsEditingAccountNumber(false);
+    // Reset resolution state when account number changes
+    setResolvedAccountName(null);
+    setHasResolutionFailed(false);
+    
+    ToastService.success('Account number updated');
+  };
+
+  const handleCancelEdit = () => {
+    setEditedAccountNumber('');
+    setIsEditingAccountNumber(false);
+  };
+
   const handleConfirmPress = async () => {
     if (!hasRequiredData) {
       Alert.alert(
@@ -186,7 +232,7 @@ export default function BankTransferModal({
                  // Continue with transfer
          setTimeout(() => {
            setIsLoading(false);
-           onConfirmTransfer(resolvedAccountName || undefined);
+           onConfirmTransfer(result.account_name, bankName, accountNumber);
          }, 500);
         
       } catch (error) {
@@ -216,7 +262,7 @@ export default function BankTransferModal({
        // Resolution already completed or not needed
        setTimeout(() => {
          setIsLoading(false);
-         onConfirmTransfer(resolvedAccountName || undefined);
+         onConfirmTransfer(accountHolderName, bankName, accountNumber);
        }, 500);
      }
   };
@@ -265,14 +311,18 @@ export default function BankTransferModal({
       animationType="fade"
       onRequestClose={handleClosePress}
     >
-      <View style={styles.overlay}>
-        <BlurView intensity={8} style={styles.blurView}>
-          <View style={styles.modalContainer}>
-            <Animated.View
-              style={{
-                transform: [{ translateY: slideAnim }]
-              }}
-            >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <View style={styles.overlay}>
+          <BlurView intensity={8} style={styles.blurView}>
+            <View style={styles.modalContainer}>
+              <Animated.View
+                style={{
+                  transform: [{ translateY: slideAnim }]
+                }}
+              >
               <TouchableOpacity
                 style={styles.modalContent}
                 activeOpacity={1}
@@ -311,16 +361,46 @@ export default function BankTransferModal({
                     <View style={styles.detailValueContainer}>
                       {hasAccountNumber ? (
                         <>
-                          <Text style={styles.detailValue}>
-                            {accountNumber}
-                          </Text>
-                          <TouchableOpacity onPress={handleCopyAccountNumber} style={styles.copyButton}>
-                            {copied ? (
-                              <Check size={20} color="#10B981" />
-                            ) : (
-                              <Copy size={20} color="rgba(255, 255, 255, 0.6)" />
-                            )}
-                          </TouchableOpacity>
+                          {isEditingAccountNumber ? (
+                            <View style={styles.editContainer}>
+                              <TextInput
+                                style={styles.editInput}
+                                value={editedAccountNumber}
+                                onChangeText={setEditedAccountNumber}
+                                keyboardType="numeric"
+                                maxLength={10}
+                                placeholder="Enter 10-digit account number"
+                                placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                                autoFocus
+                              />
+                              <View style={styles.editButtons}>
+                                <TouchableOpacity onPress={handleCancelEdit} style={styles.cancelEditButton}>
+                                  <X size={16} color="rgba(255, 255, 255, 0.6)" />
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={handleSaveAccountNumber} style={styles.saveEditButton}>
+                                  <Save size={16} color="#10B981" />
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          ) : (
+                            <>
+                              <Text style={styles.detailValue}>
+                                {accountNumber}
+                              </Text>
+                              <View style={styles.actionButtons}>
+                                <TouchableOpacity onPress={handleEditAccountNumber} style={styles.editButton}>
+                                  <Edit3 size={18} color="rgba(255, 255, 255, 0.6)" />
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={handleCopyAccountNumber} style={styles.copyButton}>
+                                  {copied ? (
+                                    <Check size={20} color="#10B981" />
+                                  ) : (
+                                    <Copy size={20} color="rgba(255, 255, 255, 0.6)" />
+                                  )}
+                                </TouchableOpacity>
+                              </View>
+                            </>
+                          )}
                         </>
                       ) : (
                         <Text style={styles.missingDataText}>
@@ -330,8 +410,8 @@ export default function BankTransferModal({
                     </View>
                   </View>
 
-                  {/* Show extraction confidence if available */}
-                  {extractedData && (
+                  {/* Show extraction confidence if available and keyboard is not visible */}
+                  {extractedData && !isKeyboardVisible && (
                     <View style={styles.confidenceRow}>
                       <Text style={styles.confidenceText}>
                         Extraction confidence: {extractedData.confidence}%
@@ -340,7 +420,7 @@ export default function BankTransferModal({
                   )}
                 </View>
 
-                {!hasRequiredData ? (
+                {!hasRequiredData && !isKeyboardVisible ? (
                   <View style={styles.warningContainer}>
                     <Text style={styles.errorText}>
                       ⚠️ Missing Required Information
@@ -353,11 +433,11 @@ export default function BankTransferModal({
                       }
                     </Text>
                   </View>
-                ) : (
+                ) : hasRequiredData && !isKeyboardVisible ? (
                   <Text style={styles.warningText}>
                     Please confirm the details before sending.{'\n'}Transfers can't be reversed once completed.
                   </Text>
-                )}
+                ) : null}
 
                 <View style={styles.buttonContainer}>
                   <Button
@@ -391,6 +471,7 @@ export default function BankTransferModal({
           </View>
         </BlurView>
       </View>
+      </KeyboardAvoidingView>
 
       {/* Bank Selection Modal */}
       <BankSelectionModal
@@ -480,6 +561,44 @@ const styles = StyleSheet.create({
   },
   copyButton: {
     padding: 4,
+  },
+  editButton: {
+    padding: 4,
+    marginRight: 8,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  editContainer: {
+    flex: 1,
+  },
+  editInput: {
+    fontSize: 20,
+    fontFamily: fontFamilies.sora.bold,
+    color: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#F5C842',
+    marginBottom: 8,
+  },
+  editButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  cancelEditButton: {
+    padding: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 6,
+  },
+  saveEditButton: {
+    padding: 8,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderRadius: 6,
   },
   // Skeleton loading styles
   skeletonContainer: {
@@ -585,7 +704,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 24,
-    borderLeftWidth: 4,
+    borderLeftWidth: 0,
     borderLeftColor: '#F5C842',
   },
   errorText: {

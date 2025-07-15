@@ -99,7 +99,7 @@ export default function TransferSuccessScreen() {
           <Text style={styles.successText}>
             You sent ₦{amount} to
           </Text>
-          <Text style={styles.recipientText}>
+          <Text numberOfLines={2} ellipsizeMode="tail" style={styles.recipientText}>
             {recipientName}
           </Text>
         </View>

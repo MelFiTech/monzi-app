@@ -11,7 +11,7 @@ interface CameraModalsProps {
   isPendingVerification: boolean;
   walletRecoveryPending: boolean;
   onBankModalClose: () => void;
-  onBankModalConfirm: (resolvedAccountName?: string) => void;
+  onBankModalConfirm: (resolvedAccountName?: string, selectedBankName?: string, accountNumber?: string) => void;
   onBankModalSuccess: () => void;
   onVerificationModalClose: () => void;
   onVerifyID: () => void;

@@ -188,7 +188,7 @@ export default function TransferScreen() {
   // Extract numeric value from balance for comparison
   const walletBalanceNumeric = hasWalletAccess ? (balanceData?.balance || 0) : 0;
 
-  // Use only extracted/resolved data - no fallback values
+  // Use extracted data from home screen
   const recipientName = extractedAccountHolderName || '';
   const accountNumber = extractedAccountNumber || '';
   const bankName = extractedBankName || '';
@@ -211,6 +211,8 @@ export default function TransferScreen() {
   useEffect(() => {
     if (!accountNumber || !bankName) {
       console.error('❌ Missing required transfer data:', { accountNumber, bankName, recipientName });
+      
+      // Show error alert for missing data
       Alert.alert(
         'Missing Transfer Data',
         'Required account information is missing. Please scan the payment details again.',
@@ -376,6 +378,8 @@ export default function TransferScreen() {
     setShowPinModal(false);
   };
 
+
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
@@ -514,6 +518,8 @@ export default function TransferScreen() {
         fee="10.00"
         pinError={pinError}
       />
+
+
     </SafeAreaView>
   );
 }
