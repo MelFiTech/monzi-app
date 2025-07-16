@@ -9,7 +9,7 @@ interface PulsatingGlowProps {
 }
 
 export default function PulsatingGlow({
-  size = 346,
+  size = 500,
   style,
   containerStyle,
   animationDuration = 2000,
@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   glowImage: {
-    width: 346,
-    height: 346,
+    width: 500,
+    height: 500,
   },
 }); 

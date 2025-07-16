@@ -230,21 +230,19 @@ export const useLogout = () => {
       }
     },
     onSuccess: () => {
-      // Clear all queries (auth, wallet, account, etc.)
-      queryClient.clear();
+      // 🗑️ COMPREHENSIVE CACHE CLEARING - Clear all caches on logout
+      console.log('🗑️ [Auth Cache] Clearing all caches on logout...');
+      queryClient.clear(); // Nuclear option - fresh start for new user
       
-      // Also clear specific auth-related queries
+      // Also clear specific auth-related queries (redundant but safe)
       queryClient.removeQueries({ queryKey: authKeys.all });
       
-      // Clear wallet queries if they exist
-      try {
-        queryClient.removeQueries({ queryKey: ['wallet'] });
-        queryClient.removeQueries({ queryKey: ['accounts'] });
-      } catch (error) {
-        console.log('No wallet/account queries to clear');
-      }
+      // Clear KYC and wallet queries explicitly
+      queryClient.removeQueries({ queryKey: ['kyc'] });
+      queryClient.removeQueries({ queryKey: ['wallet'] }); // This covers all wallet queries including transactions
+      queryClient.removeQueries({ queryKey: ['accounts'] });
       
-      console.log('Logout successful - all session data cleared');
+      console.log('✅ [Auth Cache] Logout successful - all session data and caches cleared');
     },
     onError: (error) => {
       console.log('Logout failed:', error);

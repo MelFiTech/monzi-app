@@ -58,6 +58,33 @@ export default function BridgeScreen() {
   const { currentStep, isKYCComplete, canProceedToSelfie } = useKYCStep();
   const { logout } = useAuth();
 
+  // Set global KYC flow flag when Bridge screen mounts
+  useEffect(() => {
+    const setKYCFlowFlag = async () => {
+      try {
+        await AsyncStorage.setItem('is_in_kyc_flow', 'true');
+        console.log('🎯 Bridge Screen: Set KYC flow flag to prevent verification modal');
+      } catch (error) {
+        console.error('Error setting KYC flow flag:', error);
+      }
+    };
+    
+    setKYCFlowFlag();
+    
+    // Clear flag when component unmounts
+    return () => {
+      const clearKYCFlowFlag = async () => {
+        try {
+          await AsyncStorage.removeItem('is_in_kyc_flow');
+          console.log('🔄 Bridge Screen: Cleared KYC flow flag on unmount');
+        } catch (error) {
+          console.error('Error clearing KYC flow flag:', error);
+        }
+      };
+      clearKYCFlowFlag();
+    };
+  }, []);
+
   useEffect(() => {
     if (kycStatus) {
       console.log('🔄 Bridge screen updating steps from KYC status:', {

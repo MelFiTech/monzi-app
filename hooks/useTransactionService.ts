@@ -56,7 +56,7 @@ export const useTransactions = (limit: number = 20) => {
   const authStorageService = AuthStorageService.getInstance();
   
   return useInfiniteQuery({
-    queryKey: ['transactions', limit],
+    queryKey: ['wallet', 'transactions', { limit }], // 🚀 STANDARDIZED: Match wallet service query keys
     queryFn: async ({ pageParam = 0 }) => {
       const accessToken = await authStorageService.getAccessToken();
       if (!accessToken) {
@@ -117,6 +117,14 @@ export const useTransactionsList = () => {
   // Flatten all pages into a single array
   const transactions = data?.pages?.flatMap(page => page.transactions) || [];
 
+  console.log('📊 [Transaction Cache] Transaction list status:', {
+    totalTransactions: transactions.length,
+    loading: isLoading,
+    refreshing: isRefetching,
+    hasMore: hasNextPage,
+    queryKey: ['wallet', 'transactions', { limit: 20 }], // 🚀 CORRECTED: Actual query key being used
+  });
+
   return {
     transactions,
     loading: isLoading,
@@ -128,6 +136,7 @@ export const useTransactionsList = () => {
     onRefresh: refetch,
     onEndReached: () => {
       if (hasNextPage && !isFetchingNextPage) {
+        console.log('📊 [Transaction Cache] Loading more transactions...');
         fetchNextPage();
       }
     },

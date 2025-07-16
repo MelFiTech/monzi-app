@@ -77,26 +77,26 @@ export default function Toast({
   const getBackgroundColor = () => {
     switch (type) {
       case 'success':
-        return 'rgba(0, 0, 0, 0.7)'; // 70% transparent black
+        return '#FDE46C';
       case 'error':
-        return 'rgba(0, 0, 0, 0.7)';
+        return '#FDE46C';
       case 'info':
-        return 'rgba(0, 0, 0, 0.7)';
+        return '#FDE46C';
       default:
-        return 'rgba(0, 0, 0, 0.7)';
+        return '#FDE46C';
     }
   };
 
   const getIcon = () => {
     switch (type) {
       case 'success':
-        return <Check size={18} color="#FFFFFF" strokeWidth={2} />;
+        return <Check size={18} color="#000000" strokeWidth={2} />;
       case 'error':
         return <Text style={styles.errorIcon}>✕</Text>;
       case 'info':
         return <Text style={styles.infoIcon}>i</Text>;
       default:
-        return <Check size={18} color="#FFFFFF" strokeWidth={2} />;
+        return <Check size={18} color="#000000" strokeWidth={2} />;
     }
   };
 
@@ -154,18 +154,18 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: fontSizes.base,
     fontFamily: fontFamilies.sora.medium,
-    color: '#FFFFFF',
+    color: '#000000',
     lineHeight: 20,
     textAlign: 'center',
   },
   errorIcon: {
     fontSize: 16,
-    color: '#FFFFFF',
+    color: '#000000',
     fontWeight: 'bold',
   },
   infoIcon: {
     fontSize: 16,
-    color: '#FFFFFF',
+    color: '#000000',
     fontWeight: 'bold',
     fontFamily: fontFamilies.sora.bold,
   },

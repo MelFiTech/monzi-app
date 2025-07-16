@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Alert, Animated, Image } from 'react-native';
 import { CameraView } from 'expo-camera';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { ExtractedBankData } from '@/services';
@@ -35,6 +35,7 @@ export function useCameraLogic() {
   const [areAllChecksComplete, setAreAllChecksComplete] = useState(false);
   const [showPulsatingGlow, setShowPulsatingGlow] = useState(true);
   const [showTransactionHistory, setShowTransactionHistory] = useState(false);
+  const [isInKYCFlow, setIsInKYCFlow] = useState(false);
 
   // Refs and Animations
   const cameraRef = useRef<CameraView>(null);
@@ -80,6 +81,10 @@ export function useCameraLogic() {
           setIsPendingVerification(false);
           setIsWalletActivationMode(false);
           setShowVerificationModal(true);
+          
+          // Stop pulsating glow when verification modal is shown
+          setShowPulsatingGlow(false);
+          setAreAllChecksComplete(true);
         }
       } catch (error) {
         console.error('Error checking fresh registration flag:', error);
@@ -88,6 +93,39 @@ export function useCameraLogic() {
 
     checkFreshRegistration();
   }, []);
+
+  // Reset KYC flow flag when screen comes into focus (user returns from KYC)
+  useFocusEffect(
+    useCallback(() => {
+      if (isInKYCFlow) {
+        console.log('🏠 User returned to home from KYC flow, resetting flag');
+        setIsInKYCFlow(false);
+      }
+    }, [isInKYCFlow])
+  );
+
+  // Check for global KYC flow flag
+  useEffect(() => {
+    const checkKYCFlowFlag = async () => {
+      try {
+        const kycFlowFlag = await AsyncStorage.getItem('is_in_kyc_flow');
+        const isCurrentlyInKYC = kycFlowFlag === 'true';
+        
+        if (isCurrentlyInKYC !== isInKYCFlow) {
+          console.log(`🔄 Global KYC flow status changed: ${isCurrentlyInKYC}`);
+          setIsInKYCFlow(isCurrentlyInKYC);
+        }
+      } catch (error) {
+        console.error('Error checking global KYC flow flag:', error);
+      }
+    };
+
+    // Check immediately and then every second while on home screen
+    checkKYCFlowFlag();
+    const interval = setInterval(checkKYCFlowFlag, 1000);
+
+    return () => clearInterval(interval);
+  }, [isInKYCFlow]);
 
   // Handle capture
   const handleCapture = async () => {
@@ -297,19 +335,24 @@ export function useCameraLogic() {
         }
       }
     } else {
+      // Set KYC flow flag IMMEDIATELY to prevent modal from reappearing
+      setIsInKYCFlow(true);
+      
+      // Close the modal
       setShowVerificationModal(false);
       
       if (isPendingVerification) {
         setIsPendingVerification(false);
       } else {
+        // Navigate immediately without delay since flag is already set
         if (isFreshRegistration) {
           console.log('🆕 Fresh registration user starting KYC - going to BVN');
           setIsFreshRegistration(false);
           router.push('/(kyc)/bvn');
-          return;
+        } else {
+          console.log('🔄 Existing user continuing KYC - going to BVN');
+          router.push('/(kyc)/bvn');
         }
-        
-        router.push('/(kyc)/bvn');
       }
     }
   };
@@ -344,6 +387,7 @@ export function useCameraLogic() {
     areAllChecksComplete,
     showPulsatingGlow,
     showTransactionHistory,
+    isInKYCFlow,
     
     // Transaction data
     transactionsData,
@@ -381,5 +425,6 @@ export function useCameraLogic() {
     setAreAllChecksComplete,
     setShowPulsatingGlow,
     setShowTransactionHistory,
+    setIsInKYCFlow,
   };
 } 

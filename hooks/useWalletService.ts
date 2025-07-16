@@ -50,25 +50,43 @@ const useWalletAccess = () => {
 };
 
 /**
- * Hook to get wallet details
+ * Hook to get wallet details with smart long-term caching
  */
 export function useWalletDetails(): UseQueryResult<WalletDetails, WalletError> {
   const walletService = WalletService.getInstance();
-  const { hasWalletAccess, isAuthenticated } = useWalletAccess();
+  const { hasWalletAccess, isAuthenticated, kycStatus } = useWalletAccess();
 
   return useQuery({
     queryKey: walletKeys.details(),
-    queryFn: () => walletService.getWalletDetails(),
-    // ⚠️ TEMPORARY: Enable for any authenticated user to test endpoints
-    // TODO: Revert to `hasWalletAccess` after testing wallet endpoints
-    enabled: isAuthenticated, // Changed from hasWalletAccess to isAuthenticated for testing
+    queryFn: async () => {
+      console.log('🏦 [Wallet Cache] Fetching wallet details from API...');
+      const details = await walletService.getWalletDetails();
+      console.log('💾 [Wallet Cache] Fresh wallet details from API:', {
+        accountNumber: details.accountNumber,
+        bankName: details.bankName,
+        accountName: details.accountName,
+        cached: false
+      });
+      return details;
+    },
+    // 🚀 FIXED: Only enable for users with proper wallet access (KYC verified)
+    enabled: hasWalletAccess, // Reverted from testing override
     retry: 2,
     retryDelay: 1000,
-    staleTime: 30 * 60 * 1000, // 30 minutes (bank details rarely change)
-    gcTime: 2 * 60 * 60 * 1000, // 2 hours cache time
-    refetchOnWindowFocus: false, // Don't refetch on window focus
-    refetchOnReconnect: true, // Refetch on reconnect
+    
+    // 🚀 SMART LONG-TERM CACHING - Wallet details rarely change
+    staleTime: 2 * 60 * 60 * 1000, // 2 hours - account details rarely change
+    gcTime: 24 * 60 * 60 * 1000, // 24 hours cache time
+    
+    // Optimized refetch behavior
+    refetchOnWindowFocus: false, // Don't refetch on focus - use cache
+    refetchOnMount: 'stale', // Only refetch on mount if cache is stale
+    refetchOnReconnect: true, // Refetch on reconnect (safety)
     refetchInterval: false, // No automatic refetching
+    refetchIntervalInBackground: false,
+    
+    // Network mode - only when online
+    networkMode: 'online',
   });
 }
 
@@ -82,9 +100,8 @@ export function useWalletBalance(): UseQueryResult<WalletBalance, WalletError> {
   return useQuery({
     queryKey: walletKeys.balance(),
     queryFn: () => walletService.getWalletBalance(),
-    // ⚠️ TEMPORARY: Enable for any authenticated user to test endpoints
-    // TODO: Revert to `hasWalletAccess` after testing wallet endpoints
-    enabled: isAuthenticated, // Changed from hasWalletAccess to isAuthenticated for testing
+    // 🚀 FIXED: Only enable for users with proper wallet access (KYC verified)
+    enabled: hasWalletAccess, // Reverted from testing override
     retry: 2,
     retryDelay: 1000,
     staleTime: 5 * 60 * 1000, // 5 minutes (balance only changes during transactions)
@@ -235,30 +252,59 @@ export function useRefreshWallet() {
 }
 
 /**
- * Hook for optimistic balance updates
+ * Hook for optimistic balance updates (works with WebSocket real-time updates)
  */
 export function useOptimisticBalance() {
   const queryClient = useQueryClient();
 
   const updateBalanceOptimistically = (newBalance: number) => {
+    console.log('💰 [Wallet Cache] Optimistic balance update:', newBalance);
     queryClient.setQueryData(walletKeys.balance(), (oldData: WalletBalance | undefined) => {
       if (oldData) {
-        return {
+        const updatedData = {
           ...oldData,
           balance: newBalance,
           formattedBalance: WalletService.formatCurrency(newBalance),
         };
+        console.log('💾 [Wallet Cache] Balance cache updated optimistically:', {
+          from: oldData.balance,
+          to: updatedData.balance
+        });
+        return updatedData;
+      }
+      return oldData;
+    });
+  };
+
+  // Update balance from WebSocket notification (real-time)
+  const updateBalanceFromWebSocket = (balanceData: any) => {
+    console.log('🔌 [Wallet Cache] WebSocket balance update:', balanceData);
+    queryClient.setQueryData(walletKeys.balance(), (oldData: WalletBalance | undefined) => {
+      if (oldData) {
+        const updatedData = {
+          ...oldData,
+          balance: balanceData.newBalance,
+          formattedBalance: WalletService.formatCurrency(balanceData.newBalance),
+        };
+        console.log('💾 [Wallet Cache] Balance cache updated from WebSocket:', {
+          from: balanceData.oldBalance,
+          to: balanceData.newBalance,
+          change: balanceData.change
+        });
+        return updatedData;
       }
       return oldData;
     });
   };
 
   const revertOptimisticUpdate = () => {
+    console.log('🔄 [Wallet Cache] Reverting optimistic balance update');
     queryClient.invalidateQueries({ queryKey: walletKeys.balance() });
   };
 
   return {
     updateBalanceOptimistically,
+    updateBalanceFromWebSocket,
     revertOptimisticUpdate,
   };
 }
@@ -412,4 +458,129 @@ export function usePinStatus(): UseQueryResult<PinStatusResponse, WalletError> {
     refetchInterval: false,
     networkMode: 'online',
   });
-} 
+} /**
+ * Hoo
+k for comprehensive cache management across the app
+ */
+export function useCacheManager() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  // Clear all caches on logout
+  const clearAllCaches = () => {
+    console.log('🗑️ [Cache Manager] Clearing all caches on logout');
+    queryClient.clear(); // Nuclear option - fresh start
+  };
+
+  // Clear specific cache groups
+  const clearKYCCache = () => {
+    console.log('🗑️ [Cache Manager] Clearing KYC cache');
+    queryClient.removeQueries({ queryKey: ['kyc'] });
+  };
+
+  const clearWalletCache = () => {
+    console.log('🗑️ [Cache Manager] Clearing wallet cache');
+    queryClient.removeQueries({ queryKey: walletKeys.all });
+  };
+
+  // Smart cache invalidation after specific actions
+  const invalidateAfterKYCComplete = () => {
+    console.log('🔄 [Cache Manager] KYC completed - invalidating wallet queries');
+    // When KYC completes, user might now have wallet access
+    queryClient.invalidateQueries({ queryKey: walletKeys.all });
+  };
+
+  const invalidateAfterWalletCreation = () => {
+    console.log('🔄 [Cache Manager] Wallet created - refreshing wallet data');
+    queryClient.invalidateQueries({ queryKey: walletKeys.all });
+  };
+
+  // Prefetch data for smooth transitions
+  const prefetchForKYCComplete = () => {
+    console.log('🚀 [Cache Manager] Prefetching wallet data for KYC completion');
+    const walletService = WalletService.getInstance();
+    
+    // Prefetch wallet details for when user completes KYC
+    queryClient.prefetchQuery({
+      queryKey: walletKeys.details(),
+      queryFn: () => walletService.getWalletDetails(),
+      staleTime: 5 * 60 * 1000,
+    });
+
+    queryClient.prefetchQuery({
+      queryKey: walletKeys.balance(),
+      queryFn: () => walletService.getWalletBalance(),
+      staleTime: 5 * 60 * 1000,
+    });
+  };
+
+  // Get cache statistics for debugging
+  const getCacheStats = () => {
+    const cache = queryClient.getQueryCache();
+    const queries = cache.getAll();
+    
+    const stats = {
+      totalQueries: queries.length,
+      kycQueries: queries.filter(q => q.queryKey[0] === 'kyc').length,
+      walletQueries: queries.filter(q => q.queryKey[0] === 'wallet').length,
+      staleQueries: queries.filter(q => q.isStale()).length,
+      activeQueries: queries.filter(q => q.getObserversCount() > 0).length,
+    };
+
+    console.log('📊 [Cache Manager] Cache Statistics:', stats);
+    return stats;
+  };
+
+  return {
+    clearAllCaches,
+    clearKYCCache,
+    clearWalletCache,
+    invalidateAfterKYCComplete,
+    invalidateAfterWalletCreation,
+    prefetchForKYCComplete,
+    getCacheStats,
+  };
+}
+
+/**
+ * Hook to integrate WebSocket balance updates with React Query cache
+ */
+export function useWebSocketCacheIntegration() {
+  const queryClient = useQueryClient(); // Add missing queryClient
+  const { updateBalanceFromWebSocket } = useOptimisticBalance();
+  const { invalidateAfterTransaction } = useRefreshWallet();
+
+  // Handle WebSocket balance update
+  const handleBalanceUpdate = (balanceData: any) => {
+    console.log('🔌 [WebSocket Cache] Processing balance update:', balanceData);
+    
+    // Update balance cache immediately
+    updateBalanceFromWebSocket(balanceData);
+    
+    // Invalidate ALL transaction queries (both wallet and transaction service)
+    console.log('🔄 [WebSocket Cache] Invalidating wallet transaction queries...');
+    invalidateAfterTransaction();
+    
+    // 🚀 FIXED: Use standardized query key for transaction invalidation
+    console.log('🔄 [WebSocket Cache] Invalidating transaction service queries...');
+    queryClient.invalidateQueries({ queryKey: ['wallet', 'transactions'] });
+  };
+
+  // Handle WebSocket transaction notification
+  const handleTransactionNotification = (transactionData: any) => {
+    console.log('🔌 [WebSocket Cache] Processing transaction notification:', transactionData);
+    
+    // Invalidate ALL transaction queries (both wallet and transaction service)
+    console.log('🔄 [WebSocket Cache] Invalidating wallet transaction queries...');
+    invalidateAfterTransaction();
+    
+    // 🚀 FIXED: Use standardized query key for transaction invalidation
+    console.log('🔄 [WebSocket Cache] Invalidating transaction service queries...');
+    queryClient.invalidateQueries({ queryKey: ['wallet', 'transactions'] });
+  };
+
+  return {
+    handleBalanceUpdate,
+    handleTransactionNotification,
+  };
+}

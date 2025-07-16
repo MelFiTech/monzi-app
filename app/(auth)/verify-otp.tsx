@@ -95,8 +95,8 @@ export default function VerifyOTPScreen() {
         // Set flag to indicate fresh registration completion
         await AsyncStorage.setItem('fresh_registration', 'true');
         
-        // Navigate to main app
-        router.push('/(tabs)');
+        // Navigate directly to home screen like login does
+        router.replace('/(tabs)');
       } else {
         setHasNavigated(false); // Allow retry
         Alert.alert('Verification Failed', result.message || 'Invalid OTP code');

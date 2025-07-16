@@ -57,6 +57,7 @@ export default function LoginScreen() {
       
       if (result.success) {
         await checkAuthState();
+        // After successful login, go directly to home screen
         router.replace('/(tabs)');
       } else {
         Alert.alert('Login Failed', result.message || 'Invalid credentials');

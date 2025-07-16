@@ -4,7 +4,7 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect, useRef } from 'react';
-import { AppState, TouchableWithoutFeedback } from 'react-native';
+import { AppState, TouchableWithoutFeedback, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { updateLastActivity, shouldRequireReauth, INACTIVITY_TIMEOUT_MS } from '@/hooks/useInactivityService';
 import 'react-native-reanimated';
@@ -67,9 +67,11 @@ export default function RootLayout() {
     if (error) throw error;
   }, [error]);
 
+  // Only hide splash screen when fonts are loaded to prevent white flash
   useEffect(() => {
     if (loaded) {
-      SplashScreen.hideAsync();
+      // Let the splash screen component handle hiding
+      // We don't hide here to prevent white flash
     }
   }, [loaded]);
 
@@ -121,8 +123,13 @@ export default function RootLayout() {
     resetInactivityTimer();
   };
 
+  // Show a loading view while fonts are loading to prevent white flash
   if (!loaded) {
-    return null;
+    return (
+      <View style={{ flex: 1, backgroundColor: '#FFE66C' }}>
+        {/* Empty view with splash background color to prevent white flash */}
+      </View>
+    );
   }
 
   return (

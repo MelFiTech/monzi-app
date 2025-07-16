@@ -12,7 +12,7 @@ export default function CircularLoader({
   size = 50, 
   strokeWidth = 8,
   color = '#FFE66C', // Default to yellow color
-  backgroundColor = 'rgba(255,255,255,0.2)' // Default to semi-transparent white
+  backgroundColor = 'rgba(255, 255, 255, 0)' // Default to semi-transparent white
 }: CircularLoaderProps) {
   const rotateAnim = useRef(new Animated.Value(0)).current;
 

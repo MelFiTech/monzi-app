@@ -15,6 +15,7 @@ import RegisterAuthInput from '@/components/auth/Register-AuthInput';
 import Button from '@/components/common/Button';
 import { useVerifyBVN, useKYCStep } from '@/hooks/useKYCService';
 import { useAuth } from '@/hooks/useAuthService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function BVNScreen() {
   const [bvn, setBvn] = useState('');
@@ -25,6 +26,33 @@ export default function BVNScreen() {
   const verifyBVNMutation = useVerifyBVN();
   const { currentStep, statusMessage } = useKYCStep();
   const { logout } = useAuth();
+
+  // Set global KYC flow flag when BVN screen mounts
+  useEffect(() => {
+    const setKYCFlowFlag = async () => {
+      try {
+        await AsyncStorage.setItem('is_in_kyc_flow', 'true');
+        console.log('🎯 BVN Screen: Set KYC flow flag to prevent verification modal');
+      } catch (error) {
+        console.error('Error setting KYC flow flag:', error);
+      }
+    };
+    
+    setKYCFlowFlag();
+    
+    // Clear flag when component unmounts
+    return () => {
+      const clearKYCFlowFlag = async () => {
+        try {
+          await AsyncStorage.removeItem('is_in_kyc_flow');
+          console.log('🔄 BVN Screen: Cleared KYC flow flag on unmount');
+        } catch (error) {
+          console.error('Error clearing KYC flow flag:', error);
+        }
+      };
+      clearKYCFlowFlag();
+    };
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {

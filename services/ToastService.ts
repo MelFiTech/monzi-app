@@ -1,5 +1,6 @@
 class ToastService {
   private showToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
+  private backendUnavailableToastShown = false;
   
   setToastHandler(handler: (message: string, type?: 'success' | 'error' | 'info') => void) {
     this.showToast = handler;
@@ -23,6 +24,24 @@ class ToastService {
 
   info(message: string) {
     this.show(message, 'info');
+  }
+
+  // Backend unavailability specific methods
+  showBackendUnavailable(message?: string) {
+    if (!this.backendUnavailableToastShown) {
+      const defaultMessage = 'Check network connection';
+      this.info(message || defaultMessage);
+      this.backendUnavailableToastShown = true;
+    }
+  }
+
+  resetBackendUnavailableFlag() {
+    this.backendUnavailableToastShown = false;
+  }
+
+  // Check if backend unavailable toast was already shown
+  hasShownBackendUnavailable(): boolean {
+    return this.backendUnavailableToastShown;
   }
 }
 

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { usePushNotificationService } from '../hooks/usePushNotificationService';
 import { AuthStorageService, AuthService } from '../services';
 import { useQueryClient } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface User {
   id: string;
@@ -132,6 +133,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       console.log('🚪 Logging out user...');
       
+      // Clear KYC flow flag first to stop any ongoing backend checks
+      try {
+        await AsyncStorage.removeItem('is_in_kyc_flow');
+        console.log('🔄 Cleared KYC flow flag during logout');
+      } catch (error) {
+        console.log('⚠️ Failed to clear KYC flow flag:', error);
+      }
+      
+      // Clear React Query cache early to stop all queries immediately
+      console.log('🗑️ Clearing React Query cache...');
+      queryClient.clear();
+      
+      // Clear state early to trigger auth state changes
+      setUser(null);
+      setAuthToken(null);
+      
+      // Small delay to allow state changes to propagate and stop hooks
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Notify backend about sign-out to disable transaction notifications
       if (authToken) {
         try {
@@ -154,23 +174,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const authStorageService = AuthStorageService.getInstance();
       await authStorageService.clearAuthData();
       
-      // Clear React Query cache to stop all queries
-      console.log('🗑️ Clearing React Query cache...');
-      queryClient.clear();
-      
-      // Clear state
-      setUser(null);
-      setAuthToken(null);
-      
       console.log('✅ Logout successful - all session data cleared');
     } catch (error) {
       console.error('❌ Error during logout:', error);
-      // Even if push unregistration fails, still clear local state and cache
+      // Even if some steps fail, still clear local state and cache
       setUser(null);
       setAuthToken(null);
       queryClient.clear();
       const authStorageService = AuthStorageService.getInstance();
       await authStorageService.clearAuthData();
+      
+      // Clear KYC flow flag in error case too
+      try {
+        await AsyncStorage.removeItem('is_in_kyc_flow');
+      } catch (flagError) {
+        console.log('⚠️ Failed to clear KYC flow flag in error handler:', flagError);
+      }
     }
   };
 
