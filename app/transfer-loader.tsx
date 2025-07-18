@@ -4,12 +4,12 @@ import {
   Text, 
   View, 
   SafeAreaView, 
-  ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
 import { useTransferFunds } from '@/hooks/useWalletService';
+import CircularLoader from '@/components/common/CircularLoader';
 
 export default function TransferLoaderScreen() {
   const params = useLocalSearchParams();
@@ -116,15 +116,12 @@ export default function TransferLoaderScreen() {
         </TouchableOpacity>
       </View>
       <View style={styles.content}>
-        <View style={styles.loadingSection}>
-          <ActivityIndicator 
-            size="large" 
-            color="#FFFFFF"
-            style={styles.loader}
-          />
-          <Text style={styles.loadingText}>Processing transfer...</Text>
-          <Text style={styles.subText}>Please wait while we process your transaction</Text>
-        </View>
+        <CircularLoader 
+          size={70}
+          strokeWidth={6}
+          color="#FFE66C"
+          backgroundColor="rgba(255, 255, 255, 0.1)"
+        />
       </View>
     </SafeAreaView>
   );
@@ -155,26 +152,5 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  loadingSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loader: {
-    marginBottom: 24,
-  },
-  loadingText: {
-    fontSize: fontSizes.xl,
-    fontFamily: fontFamilies.clashDisplay.semibold,
-    textAlign: 'center',
-    color: '#FFFFFF',
-    marginBottom: 8,
-  },
-  subText: {
-    fontSize: fontSizes.sm,
-    fontFamily: fontFamilies.sora.regular,
-    textAlign: 'center',
-    color: 'rgba(255, 255, 255, 0.6)',
   },
 }); 

@@ -8,7 +8,6 @@ import {
   Alert,
   Animated,
   Image,
-  ActivityIndicator,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router } from 'expo-router';
@@ -16,11 +15,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/providers/AuthProvider';
 import { CameraHeader } from '@/components/layout';
 import { PulsatingGlow, Transaction } from '@/components/common';
-import { CameraPermissions, CameraInterface, CameraControls, CameraModals } from '@/components/camera';
+import { CameraPermissions, CameraInterface, CameraControls, CameraModals, ExtractionLoader } from '@/components/camera';
 import { useCameraLogic } from '@/hooks/useCameraLogic';
 import { useBackendChecks } from '@/hooks/useBackendChecks';
 import { useNotificationService } from '@/hooks/useNotificationService';
-import { useWalletDetails, useWalletBalance, useWebSocketCacheIntegration } from '@/hooks/useWalletService';
+import { useWebSocketCacheIntegration } from '@/hooks/useWalletService';
 import { fontFamilies } from '@/constants/fonts';
 import ToastService from '@/services/ToastService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -31,19 +30,17 @@ export default function CameraScreen() {
   const { logout, user } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
   const queryClient = useQueryClient();
-  
+
   // Backend checks state
   const [backendChecksStarted, setBackendChecksStarted] = useState(false);
   const [backendUnavailableToastShown, setBackendUnavailableToastShown] = useState(false);
   const [delayTimerComplete, setDelayTimerComplete] = useState(false);
-  
-  // Get wallet data to check if we should show toast
-  const { data: walletDetails, isLoading: walletDetailsLoading, error: walletDetailsError } = useWalletDetails();
-  const { data: walletBalance, isLoading: walletBalanceLoading, error: walletBalanceError } = useWalletBalance();
-  
+
+  // Wallet data will be handled by backend checks when KYC is verified
+
   // Use custom hooks for logic separation
   const cameraLogic = useCameraLogic();
-  
+
   // Initialize backend checks after delay (skip delay for fresh registration)
   useEffect(() => {
     if (!backendChecksStarted && !delayTimerComplete) {
@@ -57,19 +54,18 @@ export default function CameraScreen() {
         cameraLogic.setAreAllChecksComplete(true);
         return;
       }
-      
+
       console.log('🏠 Home screen loaded, starting 5-second delay before backend checks...');
-      
-      // Show PulsatingGlow during initial delay
-      cameraLogic.setShowPulsatingGlow(true);
+
+      // Don't show PulsatingGlow during initial delay - only when backend is unavailable
       cameraLogic.setAreAllChecksComplete(false);
-      
+
       const delayTimer = setTimeout(() => {
         console.log('⏰ 5-second delay complete, starting backend checks...');
         setDelayTimerComplete(true);
         setBackendChecksStarted(true);
       }, 5000);
-      
+
       return () => {
         clearTimeout(delayTimer);
       };
@@ -87,49 +83,21 @@ export default function CameraScreen() {
     if (delayTimerComplete && !backendUnavailableToastShown) {
       // Wait 10 seconds after delay completion before showing toast
       const toastTimer = setTimeout(() => {
-        // Check for actual network errors from the wallet hooks
-        const hasNetworkError = (walletDetailsError && 
-          (walletDetailsError.message?.includes('Network request failed') || 
-           walletDetailsError.message?.includes('Failed to fetch') ||
-           walletDetailsError.message?.includes('Connection failed'))) ||
-          (walletBalanceError && 
-          (walletBalanceError.message?.includes('Network request failed') || 
-           walletBalanceError.message?.includes('Failed to fetch') ||
-           walletBalanceError.message?.includes('Connection failed')));
-           
-        const hasWalletData = walletDetails && walletBalance;
-        
-        // Only show toast for actual network/connection issues, not when backend responds with data or other errors
-        if (hasNetworkError && !backendUnavailableToastShown) {
-          console.log('💬 Showing backend unavailable toast - actual network issue detected:', {
-            walletDetailsError: walletDetailsError?.message,
-            walletBalanceError: walletBalanceError?.message
-          });
-          ToastService.showBackendUnavailable();
-          setBackendUnavailableToastShown(true);
-        } else if (hasWalletData) {
-          console.log('✅ Backend responding with data, skipping network toast');
-        } else if (walletDetailsError || walletBalanceError) {
-          console.log('⚠️ Backend returned error but not network-related, skipping network toast:', {
-            walletDetailsError: walletDetailsError?.message,
-            walletBalanceError: walletBalanceError?.message
-          });
-        } else {
-          console.log('⏳ Backend still loading, not showing network toast yet');
-        }
+        // Network toast logic will be handled by backend checks when appropriate
+        console.log('⏳ Backend checks will handle network connectivity issues');
       }, 10000); // 10 seconds after the 5-second delay = 15 seconds total
-      
+
       return () => {
         clearTimeout(toastTimer);
       };
     }
-  }, [delayTimerComplete, backendUnavailableToastShown, walletDetails, walletBalance, walletDetailsLoading, walletBalanceLoading, walletDetailsError, walletBalanceError, cameraLogic.isFreshRegistration]);
+  }, [delayTimerComplete, backendUnavailableToastShown, cameraLogic.isFreshRegistration]);
 
   // Only start backend checks after delay (or immediately for fresh registration)
   // BUT stop them if verification modal is shown or user is in KYC flow
-  const shouldRunBackendChecks = (backendChecksStarted || cameraLogic.isFreshRegistration) && 
-                                !cameraLogic.showVerificationModal && 
-                                !cameraLogic.isInKYCFlow;
+  const shouldRunBackendChecks = (backendChecksStarted || cameraLogic.isFreshRegistration) &&
+    !cameraLogic.showVerificationModal &&
+    !cameraLogic.isInKYCFlow;
 
   // Debug logging for backend checks state
   useEffect(() => {
@@ -145,7 +113,7 @@ export default function CameraScreen() {
       console.log('❌ Backend checks DISABLED - modal shown or in KYC flow');
     }
   }, [shouldRunBackendChecks, cameraLogic.showVerificationModal, cameraLogic.isInKYCFlow, backendChecksStarted, cameraLogic.isFreshRegistration]);
-  
+
   const backendChecks = useBackendChecks({
     enabled: shouldRunBackendChecks,
     isFreshRegistration: cameraLogic.isFreshRegistration,
@@ -174,36 +142,36 @@ export default function CameraScreen() {
     console.log('❌ [CameraScreen] Real-time notification error:', error?.message);
   }, []);
 
+  // WebSocket cache integration
+  const { handleBalanceUpdate, handleTransactionNotification: handleWSTransactionNotification } = useWebSocketCacheIntegration();
+
   // Handle transaction notifications to refresh transaction history
   const handleTransactionNotification = useCallback((transaction: any) => {
     console.log('💰 [CameraScreen] New transaction received:', transaction);
-    
+
     // Use the new WebSocket cache integration
     handleWSTransactionNotification(transaction);
-    
+
     // 🚀 FIXED: Use correct standardized query key for transaction invalidation
     queryClient.invalidateQueries({ queryKey: ['wallet', 'transactions'] });
-    
+
     // If transaction history is currently open, the list will auto-refresh
     // due to React Query's cache invalidation
   }, [queryClient, handleWSTransactionNotification]);
 
-  // WebSocket cache integration
-  const { handleBalanceUpdate, handleTransactionNotification: handleWSTransactionNotification } = useWebSocketCacheIntegration();
-
   // Handle wallet balance updates to refresh transaction history
   const handleWalletBalanceUpdate = useCallback((balanceUpdate: any) => {
     console.log('💰 [CameraScreen] Wallet balance updated:', balanceUpdate);
-    
+
     // Use the new WebSocket cache integration
     handleBalanceUpdate(balanceUpdate);
-    
+
     // 🚀 FIXED: Use correct standardized query key for transaction invalidation
     queryClient.invalidateQueries({ queryKey: ['wallet', 'transactions'] });
   }, [queryClient, handleBalanceUpdate]);
 
   // Real-time notification connection status
-  const { 
+  const {
     isConnected: isNotificationConnected,
   } = useNotificationService(
     {
@@ -248,8 +216,8 @@ export default function CameraScreen() {
   // Handle camera permissions
   if (!permission || !permission.granted) {
     return (
-      <CameraPermissions 
-        permission={permission} 
+      <CameraPermissions
+        permission={permission}
         onRequestPermission={requestPermission}
       />
     );
@@ -259,7 +227,7 @@ export default function CameraScreen() {
     <View style={styles.container}>
       {/* Header - Hide when transaction history is open */}
       {!cameraLogic.showTransactionHistory && <CameraHeader />}
-      
+
       {/* Camera Interface - Always show for immediate feedback */}
       <CameraInterface
         cameraRef={cameraLogic.cameraRef}
@@ -273,44 +241,39 @@ export default function CameraScreen() {
         dimViewfinderRings={cameraLogic.showTransactionHistory}
       />
 
-      {/* Show Pulsating Glow during initial delay or if backend checks are not complete */}
+      {/* Show Pulsating Glow only when backend is not readily available */}
       {cameraLogic.showPulsatingGlow && (
         <View style={styles.pulsatingGlowOverlay}>
           <PulsatingGlow size={146} />
-          {!delayTimerComplete && (
-            <Text style={styles.delayText}>
-              Initializing...
-            </Text>
-          )}
         </View>
       )}
 
-      {/* Extracting Overlay - Show during capture/processing */}
-      {(cameraLogic.isCapturing || cameraLogic.isProcessing) && (
-        <View style={styles.extractingOverlay}>
-          <View style={styles.extractingContainer}>
-            <ActivityIndicator size="large" color="#FFFFFF" />
-            <Text style={styles.extractingText}>
-              {cameraLogic.isCapturing ? 'Capturing...' : 'Extracting...'}
-            </Text>
-          </View>
-        </View>
+      {/* Extraction Loader - Show during processing with captured image background */}
+      {cameraLogic.showExtractionLoader && cameraLogic.capturedImageUri && (
+        <ExtractionLoader
+          visible={cameraLogic.showExtractionLoader}
+          imageUri={cameraLogic.capturedImageUri}
+          onComplete={(extractedData) => {
+            console.log('Extraction completed:', extractedData);
+            // The extraction completion is handled in useCameraLogic
+          }}
+        />
       )}
 
       {/* Flash Animation Overlay */}
-      <Animated.View 
+      <Animated.View
         style={[
-          styles.flashOverlay, 
-          { 
+          styles.flashOverlay,
+          {
             opacity: cameraLogic.flashAnimation,
             backgroundColor: 'white',
           }
-        ]} 
+        ]}
         pointerEvents="none"
       />
 
-      {/* Camera Controls - Show when not capturing/processing */}
-      {!cameraLogic.isCapturing && !cameraLogic.isProcessing && (
+      {/* Camera Controls - Show when not capturing/processing/extracting */}
+      {!cameraLogic.isCapturing && !cameraLogic.isProcessing && !cameraLogic.showExtractionLoader && (
         <CameraControls
           zoom={cameraLogic.zoom}
           flashMode={cameraLogic.flashMode}
@@ -347,6 +310,7 @@ export default function CameraScreen() {
         showVerificationModal={cameraLogic.showVerificationModal}
         showSetPinModal={cameraLogic.showSetPinModal}
         extractedData={cameraLogic.extractedData}
+        capturedImageUri={cameraLogic.capturedImageUri}
         isWalletActivationMode={cameraLogic.isWalletActivationMode}
         isPendingVerification={cameraLogic.isPendingVerification}
         walletRecoveryPending={cameraLogic.walletRecoveryMutation.isPending}
@@ -390,28 +354,6 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.sora.medium,
     marginTop: 20,
     textAlign: 'center',
-  },
-  extractingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-    zIndex: 500,
-  },
-  extractingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  extractingText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontFamily: fontFamilies.sora.medium,
-    marginTop: 12,
   },
   flashOverlay: {
     position: 'absolute',

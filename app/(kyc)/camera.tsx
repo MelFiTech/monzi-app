@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  SafeAreaView, 
+import {
+  StyleSheet,
+  Text,
+  View,
+  SafeAreaView,
   TouchableOpacity,
   Alert,
   Dimensions,
@@ -34,7 +34,7 @@ export default function CameraScreen() {
   useEffect(() => {
     if (params.error) {
       setShowErrorOverlay(true);
-      
+
       // Show overlay with fade-in animation
       Animated.timing(overlayAnimation, {
         toValue: 1,
@@ -77,7 +77,7 @@ export default function CameraScreen() {
 
   if (!permission.granted) {
     return (
-      <SafeAreaView style={styles.container}> 
+      <SafeAreaView style={styles.container}>
         <View style={styles.headerContainer}>
           <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
             <Text style={styles.signOutText}>Sign out</Text>
@@ -98,16 +98,16 @@ export default function CameraScreen() {
       try {
         setIsCapturing(true);
         const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.9, // Higher quality for KYC verification
+          quality: 0.4, // 40% quality - optimal for KYC while keeping file size manageable
           base64: false,
           exif: false,
           skipProcessing: false // Enable processing for better quality
         });
-        
+
         if (photo && photo.uri) {
-          router.push({ 
-            pathname: '/(kyc)/photo-review', 
-            params: { photoUri: photo.uri } 
+          router.push({
+            pathname: '/(kyc)/photo-review',
+            params: { photoUri: photo.uri }
           });
         } else {
           throw new Error('Failed to capture photo');
@@ -131,33 +131,33 @@ export default function CameraScreen() {
 
   return (
     <View style={styles.container}>
-      <CameraView 
-        style={styles.camera} 
+      <CameraView
+        style={styles.camera}
         facing={facing}
         ref={cameraRef}
       />
-      
+
       {/* Header */}
       <SafeAreaView style={styles.headerOverlay}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.closeButton}
           onPress={() => router.back()}
         >
           <X size={24} color="#FFFFFF" />
         </TouchableOpacity>
-        
+
         <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
           <Text style={styles.signOutText}>Sign out</Text>
         </TouchableOpacity>
       </SafeAreaView>
-      
+
       {/* Face Outline */}
       <View style={styles.overlay}>
         <View style={styles.circleContainer}>
           <View style={styles.circle} />
         </View>
       </View>
-      
+
       {/* Error Overlay */}
       {showErrorOverlay && (
         <Animated.View style={[styles.errorOverlay, { opacity: overlayAnimation }]}>
@@ -167,7 +167,7 @@ export default function CameraScreen() {
             <Text style={styles.errorMessage}>
               {params.error || 'Please ensure your face is clearly visible with good lighting and try again'}
             </Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.retryButton}
               onPress={() => {
                 setShowErrorOverlay(false);
@@ -179,7 +179,7 @@ export default function CameraScreen() {
           </View>
         </Animated.View>
       )}
-      
+
       {/* Instructions */}
       <View style={styles.instructionsContainer}>
         <Text style={styles.instructionText}>
@@ -188,17 +188,17 @@ export default function CameraScreen() {
           Remove glasses if possible
         </Text>
       </View>
-      
+
       {/* Camera Controls */}
       <SafeAreaView style={styles.controlsContainer}>
-        <TouchableOpacity 
-          style={styles.flipButton} 
+        <TouchableOpacity
+          style={styles.flipButton}
           onPress={flipCamera}
         >
           <RotateCcw size={24} color="#FFFFFF" />
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           onPress={takePicture}
           disabled={isCapturing}
           style={[styles.captureButton, { opacity: isCapturing ? 0.5 : 1 }]}
@@ -207,7 +207,7 @@ export default function CameraScreen() {
             <View style={styles.captureButtonCore} />
           </View>
         </TouchableOpacity>
-        
+
         <View style={styles.placeholder} />
       </SafeAreaView>
     </View>
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     flexDirection: 'row',
-    alignItems: 'center', 
+    alignItems: 'center',
     paddingTop: 16,
     paddingBottom: 24,
     paddingHorizontal: 24,

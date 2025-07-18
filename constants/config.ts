@@ -8,20 +8,20 @@ export const Config = {
   API: {
     // Production URL for render.com
     PRODUCTION_URL: 'https://monzi-backend.onrender.com',
-    
+
     // Development URL (ngrok tunnel)
-    DEVELOPMENT_URL: process.env.EXPO_PUBLIC_DEV_API_URL || 'https://42c26ffe4c8f.ngrok-free.app',
-    
+    DEVELOPMENT_URL: process.env.EXPO_PUBLIC_DEV_API_URL || 'https://7fb1e0a8e412.ngrok-free.app',
+
     // Get the appropriate base URL based on environment
     getBaseUrl(): string {
       // Check if we're in production (EAS Build production profile)
-      const isProduction = process.env.EXPO_PUBLIC_ENV === 'production' || 
-                          process.env.NODE_ENV === 'production' ||
-                          __DEV__ === false;
-      
+      const isProduction = process.env.EXPO_PUBLIC_ENV === 'production' ||
+        process.env.NODE_ENV === 'production' ||
+        __DEV__ === false;
+
       return isProduction ? this.PRODUCTION_URL : this.DEVELOPMENT_URL;
     },
-    
+
     // Common endpoints
     ENDPOINTS: {
       AUTH: '/auth',
@@ -31,23 +31,23 @@ export const Config = {
       TRANSACTIONS: '/transactions',
     }
   },
-  
+
   // App Configuration
   APP: {
     NAME: 'Monzi',
     VERSION: '1.0.0',
     BUNDLE_ID: 'com.dreemlab.monzi',
   },
-  
+
   // Environment helpers
   isDevelopment(): boolean {
     return __DEV__ === true;
   },
-  
+
   isProduction(): boolean {
     return __DEV__ === false;
   },
-  
+
   getCurrentEnvironment(): 'development' | 'production' {
     return this.isProduction() ? 'production' : 'development';
   }

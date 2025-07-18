@@ -14,6 +14,7 @@ export { default as PulsatingGlow } from './PulsatingGlow';
 export { default as RecipientDetailCard } from './RecipientDetailCard';
 export { default as SetPinModal } from './SetPinModal';
 export { WalletHeaderSkeleton } from './SkeletonLoader';
+export { default as SlideToPayButton } from './SlideToPayButton';
 export { MonoText } from './StyledText';
 export { default as ThemeDemo } from './ThemeDemo';
 export { default as Toast } from './Toast';

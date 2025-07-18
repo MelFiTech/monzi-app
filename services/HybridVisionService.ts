@@ -1,12 +1,13 @@
 import CloudVisionService from './CloudVisionService';
 import GeminiService from './GeminiService';
+import OpenAIService from './OpenAIService';
 import { type ExtractedBankData } from './GeminiService';
 import ImageOptimizationService from './ImageOptimizationService';
 import SmartPromptService from './SmartPromptService';
 import PatternLearningService from './PatternLearningService';
 
 interface ExtractionAttempt {
-  service: 'cloudVision' | 'gemini';
+  service: 'cloudVision' | 'gemini' | 'openai';
   data: ExtractedBankData;
   duration: number;
   success: boolean;
@@ -15,7 +16,7 @@ interface ExtractionAttempt {
 interface ExtractionResult {
   data: ExtractedBankData;
   attempts: ExtractionAttempt[];
-  primaryService: 'cloudVision' | 'gemini';
+  primaryService: 'cloudVision' | 'gemini' | 'openai';
   fallbackUsed: boolean;
   totalDuration: number;
 }
@@ -25,9 +26,11 @@ class HybridVisionService {
   private readonly PARALLEL_TIMEOUT = 15000; // 15 seconds for CloudVision processing
   private readonly FALLBACK_TIMEOUT = 20000; // 20 seconds for individual fallback
   private geminiService: GeminiService;
+  private openaiService: OpenAIService;
 
   constructor() {
     this.geminiService = new GeminiService();
+    this.openaiService = new OpenAIService();
   }
 
   /**
@@ -91,48 +94,150 @@ class HybridVisionService {
       } else {
         if (cloudVisionResult.success) {
           console.log(`⚠️ CloudVision extraction successful but low quality (confidence: ${cloudVisionResult.data.confidence}%)`);
+          
+          // Check if CloudVision returned empty data (no text detected)
+          const hasAnyData = cloudVisionResult.data.bankName || 
+                           cloudVisionResult.data.accountNumber || 
+                           cloudVisionResult.data.accountHolderName || 
+                           cloudVisionResult.data.amount;
+          
+          if (!hasAnyData && cloudVisionResult.data.confidence === 0) {
+            console.log('🚫 CloudVision: No text detected in image - stopping extraction to save costs');
+            console.log('💰 Cost optimization: Not sending to OpenAI/Gemini when no text is detected');
+            
+            // Return empty result immediately - no need to try expensive AI services
+            const totalDuration = Date.now() - startTime;
+            console.log('🎉 HybridVision: Extraction stopped early due to no text detection');
+            console.log(`⏱️ Total extraction time: ${totalDuration}ms`);
+            console.log(`🔧 Services used: cloudVision only`);
+            console.log(`🔄 Fallback used: No (cost optimization)`);
+            
+            return this.enhanceResultWithMetadata(this.createEmptyResult(), {
+              attempts: [cloudVisionAttempt],
+              primaryService: 'cloudVision',
+              fallbackUsed: false,
+              totalDuration
+            });
+          }
+          
           bestResult = cloudVisionResult.data; // Keep as fallback
         } else {
           console.warn('❌ CloudVision extraction failed:', cloudVisionResult.error);
+          
+          // Check if CloudVision failed due to no text detected
+          const errorMessage = cloudVisionResult.error?.message || '';
+          if (errorMessage.includes('No text detected') || errorMessage.includes('No text found')) {
+            console.log('🚫 CloudVision: No text detected in image - stopping extraction to save costs');
+            console.log('💰 Cost optimization: Not sending to OpenAI/Gemini when no text is detected');
+            
+            // Return empty result immediately - no need to try expensive AI services
+            const totalDuration = Date.now() - startTime;
+            console.log('🎉 HybridVision: Extraction stopped early due to no text detection');
+            console.log(`⏱️ Total extraction time: ${totalDuration}ms`);
+            console.log(`🔧 Services used: cloudVision only`);
+            console.log(`🔄 Fallback used: No (cost optimization)`);
+            
+            return this.enhanceResultWithMetadata(this.createEmptyResult(), {
+              attempts: [cloudVisionAttempt],
+              primaryService: 'cloudVision',
+              fallbackUsed: false,
+              totalDuration
+            });
+          }
+          
+          // If CloudVision failed for other reasons, also stop to save costs
+          console.log('🚫 CloudVision: Failed for other reasons - stopping extraction to save costs');
+          console.log('💰 Cost optimization: Not sending to OpenAI/Gemini when CloudVision fails');
+          
+          const totalDuration = Date.now() - startTime;
+          console.log('🎉 HybridVision: Extraction stopped early due to CloudVision failure');
+          console.log(`⏱️ Total extraction time: ${totalDuration}ms`);
+          console.log(`🔧 Services used: cloudVision only`);
+          console.log(`🔄 Fallback used: No (cost optimization)`);
+          
+          return this.enhanceResultWithMetadata(this.createEmptyResult(), {
+            attempts: [cloudVisionAttempt],
+            primaryService: 'cloudVision',
+            fallbackUsed: false,
+            totalDuration
+          });
         }
 
-        // STEP 3: Try Gemini as fallback/refinement using CloudVision context
-        console.log('🤖 HybridVision: Running Gemini context-aware refinement...');
-        console.log('📋 Passing CloudVision result to Gemini for context:', cloudVisionResult.data);
-        
-        const geminiResult = await this.tryWithTimeout(
-          () => this.geminiService.extractBankDataWithContext(optimizedImageUri, cloudVisionResult.data),
-          this.FALLBACK_TIMEOUT,
-          'Gemini'
-        );
-
-        const geminiAttempt: ExtractionAttempt = {
-          service: 'gemini',
-          data: geminiResult.data as ExtractedBankData,
-          duration: geminiResult.duration,
-          success: geminiResult.success
-        };
-        attempts.push(geminiAttempt);
-
-        // Compare Gemini result with CloudVision result
-        if (geminiResult.success) {
-          const geminiData = geminiResult.data as ExtractedBankData;
-          console.log('✅ Gemini extraction successful');
-          console.log(`📊 Gemini confidence: ${geminiData.confidence}%`);
+        // Only try OpenAI/Gemini if CloudVision found some text but quality is low
+        if (cloudVisionResult.success) {
+          // STEP 3: Try OpenAI as primary refinement using CloudVision context
+          console.log('🤖 HybridVision: Running OpenAI context-aware refinement...');
+          console.log('📋 Passing CloudVision result to OpenAI for context:', cloudVisionResult.data);
           
-          // Use the better result
-          if (!bestResult || this.compareResults(geminiData, bestResult) > 0) {
-            console.log('🏆 Gemini result is better, using Gemini data');
-            bestResult = geminiData;
+          const openaiResult = await this.tryWithTimeout(
+            () => this.openaiService.extractBankDataWithContext(optimizedImageUri, cloudVisionResult.data),
+            this.FALLBACK_TIMEOUT,
+            'OpenAI'
+          );
+
+          const openaiAttempt: ExtractionAttempt = {
+            service: 'openai',
+            data: openaiResult.data as ExtractedBankData,
+            duration: openaiResult.duration,
+            success: openaiResult.success
+          };
+          attempts.push(openaiAttempt);
+
+          // Compare OpenAI result with CloudVision result
+          if (openaiResult.success) {
+            const openaiData = openaiResult.data as ExtractedBankData;
+            console.log('✅ OpenAI extraction successful');
+            console.log(`📊 OpenAI confidence: ${openaiData.confidence}%`);
+            
+            // Use the better result
+            if (!bestResult || this.compareResults(openaiData, bestResult) > 0) {
+              console.log('🏆 OpenAI result is better, using OpenAI data');
+              bestResult = openaiData;
+            } else {
+              console.log('🏆 CloudVision result is better, keeping CloudVision data');
+            }
           } else {
-            console.log('🏆 CloudVision result is better, keeping CloudVision data');
+            console.warn('❌ OpenAI extraction failed:', openaiResult.error);
+            
+            // STEP 4: Try Gemini as fallback when OpenAI fails
+            console.log('🤖 HybridVision: OpenAI failed, trying Gemini as fallback...');
+            console.log('📋 Passing CloudVision result to Gemini for context:', cloudVisionResult.data);
+            
+            const geminiResult = await this.tryWithTimeout(
+              () => this.geminiService.extractBankDataWithContext(optimizedImageUri, cloudVisionResult.data),
+              this.FALLBACK_TIMEOUT,
+              'Gemini'
+            );
+
+            const geminiAttempt: ExtractionAttempt = {
+              service: 'gemini',
+              data: geminiResult.data as ExtractedBankData,
+              duration: geminiResult.duration,
+              success: geminiResult.success
+            };
+            attempts.push(geminiAttempt);
+
+            // Use Gemini result if successful
+            if (geminiResult.success) {
+              const geminiData = geminiResult.data as ExtractedBankData;
+              console.log('✅ Gemini extraction successful');
+              console.log(`📊 Gemini confidence: ${geminiData.confidence}%`);
+              
+              // Use the better result
+              if (!bestResult || this.compareResults(geminiData, bestResult) > 0) {
+                console.log('🏆 Gemini result is better, using Gemini data');
+                bestResult = geminiData;
+              } else {
+                console.log('🏆 CloudVision result is better, keeping CloudVision data');
+              }
+            } else {
+              console.warn('❌ Gemini extraction failed:', geminiResult.error);
+            }
           }
-        } else {
-          console.warn('❌ Gemini extraction failed:', geminiResult.error);
         }
       }
 
-      // STEP 4: Return results
+      // STEP 5: Return results
       const totalDuration = Date.now() - startTime;
       
       if (bestResult) {
@@ -312,7 +417,7 @@ class HybridVisionService {
   /**
    * Get the primary service used for extraction
    */
-  getPrimaryService(data: ExtractedBankData): 'cloudVision' | null {
+  getPrimaryService(data: ExtractedBankData): 'cloudVision' | 'gemini' | 'openai' | null {
     return (data as any)._extractionMetadata?.primaryService || null;
   }
 }

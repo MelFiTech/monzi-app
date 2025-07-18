@@ -18,7 +18,7 @@ export default function TransferSuccessScreen() {
   
   // Extract transfer details from params
   const amount = params.amount as string || '0';
-  const recipientName = params.recipientName as string || '';
+  const recipientName = (params.recipientName as string || '').toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   const reference = params.reference as string || '';
   const newBalance = params.newBalance as string || '';
 
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   iconContainer: {
-    marginBottom: 40,
+    marginBottom: 20,
   },
   checkmarkCircle: {
     width: 80,
@@ -159,19 +159,18 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
     lineHeight: 36,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   recipientText: {
-    fontSize: 28,
-    fontFamily: fontFamilies.clashDisplay.bold,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontSize: 18,
+    fontFamily: fontFamilies.sora.regular,
+    color: '#525252',
     textAlign: 'center',
     lineHeight: 36,
   },
   buttonContainer: {
-    paddingHorizontal: 40,
-    paddingBottom: 20,
+    paddingHorizontal: 20,
+    paddingBottom: -10,
     paddingTop: 10,
     gap: 12,
   },

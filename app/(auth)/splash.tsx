@@ -63,8 +63,12 @@ export default function SplashScreenComponent() {
       }),
     ]).start();
 
+    // Check if user has biometric setup to reduce delay
+    const shouldTryBiometric = await shouldAttemptBiometric();
+    const animationDelay = shouldTryBiometric ? 300 : 1200; // Shorter delay for biometric users
+    
     // Wait for animations to settle
-    await new Promise(resolve => setTimeout(resolve, 1200));
+    await new Promise(resolve => setTimeout(resolve, animationDelay));
 
     // Check for reauth requirement first
     const requireReauth = await AsyncStorage.getItem('requireReauth');
@@ -132,40 +136,12 @@ export default function SplashScreenComponent() {
   }, [isAuthenticated, authLoading, kycLoading, kycStatus, isCheckingAuth, hasInitialized]);
 
   const navigateBasedOnKYC = async () => {
-    if (!kycStatus) {
-      // KYC status failed to load - default to BVN
-      console.log('❌ KYC Status failed to load, defaulting to BVN screen');
-      router.replace('/(kyc)/bvn');
-      return;
-    }
-
     console.log('📋 KYC Status on Splash:', kycStatus);
     
-    // Add small delay to ensure navigation stack is ready
-    setTimeout(() => {
-      if ((kycStatus.kycStatus === 'VERIFIED' || kycStatus.kycStatus === 'APPROVED') && 
-          kycStatus.isVerified && kycStatus.bvnVerified && kycStatus.selfieVerified) {
-        // Fully verified users go to home screen
-        console.log('🏠 Navigating to home screen for verified user');
-        router.replace('/(tabs)');
-      } else if (kycStatus.kycStatus === 'IN_PROGRESS' && kycStatus.bvnVerified && !kycStatus.selfieVerified) {
-        // BVN verified but selfie needed
-        console.log('📸 Navigating to bridge for selfie completion');
-        router.replace('/(kyc)/bridge');
-      } else if (kycStatus.kycStatus === 'UNDER_REVIEW') {
-        // Under review
-        console.log('⏳ Navigating to bridge for review status');
-        router.replace('/(kyc)/bridge');
-      } else if (kycStatus.kycStatus === 'REJECTED') {
-        // Rejected
-        console.log('❌ Navigating to bridge for rejection handling');
-        router.replace('/(kyc)/bridge');
-      } else {
-        // Start/complete KYC
-        console.log('📋 Navigating to BVN screen to start/complete KYC');
-        router.replace('/(kyc)/bvn');
-      }
-    }, 100);
+    // For authenticated users (especially biometric users), go to home screen
+    // Let the backend checks in camera screen handle KYC verification through modals
+    console.log('🏠 Navigating authenticated user to home screen - backend checks will handle KYC');
+    router.replace('/(tabs)');
   };
 
   const shouldAttemptBiometric = async (): Promise<boolean> => {

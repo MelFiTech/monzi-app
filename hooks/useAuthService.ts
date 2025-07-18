@@ -99,11 +99,9 @@ export const useVerifyOtp = () => {
         // Store auth data
         await authStorageService.storeAuthData(response.data);
         
-        // Enable biometric login if available
-        const isBiometricAvailable = await biometricService.isBiometricAvailable();
-        if (isBiometricAvailable) {
-          await authStorageService.setBiometricEnabled(true);
-        }
+        // DON'T automatically enable biometric for new users during registration
+        // Biometric should only be enabled when user explicitly chooses to set it up
+        console.log('✅ OTP verification successful - auth data stored without auto-biometric setup');
 
         // Invalidate relevant queries
         queryClient.invalidateQueries({ queryKey: authKeys.all });

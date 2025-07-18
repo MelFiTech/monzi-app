@@ -15,7 +15,7 @@ interface ProfileHeaderProps {
 
 export default function ProfileHeader({
   onClose,
-  version = 'beta 1.0',
+  version = 'beta 2.0.0',
 }: ProfileHeaderProps) {
   return (
     <View style={styles.header}>

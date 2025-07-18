@@ -6,6 +6,7 @@ import { fontFamilies } from '@/constants/fonts';
 import TransactionList from '@/components/common/TransactionList';
 import { Transaction } from '@/components/common/TransactionListItem';
 import { Button } from '@/components/common';
+import { useScanStatusMessage, useRemainingFreeScans } from '@/hooks/useScanTracking';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -52,6 +53,9 @@ export default function CameraControls({
   hasMoreData = false,
   onRequestStatement,
 }: CameraControlsProps) {
+  // Get scan status message and remaining free scans
+  const { data: scanStatusMessage, isLoading: scanStatusLoading } = useScanStatusMessage();
+  const { data: remainingFreeScans } = useRemainingFreeScans();
   // Animation values
   const slideAnim = useRef(new Animated.Value(0)).current;
 
@@ -76,11 +80,11 @@ export default function CameraControls({
 
   const renderFlashIcon = () => {
     switch (flashMode) {
-      case 'on': 
+      case 'on':
         return <Image source={require('@/assets/icons/home/flash-on.png')} style={{ width: 24, height: 24, tintColor: '#FFFFFF' }} />;
-      case 'auto': 
+      case 'auto':
         return <Image source={require('@/assets/icons/home/flash-on.png')} style={{ width: 24, height: 24, tintColor: '#FFFFFF', opacity: 0.5 }} />;
-      default: 
+      default:
         return <Image source={require('@/assets/icons/home/flash-off.png')} style={{ width: 24, height: 24, tintColor: '#FFFFFF' }} />;
     }
   };
@@ -94,7 +98,7 @@ export default function CameraControls({
   return (
     <>
       {/* Dark Overlay for Transaction History */}
-      <Animated.View 
+      <Animated.View
         style={[
           styles.darkOverlay,
           {
@@ -112,36 +116,21 @@ export default function CameraControls({
         colors={['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0.75)']}
         style={[styles.bottomContainer, showTransactionHistory && styles.bottomContainerPushedUp]}
       >
-        {/* Zoom Controls */}
-        <View style={[styles.zoomContainer, { opacity: (isConnectionDisabled || showTransactionHistory) ? 0.3 : 1 }]}>
-          <TouchableOpacity 
-            style={[styles.zoomButton, zoom === 0 && styles.zoomButtonActive]} 
-            onPress={() => onZoomChange(0)}
-            disabled={isConnectionDisabled || showTransactionHistory}
-          >
-            <Text style={[styles.zoomButtonText, zoom === 0 && styles.zoomButtonTextActive]}>1x</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.zoomButton, zoom === 0.5 && styles.zoomButtonActive]} 
-            onPress={() => onZoomChange(0.5)}
-            disabled={isConnectionDisabled || showTransactionHistory}
-          >
-            <Text style={[styles.zoomButtonText, zoom === 0.5 && styles.zoomButtonTextActive]}>1.5x</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.zoomButton, zoom === 1 && styles.zoomButtonActive]} 
-            onPress={() => onZoomChange(1)}
-            disabled={isConnectionDisabled || showTransactionHistory}
-          >
-            <Text style={[styles.zoomButtonText, zoom === 1 && styles.zoomButtonTextActive]}>2x</Text>
-          </TouchableOpacity>
+        {/* Free scans text */}
+        <View style={styles.zoomContainer}>
+          <Text style={[
+            styles.zoomButtonText,
+            remainingFreeScans !== undefined && remainingFreeScans <= 3 && styles.warningText
+          ]}>
+            {scanStatusLoading ? 'Loading...' : scanStatusMessage || '20 free scans left this month'}
+          </Text>
         </View>
 
         {/* Bottom Controls */}
         <View style={[styles.bottomControls, { opacity: (isConnectionDisabled || showTransactionHistory) ? 0.3 : 1 }]}>
           {/* Flash Button */}
-          <TouchableOpacity 
-            style={styles.flashButton} 
+          <TouchableOpacity
+            style={styles.flashButton}
             onPress={onToggleFlash}
             disabled={isConnectionDisabled || showTransactionHistory}
           >
@@ -151,15 +140,15 @@ export default function CameraControls({
           </TouchableOpacity>
 
           {/* Capture Button */}
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={onCapture}
             disabled={isCaptureDisabled}
             style={[
-              styles.captureButton, 
-              { 
+              styles.captureButton,
+              {
                 opacity: isCaptureDisabled ? 0.3 : 1,
-                borderColor: isConnectionDisabled 
-                  ? 'rgba(255, 255, 255, 0.1)' 
+                borderColor: isConnectionDisabled
+                  ? 'rgba(255, 255, 255, 0.1)'
                   : 'rgba(255, 255, 255, 0.2)'
               }
             ]}
@@ -167,16 +156,16 @@ export default function CameraControls({
             <View style={[
               styles.captureButtonInner,
               {
-                backgroundColor: isConnectionDisabled 
-                  ? 'rgba(255, 255, 255, 0.3)' 
+                backgroundColor: isConnectionDisabled
+                  ? 'rgba(255, 255, 255, 0.3)'
                   : '#FFFFFF'
               }
             ]}>
               <View style={[
                 styles.captureButtonCore,
                 {
-                  backgroundColor: isConnectionDisabled 
-                    ? 'rgba(255, 255, 255, 0.3)' 
+                  backgroundColor: isConnectionDisabled
+                    ? 'rgba(255, 255, 255, 0.3)'
                     : '#FFFFFF'
                 }
               ]} />
@@ -184,8 +173,8 @@ export default function CameraControls({
           </TouchableOpacity>
 
           {/* Gallery Button */}
-          <TouchableOpacity 
-            style={styles.galleryButton} 
+          <TouchableOpacity
+            style={styles.galleryButton}
             onPress={onOpenGallery}
             disabled={isConnectionDisabled || showTransactionHistory}
           >
@@ -196,8 +185,8 @@ export default function CameraControls({
         </View>
 
         {/* View History */}
-        <TouchableOpacity 
-          style={styles.viewHistoryButton} 
+        <TouchableOpacity
+          style={styles.viewHistoryButton}
           onPress={onViewHistory}
           activeOpacity={0.7}
         >
@@ -285,6 +274,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.6)',
     fontFamily: fontFamilies.sora.medium,
+  },
+  warningText: {
+    color: '#FF6B6B',
   },
   zoomButtonTextActive: {
     color: '#FFFFFF',
@@ -375,7 +367,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     overflow: 'hidden',
     marginTop: -20, // Changed from 10 to -20 to move transaction list up
-    marginBottom:20,
+    marginBottom: 20,
   },
   transactionHistoryGradient: {
     flex: 1,
@@ -394,7 +386,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignSelf: 'center',
     marginBottom: 15,
-    marginTop:15,
+    marginTop: 15,
   },
   requestStatementText: {
     fontSize: 16,

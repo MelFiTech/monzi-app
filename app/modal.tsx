@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -9,11 +9,86 @@ import {
   TouchableOpacity,
   StatusBar,
   Linking,
+  Animated,
+  Easing,
 } from 'react-native';
 import { router } from 'expo-router';
 import { fontFamilies } from '@/constants/fonts';
+import { Gyroscope } from 'expo-sensors';
 
 export default function ModalScreen() {
+  const [gyroData, setGyroData] = useState({ x: 0, y: 0, z: 0 });
+  const glowX = new Animated.Value(0);
+  const glowY = new Animated.Value(0);
+  const glowScale = new Animated.Value(1);
+
+  useEffect(() => {
+    // Start pulsating animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowScale, {
+          toValue: 1.1,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowScale, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    let subscription: any;
+
+    const startGyroscope = async () => {
+      try {
+        // Check if gyroscope is available
+        const isAvailable = await Gyroscope.isAvailableAsync();
+        if (!isAvailable) {
+          console.log('Gyroscope not available');
+          return;
+        }
+
+        // Set update interval (60fps for smooth movement)
+        Gyroscope.setUpdateInterval(16);
+
+        subscription = Gyroscope.addListener((data) => {
+          setGyroData(data);
+          
+          // Create smooth animated movement based on gyroscope data
+          const moveX = data.y * 1090; // Use Y axis for X movement (tilt left/right)
+          const moveY = data.x * 1090; // Use X axis for Y movement (tilt forward/back)
+          
+          Animated.parallel([
+            Animated.timing(glowX, {
+              toValue: moveX,
+              duration: 600,
+              useNativeDriver: true,
+            }),
+            Animated.timing(glowY, {
+              toValue: moveY,
+              duration: 600,
+              useNativeDriver: true,
+            }),
+          ]).start();
+        });
+      } catch (error) {
+        console.log('Error starting gyroscope:', error);
+      }
+    };
+
+    startGyroscope();
+
+    return () => {
+      if (subscription) {
+        subscription.remove();
+      }
+    };
+  }, []);
+
   const handleClose = () => {
     router.back();
   };
@@ -29,13 +104,12 @@ export default function ModalScreen() {
   };
 
   const handleSocialMediaPress = () => {
-    // TODO: Open social media link
-    console.log('Social media pressed');
+    Linking.openURL('https://www.instagram.com/monzimoney/?utm_source=ig_web_button_share_sheet');
   };
 
   return (
     <ImageBackground
-      source={require('@/assets/icons/profile/about/about-bg.png')}
+      source={require('@/assets/images/about/about-bg.png')}
       style={styles.container}
       resizeMode="cover"
     >
@@ -52,9 +126,18 @@ export default function ModalScreen() {
         <View style={styles.mainContent}>
           {/* Logo Section */}
           <View style={styles.logoContainer}>
-            <Image
+            <Animated.Image
               source={require('@/assets/icons/profile/about/glow.png')}
-              style={styles.glow}
+              style={[
+                styles.glow,
+                {
+                  transform: [
+                    { translateX: glowX },
+                    { translateY: glowY },
+                    { scale: glowScale },
+                  ],
+                },
+              ]}
             />
           </View>
 

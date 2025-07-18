@@ -9,9 +9,9 @@ interface CircularLoaderProps {
 }
 
 export default function CircularLoader({ 
-  size = 50, 
+  size = 20, // Changed default size to 20
   strokeWidth = 8,
-  color = '#FFE66C', // Default to yellow color
+  color = '#FFE66C', // Primary yellow color
   backgroundColor = 'rgba(255, 255, 255, 0)' // Default to semi-transparent white
 }: CircularLoaderProps) {
   const rotateAnim = useRef(new Animated.Value(0)).current;

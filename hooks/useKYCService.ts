@@ -21,32 +21,29 @@ export const useKYCStatus = () => {
   return useQuery({
     queryKey: [...KYC_QUERY_KEYS.status, user?.id], // Include user ID for cache isolation
     queryFn: async () => {
-      console.log('🔍 [KYC Cache] Fetching KYC status from API...');
+      console.log('🔍 Fetching fresh KYC status from API...');
       const status = await getKYCStatus();
-      console.log('📊 [KYC Cache] Fresh KYC Status from API:', {
+      console.log('📊 Fresh KYC Status from API:', {
         kycStatus: status.kycStatus,
         bvnVerified: status.bvnVerified,
         selfieVerified: status.selfieVerified,
         isVerified: status.isVerified,
         nextStep: status.nextStep,
-        message: status.message,
-        cached: false
+        message: status.message
       });
       return status;
     },
     // Only enable when user is authenticated AND has auth token
     enabled: isAuthenticated && !!authToken,
 
-    // 🚀 SMART LONG-TERM CACHING - KYC status only changes during user actions
-    staleTime: 24 * 60 * 60 * 1000, // 24 hours - KYC status rarely changes
-    gcTime: 7 * 24 * 60 * 60 * 1000, // Keep in cache for 7 days
+    // 🚀 NO CACHING - Always fetch fresh KYC status
+    staleTime: 0, // Always consider data stale
+    gcTime: 0, // Don't keep in cache
 
-    // Optimized refetch behavior - rely on smart cache invalidation
-    refetchOnWindowFocus: false, // Don't refetch on focus - use cache
-    refetchOnMount: 'stale', // Only refetch on mount if cache is stale
-    refetchOnReconnect: true, // Refetch when network reconnects (safety)
-    refetchInterval: false, // No automatic polling - smart invalidation only
-    refetchIntervalInBackground: false,
+    // Always refetch - no caching
+    refetchOnWindowFocus: true, // Refetch when app comes into focus
+    refetchOnMount: true, // Always refetch on mount
+    refetchOnReconnect: true, // Refetch when network reconnects
 
     // Retry configuration
     retry: 2,

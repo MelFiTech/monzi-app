@@ -14,6 +14,7 @@ export * from './useNotificationService';
 export * from './usePushNotificationService';
 export * from './useCameraLogic';
 export * from './useBackendChecks'; 
+export * from './useScanTracking';
 
 
 // Explicitly export wallet hooks for easier access

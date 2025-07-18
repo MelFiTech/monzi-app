@@ -7,6 +7,7 @@ interface CameraModalsProps {
   showVerificationModal: boolean;
   showSetPinModal: boolean;
   extractedData: ExtractedBankData | null;
+  capturedImageUri?: string | null;
   isWalletActivationMode: boolean;
   isPendingVerification: boolean;
   walletRecoveryPending: boolean;
@@ -24,6 +25,7 @@ export default function CameraModals({
   showVerificationModal,
   showSetPinModal,
   extractedData,
+  capturedImageUri,
   isWalletActivationMode,
   isPendingVerification,
   walletRecoveryPending,
@@ -46,6 +48,7 @@ export default function CameraModals({
         amount={extractedData?.amount || '0'}
         nairaAmount={`N${extractedData?.amount || '0'}`}
         extractedData={extractedData || undefined}
+        capturedImageUri={capturedImageUri}
       />
 
       {/* Verification Modal */}

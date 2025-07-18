@@ -9,6 +9,7 @@ import { useHybridVisionExtractBankDataMutation } from '@/hooks';
 import { useResolveAccountMutation } from '@/hooks/useAccountService';
 import { useWalletRecovery } from '@/hooks/useWalletService';
 import { useTransactionsList } from '@/hooks/useTransactionService';
+import { useRecordScan } from '@/hooks/useScanTracking';
 import { Transaction } from '@/components/common';
 import ToastService from '@/services/ToastService';
 
@@ -33,9 +34,12 @@ export function useCameraLogic() {
   const [isFreshRegistration, setIsFreshRegistration] = useState(false);
   const [isWalletActivationMode, setIsWalletActivationMode] = useState(false);
   const [areAllChecksComplete, setAreAllChecksComplete] = useState(false);
-  const [showPulsatingGlow, setShowPulsatingGlow] = useState(true);
+  const [showPulsatingGlow, setShowPulsatingGlow] = useState(false);
   const [showTransactionHistory, setShowTransactionHistory] = useState(false);
   const [isInKYCFlow, setIsInKYCFlow] = useState(false);
+  
+  // Extraction loader state
+  const [showExtractionLoader, setShowExtractionLoader] = useState(false);
 
   // Refs and Animations
   const cameraRef = useRef<CameraView>(null);
@@ -48,6 +52,7 @@ export function useCameraLogic() {
   const resolveAccountMutation = useResolveAccountMutation();
   const walletRecoveryMutation = useWalletRecovery();
   const transactionsData = useTransactionsList();
+  const recordScanMutation = useRecordScan();
 
   // Hide instructions after 3 seconds
   useEffect(() => {
@@ -71,7 +76,7 @@ export function useCameraLogic() {
         if (isFreshRegistration === 'true') {
           console.log('🆕 Fresh registration detected, showing verification modal immediately');
           
-          // Clear the flag
+          // Clear the flag immediately to prevent it from affecting future sessions
           await AsyncStorage.removeItem('fresh_registration');
           
           // Set state to remember this is a fresh registration
@@ -85,6 +90,8 @@ export function useCameraLogic() {
           // Stop pulsating glow when verification modal is shown
           setShowPulsatingGlow(false);
           setAreAllChecksComplete(true);
+        } else {
+          console.log('👤 Existing user detected - no fresh registration flag');
         }
       } catch (error) {
         console.error('Error checking fresh registration flag:', error);
@@ -97,39 +104,24 @@ export function useCameraLogic() {
   // Reset KYC flow flag when screen comes into focus (user returns from KYC)
   useFocusEffect(
     useCallback(() => {
+      // Only reset if user is actually in KYC flow and screen gains focus
+      // This prevents interference during navigation
       if (isInKYCFlow) {
-        console.log('🏠 User returned to home from KYC flow, resetting flag');
-        setIsInKYCFlow(false);
+        const timer = setTimeout(() => {
+          console.log('🏠 User returned to home from KYC flow, resetting flag');
+          setIsInKYCFlow(false);
+        }, 1000); // Longer delay to allow navigation to complete
+        
+        return () => clearTimeout(timer);
       }
     }, [isInKYCFlow])
   );
 
-  // Check for global KYC flow flag
-  useEffect(() => {
-    const checkKYCFlowFlag = async () => {
-      try {
-        const kycFlowFlag = await AsyncStorage.getItem('is_in_kyc_flow');
-        const isCurrentlyInKYC = kycFlowFlag === 'true';
-        
-        if (isCurrentlyInKYC !== isInKYCFlow) {
-          console.log(`🔄 Global KYC flow status changed: ${isCurrentlyInKYC}`);
-          setIsInKYCFlow(isCurrentlyInKYC);
-        }
-      } catch (error) {
-        console.error('Error checking global KYC flow flag:', error);
-      }
-    };
-
-    // Check immediately and then every second while on home screen
-    checkKYCFlowFlag();
-    const interval = setInterval(checkKYCFlowFlag, 1000);
-
-    return () => clearInterval(interval);
-  }, [isInKYCFlow]);
+  // Remove the polling effect that was causing infinite loops
 
   // Handle capture
   const handleCapture = async () => {
-    if (isCapturing || isProcessing) return;
+    if (isCapturing || isProcessing || showExtractionLoader) return;
     
     try {
       setIsCapturing(true);
@@ -138,6 +130,8 @@ export function useCameraLogic() {
       
       if (!cameraRef.current) {
         console.error('❌ Camera ref not available');
+        setIsCapturing(false);
+        setShowInstructions(true);
         return;
       }
 
@@ -178,47 +172,141 @@ export function useCameraLogic() {
 
       console.log('📷 Picture taken:', photo.uri);
       
-      // Store captured image
+      // Record the scan usage
+      try {
+        await recordScanMutation.mutateAsync();
+        console.log('📊 Scan usage recorded successfully');
+      } catch (error) {
+        console.error('❌ Failed to record scan usage:', error);
+        // Continue with extraction even if scan recording fails
+      }
+      
+      // Set captured image URI and show extraction loader immediately
       setCapturedImageUri(photo.uri);
       setIsCapturing(false);
-      setIsProcessing(true);
+      setShowExtractionLoader(true);
       
-      // Process image with AI
+      // Start background processing
       console.log('🎯 Starting FRESH AI extraction - NO CACHED DATA...');
-      const result = await extractBankDataMutation.mutateAsync(photo.uri);
       
-      console.log('🎯 AI extraction completed:', result);
-      
-      if (result.confidence > 0) {
-        setExtractedData(result);
+      // Set up timeout for extraction process (30 seconds)
+      const extractionTimeout = setTimeout(() => {
+        console.warn('⏰ Extraction timeout reached');
+        setShowExtractionLoader(false);
+        setExtractedData(null);
         setShowBankTransferModal(true);
-      } else {
-        console.warn('⚠️ No valid data extracted from image');
-        ToastService.show('No bank details found in image', 'error');
+        ToastService.show('Extraction took too long, please fill details manually', 'info');
+      }, 30000);
+      
+      try {
+        const result = await extractBankDataMutation.mutateAsync(photo.uri);
+        
+        // Clear timeout since extraction completed
+        clearTimeout(extractionTimeout);
+        
+        console.log('🎯 AI extraction completed:', result);
+        
+        // Hide extraction loader
+        setShowExtractionLoader(false);
+        
+        // Set extracted data (or null if no valid data)
+        if (result.confidence > 0) {
+          setExtractedData(result);
+        } else {
+          console.warn('⚠️ No valid data extracted from image');
+          setExtractedData(null);
+        }
+        
+        // Show bank transfer modal with extracted data or empty state
+        setShowBankTransferModal(true);
+        
+      } catch (error) {
+        // Clear timeout on error
+        clearTimeout(extractionTimeout);
+        
+        console.error('❌ Error during extraction:', error);
+        
+        // Hide extraction loader
+        setShowExtractionLoader(false);
+        
+        // Show modal with empty state for manual entry
+        setExtractedData(null);
+        setShowBankTransferModal(true);
+        
+        ToastService.show('Extraction failed, please fill details manually', 'error');
       }
       
     } catch (error) {
       console.error('❌ Error during capture:', error);
-      ToastService.show('Failed to capture image', 'error');
-    } finally {
       setIsCapturing(false);
-      setIsProcessing(false);
       setShowInstructions(true);
+      ToastService.show('Failed to capture image', 'error');
     }
   };
 
   const processImage = async (imageUri: string) => {
     try {
-      setIsProcessing(true);
-
-      const extractedBankData = await extractBankDataMutation.mutateAsync(imageUri);
+      // Record the scan usage for gallery images too
+      try {
+        await recordScanMutation.mutateAsync();
+        console.log('📊 Gallery scan usage recorded successfully');
+      } catch (error) {
+        console.error('❌ Failed to record gallery scan usage:', error);
+        // Continue with extraction even if scan recording fails
+      }
       
-      console.log('🎯 FRESH AI extraction completed:', extractedBankData);
+      // Set captured image URI and show extraction loader immediately
+      setCapturedImageUri(imageUri);
+      setShowExtractionLoader(true);
+      
+      console.log('🎯 Starting FRESH AI extraction from gallery - NO CACHED DATA...');
+      
+      // Set up timeout for extraction process (30 seconds)
+      const extractionTimeout = setTimeout(() => {
+        console.warn('⏰ Extraction timeout reached');
+        setShowExtractionLoader(false);
+        setExtractedData(null);
+        setShowBankTransferModal(true);
+        ToastService.show('Extraction took too long, please fill details manually', 'info');
+      }, 30000);
+      
+      try {
+        const extractedBankData = await extractBankDataMutation.mutateAsync(imageUri);
+        
+        // Clear timeout since extraction completed
+        clearTimeout(extractionTimeout);
+        
+        console.log('🎯 FRESH AI extraction completed:', extractedBankData);
 
-      const compatibleData: ExtractedBankData = extractedBankData;
-
-      setExtractedData(compatibleData);
-      setShowBankTransferModal(true);
+        // Hide extraction loader
+        setShowExtractionLoader(false);
+        
+        // Set extracted data (or null if no valid data)
+        if (extractedBankData.confidence > 0) {
+          setExtractedData(extractedBankData);
+        } else {
+          console.warn('⚠️ No valid data extracted from image');
+          setExtractedData(null);
+        }
+        
+        // Show bank transfer modal with extracted data or empty state
+        setShowBankTransferModal(true);
+        
+      } catch (error) {
+        // Clear timeout on error
+        clearTimeout(extractionTimeout);
+        
+        console.error('❌ Error during extraction:', error);
+        
+        // Hide extraction loader
+        setShowExtractionLoader(false);
+        
+        // Show modal with empty state for manual entry
+        setExtractedData(null);
+        setShowBankTransferModal(true);
+        
+        ToastService.show('Extraction failed, please fill details manually', 'error');
+      }
       
     } catch (error) {
       console.error('❌ Error processing image:', error);
@@ -226,12 +314,10 @@ export function useCameraLogic() {
         'Processing Failed', 
         'Unable to extract bank details. Please check your internet connection and try again.',
         [
-          { text: 'Retry', onPress: () => handleCapture() },
+          { text: 'Retry', onPress: () => processImage(imageUri) },
           { text: 'Cancel', style: 'cancel' }
         ]
       );
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -289,19 +375,34 @@ export function useCameraLogic() {
   };
 
   const handleBankModalConfirm = (resolvedAccountName?: string, selectedBankName?: string, accountNumber?: string) => {
-    if (extractedData) {
-      router.push({
-        pathname: '/transfer',
-        params: {
-          bankName: selectedBankName || extractedData.bankName,
-          accountNumber: accountNumber || extractedData.accountNumber,
-          accountHolderName: resolvedAccountName || extractedData.accountHolderName || '',
-          amount: extractedData.amount || '',
-        }
-      });
-      setShowBankTransferModal(false);
-      setExtractedData(null);
-    }
+    console.log('🚀 [CameraLogic] Bank modal confirm triggered:', {
+      resolvedAccountName,
+      selectedBankName,
+      accountNumber,
+      extractedData: extractedData ? 'exists' : 'null'
+    });
+
+    // Always navigate to transfer screen, even if extractedData is null
+    // This allows manual entry in the transfer screen
+    const transferParams = {
+      bankName: selectedBankName || extractedData?.bankName || '',
+      accountNumber: accountNumber || extractedData?.accountNumber || '',
+      accountHolderName: resolvedAccountName || extractedData?.accountHolderName || '',
+      amount: extractedData?.amount || '',
+    };
+
+    console.log('📤 [CameraLogic] Navigating to transfer with params:', {
+      ...transferParams,
+      accountHolderName: transferParams.accountHolderName ? 'exists' : 'empty'
+    });
+
+    router.push({
+      pathname: '/transfer',
+      params: transferParams
+    });
+    
+    setShowBankTransferModal(false);
+    setExtractedData(null);
   };
 
   const handleBankModalSuccess = () => {
@@ -335,24 +436,37 @@ export function useCameraLogic() {
         }
       }
     } else {
-      // Set KYC flow flag IMMEDIATELY to prevent modal from reappearing
+      // IMMEDIATELY close modal and set flags to prevent reappearance
+      setShowVerificationModal(false);
       setIsInKYCFlow(true);
       
-      // Close the modal
-      setShowVerificationModal(false);
+      // Force immediate state update to prevent modal from showing again
+      setShowPulsatingGlow(false);
+      setAreAllChecksComplete(true);
+      
+      // Set global flags to prevent modal from reappearing
+      try {
+        await AsyncStorage.setItem('is_in_kyc_flow', 'true');
+        await AsyncStorage.setItem('modal_dismissed_by_user', 'true');
+        console.log('🎯 Set KYC flow and modal dismissed flags');
+      } catch (error) {
+        console.error('Error setting flags:', error);
+      }
       
       if (isPendingVerification) {
         setIsPendingVerification(false);
       } else {
-        // Navigate immediately without delay since flag is already set
-        if (isFreshRegistration) {
-          console.log('🆕 Fresh registration user starting KYC - going to BVN');
-          setIsFreshRegistration(false);
-          router.push('/(kyc)/bvn');
-        } else {
-          console.log('🔄 Existing user continuing KYC - going to BVN');
-          router.push('/(kyc)/bvn');
-        }
+        // Small delay to ensure all state updates are processed before navigation
+        setTimeout(() => {
+          if (isFreshRegistration) {
+            console.log('🆕 Fresh registration user starting KYC - going to BVN');
+            setIsFreshRegistration(false);
+            router.push('/(kyc)/bvn');
+          } else {
+            console.log('🔄 Existing user continuing KYC - going to BVN');
+            router.push('/(kyc)/bvn');
+          }
+        }, 100);
       }
     }
   };
@@ -368,6 +482,14 @@ export function useCameraLogic() {
   };
 
 
+
+  // Handle extraction loader completion
+  const handleExtractionComplete = (extractedData: ExtractedBankData | null) => {
+    console.log('🎯 Extraction loader completed with data:', extractedData);
+    setShowExtractionLoader(false);
+    setExtractedData(extractedData);
+    setShowBankTransferModal(true);
+  };
 
   return {
     // State
@@ -388,6 +510,10 @@ export function useCameraLogic() {
     showPulsatingGlow,
     showTransactionHistory,
     isInKYCFlow,
+    
+    // Extraction loader state
+    showExtractionLoader,
+    capturedImageUri,
     
     // Transaction data
     transactionsData,
@@ -415,6 +541,7 @@ export function useCameraLogic() {
     handleVerifyID,
     handleSetPinModalClose,
     handleSetPinSuccess,
+    handleExtractionComplete,
     
     // State setters for backend checks
     setIsFreshRegistration,

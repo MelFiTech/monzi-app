@@ -17,12 +17,13 @@ import { fontFamilies } from '@/constants/fonts';
 import { ArrowLeft } from 'lucide-react-native';
 import RecipientDetailCard from '@/components/common/RecipientDetailCard';
 import AmountPill from '@/components/common/AmountPill';
-import Button from '@/components/common/Button';
+import SlideToPayButton from '@/components/common/SlideToPayButton';
 import TransactionPinModal from '@/components/common/TransactionPinModal';
 import { PulsatingGlow } from '@/components/common';
 import { useWalletBalance, useRefreshWallet, useOptimisticBalance, useTransferFunds, useWalletAccessStatus } from '@/hooks/useWalletService';
 import { useNotificationService } from '@/hooks/useNotificationService';
 import { useQueryClient } from '@tanstack/react-query';
+import BiometricService from '@/services/BiometricService';
 
 const predefinedAmounts = ['N5,000', 'N10,000', 'N20,000'];
 
@@ -45,6 +46,7 @@ export default function TransferScreen() {
   const [showPinModal, setShowPinModal] = useState(false);
   const [amountError, setAmountError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [buttonKey, setButtonKey] = useState(0); // Key to force button reset
 
   // Check wallet access status
   const { hasWalletAccess, statusMessage } = useWalletAccessStatus();
@@ -294,7 +296,7 @@ export default function TransferScreen() {
     });
   };
 
-  const handleTransferPress = () => {
+  const handleTransferPress = async () => {
     // Check if user has wallet access first
     if (!hasWalletAccess) {
       Alert.alert(
@@ -324,7 +326,33 @@ export default function TransferScreen() {
     // Clear any previous errors
     setAmountError(null);
 
-    // Show PIN modal
+    // Try biometric authentication first
+    try {
+      const biometricService = BiometricService.getInstance();
+      const isBiometricEnabled = await biometricService.isBiometricEnabled();
+      
+      if (isBiometricEnabled) {
+        console.log('🔐 Attempting biometric authentication...');
+        const biometricResult = await biometricService.authenticate('Authenticate to complete transfer');
+        
+        if (biometricResult.success) {
+          console.log('✅ Biometric authentication successful');
+          // Get stored PIN and proceed with transfer
+          const storedPin = await biometricService.getStoredPin();
+          if (storedPin) {
+            await handlePinConfirm(storedPin);
+            return;
+          }
+        } else {
+          console.log('❌ Biometric authentication failed:', biometricResult.error);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Biometric authentication error:', error);
+    }
+
+    // Fallback to PIN modal
+    console.log('🔑 Falling back to PIN modal');
     setShowPinModal(true);
   };
 
@@ -376,6 +404,8 @@ export default function TransferScreen() {
 
   const handlePinModalClose = () => {
     setShowPinModal(false);
+    // Reset the slide button when PIN modal is closed
+    setButtonKey(prev => prev + 1);
   };
 
 
@@ -495,13 +525,12 @@ export default function TransferScreen() {
 
         {/* Pay Button */}
         <View style={styles.payButtonContainer}>
-          <Button
-            title={transferFundsMutation.isPending ? "Processing..." : "Pay"}
-            onPress={handleTransferPress}
-            disabled={!amount || amount === '0' || !!amountError || transferFundsMutation.isPending || isBalanceLoading}
-            variant="primary"
-            size="lg"
-            fullWidth
+          <SlideToPayButton
+            key={buttonKey} // Force re-render to reset position
+            title={transferFundsMutation.isPending ? "Processing..." : "Slide to pay..."}
+            onComplete={handleTransferPress}
+            disabled={!amount || amount === '0' || !!amountError || isBalanceLoading}
+            processing={transferFundsMutation.isPending}
           />
         </View>
       </KeyboardAvoidingView>

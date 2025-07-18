@@ -27,12 +27,18 @@ export default function BVNScreen() {
   const { currentStep, statusMessage } = useKYCStep();
   const { logout } = useAuth();
 
-  // Set global KYC flow flag when BVN screen mounts
+  // Set global KYC flow flag when BVN screen mounts and force close any modals
   useEffect(() => {
     const setKYCFlowFlag = async () => {
       try {
         await AsyncStorage.setItem('is_in_kyc_flow', 'true');
         console.log('🎯 BVN Screen: Set KYC flow flag to prevent verification modal');
+        
+        // Additional safety: Clear any modal flags that might still be active
+        await AsyncStorage.removeItem('show_pending_modal');
+        await AsyncStorage.removeItem('kyc_navigation_in_progress');
+        await AsyncStorage.removeItem('modal_dismissed_by_user');
+        console.log('🔄 BVN Screen: Cleared all modal and navigation flags');
       } catch (error) {
         console.error('Error setting KYC flow flag:', error);
       }

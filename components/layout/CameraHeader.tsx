@@ -212,11 +212,13 @@ export function CameraHeader({
   const isWalletDataLoading = hasWalletAccess && (isBalanceLoading || isWalletLoading);
 
   const handleAddPress = () => {
-    router.push('/profile');
+    // Show "Feature coming soon" toast
+    setShowToast(true);
+    // You can customize the toast message here
   };
 
   const handleModalPress = () => {
-    router.push('/modal');
+    router.push('/profile');
   };
 
   const handleBackPress = () => {
@@ -259,8 +261,8 @@ export function CameraHeader({
       />
       <Toast
         visible={showToast}
-        message={`${walletDetails?.virtualAccountNumber || 'Account number'} copied`}
-        type="success"
+        message="Feature coming soon"
+        type="info"
         onHide={() => setShowToast(false)}
       />
       <LinearGradient
@@ -278,7 +280,7 @@ export function CameraHeader({
               <View style={[styles.profileAvatar, {  backgroundColor: 'rgba(0, 0, 0, 0.28)' }]}>
                 <Image 
                   source={require('@/assets/icons/home/monzi.png')}
-                  style={{width: 23, height: 13}}
+                  style={{width: 24, height: 24}}
                 />
               </View>
             </TouchableOpacity>
@@ -348,8 +350,8 @@ export function CameraHeader({
         <View style={styles.rightSection}>
           <TouchableOpacity style={styles.iconButton} onPress={handleAddPress}>
             <Image 
-              source={require('@/assets/icons/home/menu.png')}
-              style={{width: 18, height: 10}}
+              source={require('@/assets/icons/home/scan.png')}
+              style={{width: 20, height: 24}}
               tintColor="#FFFFFF"
             />
           </TouchableOpacity>

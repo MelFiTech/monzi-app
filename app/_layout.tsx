@@ -7,6 +7,7 @@ import React, { useEffect, useRef } from 'react';
 import { AppState, TouchableWithoutFeedback, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { updateLastActivity, shouldRequireReauth, INACTIVITY_TIMEOUT_MS } from '@/hooks/useInactivityService';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/common/useColorScheme';
@@ -67,11 +68,11 @@ export default function RootLayout() {
     if (error) throw error;
   }, [error]);
 
-  // Only hide splash screen when fonts are loaded to prevent white flash
+  // Hide splash screen when fonts are loaded to prevent white flash
   useEffect(() => {
     if (loaded) {
-      // Let the splash screen component handle hiding
-      // We don't hide here to prevent white flash
+      // Hide the Expo splash screen when fonts are loaded
+      SplashScreen.hideAsync();
     }
   }, [loaded]);
 
@@ -133,9 +134,11 @@ export default function RootLayout() {
   }
 
   return (
-    <TouchableWithoutFeedback onPress={handleGlobalTouch}>
-      <RootLayoutNav />
-    </TouchableWithoutFeedback>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <TouchableWithoutFeedback onPress={handleGlobalTouch}>
+        <RootLayoutNav />
+      </TouchableWithoutFeedback>
+    </GestureHandlerRootView>
   );
 }
 

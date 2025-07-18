@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Modal, Alert, Animated, TextInput, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Modal, Alert, Animated, TextInput, KeyboardAvoidingView, Platform, Keyboard, ImageBackground, Image } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/providers/ThemeProvider';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
 import Button from './Button';
 import BankSelectionModal from './BankSelectionModal';
-import { Copy, X, Check, ChevronDown, Edit3, Save } from 'lucide-react-native';
+import { Copy, Check, Edit3, Save, XCircle, ChevronDown, RefreshCw } from 'lucide-react-native';
 import { ExtractedBankData } from '@/services';
 import { useResolveAccountMutation } from '@/hooks/useAccountService';
 import { ToastService } from '@/services';
@@ -20,6 +21,7 @@ interface BankTransferModalProps {
   nairaAmount: string;
   extractedData?: ExtractedBankData;
   onBankSelect?: (bankName: string) => void;
+  capturedImageUri?: string | null;
 }
 
 export default function BankTransferModal({
@@ -30,7 +32,8 @@ export default function BankTransferModal({
   amount,
   nairaAmount,
   extractedData,
-  onBankSelect
+  onBankSelect,
+  capturedImageUri
 }: BankTransferModalProps) {
   const { colors, theme } = useTheme();
 
@@ -44,59 +47,136 @@ export default function BankTransferModal({
   const [hasResolutionFailed, setHasResolutionFailed] = useState(false);
   const [isEditingAccountNumber, setIsEditingAccountNumber] = useState(false);
   const [editedAccountNumber, setEditedAccountNumber] = useState('');
+  const [finalAccountNumber, setFinalAccountNumber] = useState('');
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isAutoRetrying, setIsAutoRetrying] = useState(false);
+  const MAX_RETRIES = 5;
 
   const resolveAccountMutation = useResolveAccountMutation();
 
-  // Use extracted data or selected bank name
-  const bankName = extractedData?.bankName || selectedBankName || '';
-  const accountNumber = editedAccountNumber || extractedData?.accountNumber || '';
+  // Use selected bank name if available, otherwise fall back to extracted data
+  const bankName = selectedBankName || extractedData?.bankName || '';
+  const accountNumber = finalAccountNumber || editedAccountNumber || extractedData?.accountNumber || '';
   const accountHolderName = resolvedAccountName || extractedData?.accountHolderName || '';
   const extractedAmount = extractedData?.amount || amount;
+
+  // Initialize final account number when modal opens with extracted data
+  useEffect(() => {
+    if (visible && extractedData?.accountNumber && !finalAccountNumber) {
+      setFinalAccountNumber(extractedData.accountNumber);
+    }
+  }, [visible, extractedData?.accountNumber, finalAccountNumber]);
+
+  // Debug logging for bank selection and account number
+  useEffect(() => {
+    console.log('🏦 Bank name state:', {
+      selectedBankName,
+      extractedBankName: extractedData?.bankName,
+      finalBankName: bankName
+    });
+  }, [selectedBankName, extractedData?.bankName, bankName]);
+
+  useEffect(() => {
+    console.log('📱 Account number state:', {
+      finalAccountNumber,
+      editedAccountNumber,
+      extractedAccountNumber: extractedData?.accountNumber,
+      finalAccountNumberUsed: accountNumber
+    });
+  }, [finalAccountNumber, editedAccountNumber, extractedData?.accountNumber, accountNumber]);
 
   // Check if we have minimum required data
   const hasBankName = Boolean(bankName);
   const hasAccountNumber = Boolean(accountNumber);
   const hasRequiredData = hasBankName && hasAccountNumber;
 
-  // Start account resolution in background when modal opens
-  useEffect(() => {
-    if (visible && hasRequiredData && !resolvedAccountName && !hasResolutionFailed) {
-      console.log('🔄 Starting background account resolution...');
-      setIsResolvingAccount(true);
-      
-      resolveAccountMutation.mutateAsync({
+  const resolveAccount = async () => {
+    if (!hasRequiredData || isResolvingAccount) return;
+
+    // Guard against invalid data that would cause 400 errors
+    if (accountNumber.length !== 10 || !/^\d{10}$/.test(accountNumber)) {
+      console.log('🚫 Skipping account resolution - invalid account number:', accountNumber);
+      return;
+    }
+
+    if (!bankName || bankName.trim().length === 0) {
+      console.log('🚫 Skipping account resolution - invalid bank name:', bankName);
+      return;
+    }
+
+    console.log('🔄 Starting account resolution for bank:', bankName, 'account:', accountNumber);
+    setIsResolvingAccount(true);
+    setHasResolutionFailed(false);
+    setIsAutoRetrying(false);
+    
+    try {
+      const result = await resolveAccountMutation.mutateAsync({
         accountNumber,
         bankName
-      })
-      .then((result) => {
-        console.log('✅ Background account resolution successful:', result);
-        setResolvedAccountName(result.account_name);
-        setIsResolvingAccount(false);
-      })
-      .catch((error) => {
-        console.error('❌ Background account resolution failed:', error);
+      });
+      console.log('✅ Account resolution successful:', result);
+      setResolvedAccountName(result.account_name);
+      setIsResolvingAccount(false);
+      setRetryCount(0); // Reset retry count on success
+      setIsAutoRetrying(false);
+    } catch (error) {
+      console.error('❌ Account resolution failed:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Only show error and stop retrying if it's a backend error (400, 401, 403, etc.)
+      if (errorMessage?.includes('statusCode: 400') || 
+          errorMessage?.includes('statusCode: 401') ||
+          errorMessage?.includes('statusCode: 403') ||
+          errorMessage?.includes('statusCode: 404') ||
+          errorMessage?.includes('statusCode: 500')) {
+        
+        console.log('🚨 Backend error detected, stopping retries');
         setIsResolvingAccount(false);
         setHasResolutionFailed(true);
+        setIsAutoRetrying(false);
+        ToastService.error('Invalid account details');
+        return;
+      }
+      
+      // For network errors or temporary failures, auto-retry
+      if (retryCount < MAX_RETRIES) {
+        console.log(`🔄 Auto-retrying resolution (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+        setRetryCount(prev => prev + 1);
+        setIsAutoRetrying(true);
         
-        // Check for specific error case
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        if (errorMessage?.includes('Account verification failed') || 
-            errorMessage?.includes('statusCode: 400') ||
-            errorMessage?.includes('Bad Request')) {
-          
-          console.log('🚨 Specific account verification error detected');
-          ToastService.error('Please scan again');
-          
-          // Close modal and navigate to home
-          setTimeout(() => {
-            onClose();
-            router.replace('/(tabs)');
-          }, 1000);
-        }
-      });
+        // Retry after 2 seconds
+        setTimeout(() => {
+          resolveAccount();
+        }, 2000);
+      } else {
+        console.log('❌ Max retries reached, but not showing error - allowing manual retry');
+        setIsResolvingAccount(false);
+        setHasResolutionFailed(false); // Don't show error state
+        setIsAutoRetrying(false);
+        // Don't show error toast or navigate away
+      }
     }
-  }, [visible, hasRequiredData, resolvedAccountName, hasResolutionFailed, accountNumber, bankName]);
+  };
+
+  // Start account resolution in background when modal opens or when bank/account changes
+  useEffect(() => {
+    if (visible && hasRequiredData && !isResolvingAccount) {
+      // Additional validation to prevent resolution with invalid data
+      if (accountNumber && accountNumber.length === 10 && /^\d{10}$/.test(accountNumber) && 
+          bankName && bankName.trim().length > 0) {
+        resolveAccount();
+      } else {
+        console.log('🚫 Skipping account resolution - data validation failed:', {
+          accountNumber,
+          accountNumberLength: accountNumber?.length,
+          bankName,
+          bankNameLength: bankName?.length
+        });
+      }
+    }
+  }, [visible, bankName, accountNumber, hasRequiredData]);
 
   // Keyboard visibility listeners
   useEffect(() => {
@@ -168,23 +248,35 @@ export default function BankTransferModal({
   };
 
   const handleBankSelect = (bankName: string) => {
+    console.log('🏦 Bank selected:', bankName);
     setSelectedBankName(bankName);
     setShowBankSelection(false);
     // Reset resolution state when bank changes
     setResolvedAccountName(null);
     setHasResolutionFailed(false);
+    setIsResolvingAccount(false); // Ensure we can start a new resolution
+    setRetryCount(0); // Reset retry count
     // Notify parent component if callback provided
     if (onBankSelect) {
       onBankSelect(bankName);
     }
+    // Show success feedback
+    ToastService.success(`${bankName} selected`);
+    
+    // If we have an account number, trigger resolution immediately
+    if (accountNumber) {
+      console.log('🔄 Triggering immediate resolution for new bank selection');
+    }
   };
 
   const handleEditAccountNumber = () => {
-    setEditedAccountNumber(accountNumber);
+    // Use the current account number (either final, edited, or extracted)
+    const currentAccountNumber = finalAccountNumber || editedAccountNumber || extractedData?.accountNumber || '';
+    setEditedAccountNumber(currentAccountNumber);
     setIsEditingAccountNumber(true);
   };
 
-  const handleSaveAccountNumber = () => {
+  const handleSaveAccountNumber = async () => {
     // Validate account number (10 digits)
     if (editedAccountNumber.length !== 10 || !/^\d{10}$/.test(editedAccountNumber)) {
       Alert.alert('Invalid Account Number', 'Account number must be exactly 10 digits.');
@@ -192,16 +284,73 @@ export default function BankTransferModal({
     }
     
     setIsEditingAccountNumber(false);
-    // Reset resolution state when account number changes
-    setResolvedAccountName(null);
-    setHasResolutionFailed(false);
+    setRetryCount(0); // Reset retry count
+    setIsAutoRetrying(false);
     
-    ToastService.success('Account number updated');
+    // If we have both bank name and account number, trigger resolution
+    if (bankName && editedAccountNumber) {
+      console.log('🔄 Resolving account for edited account number:', editedAccountNumber, 'bank:', bankName);
+      setIsResolvingAccount(true);
+      setHasResolutionFailed(false);
+      setResolvedAccountName(null);
+      
+      try {
+        const result = await resolveAccountMutation.mutateAsync({
+          accountNumber: editedAccountNumber,
+          bankName
+        });
+        console.log('✅ Account resolution successful for edited account:', result);
+        setResolvedAccountName(result.account_name);
+        setFinalAccountNumber(editedAccountNumber); // Set the final account number
+        setIsResolvingAccount(false);
+        setIsAutoRetrying(false);
+        ToastService.success('Account verified successfully');
+      } catch (error) {
+        console.error('❌ Account resolution failed for edited account:', error);
+        
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        // Only show error and stop retrying if it's a backend error
+        if (errorMessage?.includes('statusCode: 400') || 
+            errorMessage?.includes('statusCode: 401') ||
+            errorMessage?.includes('statusCode: 403') ||
+            errorMessage?.includes('statusCode: 404') ||
+            errorMessage?.includes('statusCode: 500')) {
+          
+          console.log('🚨 Backend error detected for edited account, stopping retries');
+          setIsResolvingAccount(false);
+          setHasResolutionFailed(true);
+          setIsAutoRetrying(false);
+          ToastService.error('Invalid account number');
+          return;
+        }
+        
+        // For network errors or temporary failures, auto-retry
+        if (retryCount < MAX_RETRIES) {
+          console.log(`🔄 Auto-retrying resolution for edited account (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+          setRetryCount(prev => prev + 1);
+          setIsAutoRetrying(true);
+          
+          setTimeout(() => {
+            handleSaveAccountNumber();
+          }, 2000);
+        } else {
+          console.log('❌ Max retries reached for edited account, but not showing error');
+          setIsResolvingAccount(false);
+          setHasResolutionFailed(false); // Don't show error state
+          setIsAutoRetrying(false);
+          // Don't show error toast
+        }
+      }
+    } else {
+      ToastService.success('Account number updated');
+    }
   };
 
   const handleCancelEdit = () => {
     setEditedAccountNumber('');
     setIsEditingAccountNumber(false);
+    // Don't reset finalAccountNumber as it should persist
   };
 
   const handleConfirmPress = async () => {
@@ -228,78 +377,113 @@ export default function BankTransferModal({
         console.log('✅ Account resolution completed:', result);
         setResolvedAccountName(result.account_name);
         setIsResolvingAccount(false);
+        setRetryCount(0); // Reset retry count on success
+        setIsAutoRetrying(false);
         
-                 // Continue with transfer
-         setTimeout(() => {
-           setIsLoading(false);
-           onConfirmTransfer(result.account_name, bankName, accountNumber);
-         }, 500);
+        // Continue with transfer
+        setTimeout(() => {
+          setIsLoading(false);
+          onConfirmTransfer(result.account_name, bankName, accountNumber);
+        }, 500);
         
       } catch (error) {
         console.error('❌ Account resolution failed during confirm:', error);
         setIsLoading(false);
-        setHasResolutionFailed(true);
         
-        // Check for specific error case
         const errorMessage = error instanceof Error ? error.message : String(error);
-        if (errorMessage?.includes('Account verification failed') || 
-            errorMessage?.includes('statusCode: 400') ||
-            errorMessage?.includes('Bad Request')) {
+        
+        // Only show error and stop retrying if it's a backend error
+        if (errorMessage?.includes('statusCode: 400') || 
+            errorMessage?.includes('statusCode: 401') ||
+            errorMessage?.includes('statusCode: 403') ||
+            errorMessage?.includes('statusCode: 404') ||
+            errorMessage?.includes('statusCode: 500')) {
           
-          ToastService.error('Please scan again');
+          console.log('🚨 Backend error detected during confirm, stopping retries');
+          setHasResolutionFailed(true);
+          setIsAutoRetrying(false);
+          ToastService.error('Invalid account details');
+          return;
+        }
+        
+        // For network errors or temporary failures, auto-retry
+        if (retryCount < MAX_RETRIES) {
+          console.log(`🔄 Auto-retrying resolution during confirm (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+          setRetryCount(prev => prev + 1);
+          setIsAutoRetrying(true);
           
-          // Close modal and navigate to home
           setTimeout(() => {
-            onClose();
-            router.replace('/(tabs)');
-          }, 1000);
+            handleConfirmPress();
+          }, 2000);
         } else {
-          Alert.alert('Error', 'Failed to verify account details. Please try again.');
+          console.log('❌ Max retries reached during confirm, but not showing error');
+          setHasResolutionFailed(false); // Don't show error state
+          setIsAutoRetrying(false);
+          // Don't show error toast or navigate away
         }
         return;
       }
-         } else {
-       // Resolution already completed or not needed
-       setTimeout(() => {
-         setIsLoading(false);
-         onConfirmTransfer(accountHolderName, bankName, accountNumber);
-       }, 500);
-     }
+    } else {
+      // Resolution already completed or not needed
+      setTimeout(() => {
+        setIsLoading(false);
+        onConfirmTransfer(accountHolderName, bankName, accountNumber);
+      }, 500);
+    }
   };
 
   // Render account name with skeleton loading
   const renderAccountName = () => {
     if (isResolvingAccount) {
       return (
-        <View style={styles.skeletonContainer}>
-          <View style={styles.skeletonLine} />
-          <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
-        </View>
+        <Text style={[styles.nameValue, {color: 'rgba(255, 255, 255, 0.4)'}]}>
+          {isAutoRetrying ? `Retrying (${retryCount}/${MAX_RETRIES})...` : 'Verifying...'}
+        </Text>
       );
     }
     
     if (hasResolutionFailed) {
       return (
-        <Text style={styles.errorAccountName}>
-          Unable to verify account name
-        </Text>
+        <View style={styles.detailValueContainer}>
+          <Text style={styles.errorAccountName}>
+            Invalid account details
+          </Text>
+          <TouchableOpacity onPress={() => {
+            setRetryCount(0);
+            setHasResolutionFailed(false);
+            resolveAccount();
+          }}>
+            <RefreshCw size={20} color="rgba(255, 107, 107, 0.8)" />
+          </TouchableOpacity>
+        </View>
       );
     }
     
-    if (accountHolderName) {
+    if (accountHolderName && accountHolderName !== 'Not found') {
+      // Only break into lines if name is longer than 25 characters
+      if (accountHolderName.length > 25) {
+        const midpoint = Math.ceil(accountHolderName.length / 2);
+        const firstLine = accountHolderName.slice(0, midpoint);
+        const secondLine = accountHolderName.slice(midpoint);
+        
+        return (
+          <Text style={[styles.nameValue, isEditingAccountNumber && styles.editingText, resolvedAccountName && {color: '#FFE66C'}]}>
+            {firstLine}{'\n'}{secondLine}
+          </Text>
+        );
+      }
+      
       return (
-        <Text style={styles.nameValue}>
-          {accountHolderName.includes(' ') 
-            ? accountHolderName.replace(' ', '\n') 
-            : accountHolderName
-          }
+        <Text style={[styles.nameValue, isEditingAccountNumber && styles.editingText, resolvedAccountName && {color: '#FFE66C'}]}>
+          {accountHolderName}
         </Text>
       );
     }
     
+    // Show "Waiting for you" when no valid name is available
     return (
-      <Text style={styles.placeholderName}>
-        Resolving account name...
+      <Text style={[styles.nameValue, {color: 'rgba(255, 255, 255, 0.4)'}]}>
+        Waiting for you
       </Text>
     );
   };
@@ -312,55 +496,62 @@ export default function BankTransferModal({
       onRequestClose={handleClosePress}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
+        style={styles.container}
+        keyboardVerticalOffset={0}
       >
-        <View style={styles.overlay}>
-          <BlurView intensity={8} style={styles.blurView}>
-            <View style={styles.modalContainer}>
-              <Animated.View
-                style={{
-                  transform: [{ translateY: slideAnim }]
-                }}
+        <TouchableOpacity 
+          style={styles.overlay}
+          activeOpacity={1} 
+          onPress={Keyboard.dismiss}
+        >
+          {capturedImageUri && (
+            <ImageBackground
+              source={{ uri: capturedImageUri }}
+              style={styles.imageBackground}
+            >
+              <LinearGradient
+                colors={['rgba(0, 0, 0, 0.3)', 'rgba(0, 0, 0, 0.95)']}
+                style={styles.gradientOverlay}
               >
-              <TouchableOpacity
-                style={styles.modalContent}
-                activeOpacity={1}
-                onPress={handleModalPress}
-              >
-                <View style={styles.header}>
-                  <TouchableOpacity onPress={handleClosePress} style={styles.closeButton}>
-                    <X size={24} color="#FFFFFF" />
-                  </TouchableOpacity>
-                  <Text style={styles.headerText}>Transfer to</Text>
-                  <View style={styles.spacer} />
-                </View>
+                <Animated.View
+                  style={[
+                    styles.modalView,
+                    {
+                      transform: [{ translateY: slideAnim }]
+                    }
+                  ]}
+                >
+                  <LinearGradient
+                    colors={['transparent', 'rgb(0, 0, 0)']}
+                    style={styles.modalContent}
+                  >
+                    <View style={styles.detailsContainer}>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Name</Text>
+                        {renderAccountName()}
+                      </View>
 
-                <View style={styles.detailsCard}>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Name</Text>
-                    {renderAccountName()}
-                  </View>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Bank Name</Text>
+                        <TouchableOpacity onPress={handleBankSelection} style={styles.detailValueContainer}>
+                          {hasBankName ? (
+                            <Text style={styles.detailValue}>
+                              {bankName}
+                              {isResolvingAccount && (
+                                <Text style={styles.resolvingText}> • Resolving...</Text>
+                              )}
+                            </Text>
+                          ) : (
+                            <Text style={styles.nameValue}>Select bank</Text>
+                          )}
+                          <ChevronDown size={24} color="#FFFFFF" />
+                        </TouchableOpacity>
+                      </View>
 
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Bank Name</Text>
-                    {hasBankName ? (
-                      <Text style={styles.detailValue}>
-                        {bankName}
-                      </Text>
-                    ) : (
-                      <TouchableOpacity onPress={handleBankSelection} style={styles.selectBankButton}>
-                        <Text style={styles.selectBankText}>Select bank</Text>
-                        <ChevronDown size={16} color="#6CB1FF" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Account number</Text>
-                    <View style={styles.detailValueContainer}>
-                      {hasAccountNumber ? (
-                        <>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Account number</Text>
+                        <View style={styles.detailValueContainer}>
                           {isEditingAccountNumber ? (
                             <View style={styles.editContainer}>
                               <TextInput
@@ -373,107 +564,84 @@ export default function BankTransferModal({
                                 placeholderTextColor="rgba(255, 255, 255, 0.4)"
                                 autoFocus
                               />
-                              <View style={styles.editButtons}>
-                                <TouchableOpacity onPress={handleCancelEdit} style={styles.cancelEditButton}>
-                                  <X size={16} color="rgba(255, 255, 255, 0.6)" />
-                                </TouchableOpacity>
-                                <TouchableOpacity onPress={handleSaveAccountNumber} style={styles.saveEditButton}>
-                                  <Save size={16} color="#10B981" />
-                                </TouchableOpacity>
-                              </View>
+                              <TouchableOpacity 
+                                onPress={handleSaveAccountNumber} 
+                                style={[styles.editPillButton, {backgroundColor: '#FFE66C'}]}
+                              >
+                                <Text style={[styles.editPillText, {color: '#000000'}]}>Done</Text>
+                              </TouchableOpacity>
                             </View>
                           ) : (
                             <>
-                              <Text style={styles.detailValue}>
-                                {accountNumber}
-                              </Text>
-                              <View style={styles.actionButtons}>
-                                <TouchableOpacity onPress={handleEditAccountNumber} style={styles.editButton}>
-                                  <Edit3 size={18} color="rgba(255, 255, 255, 0.6)" />
-                                </TouchableOpacity>
-                                <TouchableOpacity onPress={handleCopyAccountNumber} style={styles.copyButton}>
-                                  {copied ? (
-                                    <Check size={20} color="#10B981" />
-                                  ) : (
-                                    <Copy size={20} color="rgba(255, 255, 255, 0.6)" />
-                                  )}
-                                </TouchableOpacity>
-                              </View>
+                              {hasAccountNumber ? (
+                                <Text style={styles.detailValue}>
+                                  {accountNumber}
+                                </Text>
+                              ) : (
+                                <Text style={styles.nameValue}>
+                                  Enter account number
+                                </Text>
+                              )}
+                              <TouchableOpacity onPress={handleEditAccountNumber} style={styles.editPillButton}>
+                                <Text style={styles.editPillText}>Edit</Text>
+                              </TouchableOpacity>
                             </>
                           )}
-                        </>
-                      ) : (
-                        <Text style={styles.missingDataText}>
-                          Not detected - Please retake photo
-                        </Text>
+                        </View>
+                      </View>
+
+                      {/* Show extraction confidence if available and keyboard is not visible */}
+                      {extractedData && !isKeyboardVisible && (
+                        <View style={styles.confidenceRow}>
+                          <Text style={styles.confidenceText}>
+                            Extraction confidence: {extractedData.confidence}%
+                          </Text>
+                        </View>
                       )}
                     </View>
-                  </View>
 
-                  {/* Show extraction confidence if available and keyboard is not visible */}
-                  {extractedData && !isKeyboardVisible && (
-                    <View style={styles.confidenceRow}>
-                      <Text style={styles.confidenceText}>
-                        Extraction confidence: {extractedData.confidence}%
+                    {!isKeyboardVisible && (
+                      <Text style={styles.warningText}>
+                        Please confirm the details before sending.{'\n'}Transfers can't be reversed once completed.
                       </Text>
-                    </View>
-                  )}
-                </View>
+                    )}
 
-                {!hasRequiredData && !isKeyboardVisible ? (
-                  <View style={styles.warningContainer}>
-                    <Text style={styles.errorText}>
-                      ⚠️ Missing Required Information
-                    </Text>
-                    <Text style={styles.errorDetails}>
-                      {!hasBankName && !hasAccountNumber ? 
-                        'Bank name and account number are required.' :
-                        !hasBankName ? 'Please select a bank name.' :
-                        'Account number not detected. Please retake photo.'
-                      }
-                    </Text>
-                  </View>
-                ) : hasRequiredData && !isKeyboardVisible ? (
-                  <Text style={styles.warningText}>
-                    Please confirm the details before sending.{'\n'}Transfers can't be reversed once completed.
-                  </Text>
-                ) : null}
-
-                <View style={styles.buttonContainer}>
-                  <Button
-                    title="Recheck"
-                    variant="secondary"
-                    size="lg"
-                    onPress={handleClosePress}
-                    style={styles.recheckButton}
-                    textStyle={styles.recheckButtonText}
-                  />
-                  
-                  <Button
-                    title={isLoading ? 'Processing...' : 'Continue'}
-                    variant="primary"
-                    size="lg"
-                    onPress={handleConfirmPress}
-                    disabled={isLoading || !hasRequiredData}
-                    style={{
-                      ...styles.continueButton,
-                      ...((!hasRequiredData) ? styles.disabledButton : {})
-                    }}
-                    textStyle={{
-                      ...styles.continueButtonText,
-                      ...((!hasRequiredData) ? styles.disabledButtonText : {})
-                    }}
-                  />
-                </View>
-
-              </TouchableOpacity>
-            </Animated.View>
-          </View>
-        </BlurView>
-      </View>
+                    {!isEditingAccountNumber && (
+                      <View style={styles.buttonContainer}>
+                        <Button
+                          title="Rescan"
+                          variant="secondary"
+                          size="lg"
+                          onPress={handleClosePress}
+                          style={styles.recheckButton}
+                          textStyle={styles.recheckButtonText}
+                        />
+                        
+                        <Button
+                          title={isLoading ? 'Processing...' : 'Confirm'}
+                          variant="primary"
+                          size="lg"
+                          onPress={handleConfirmPress}
+                          disabled={isLoading || !hasRequiredData}
+                          style={{
+                            ...styles.continueButton,
+                            ...(!hasRequiredData ? styles.disabledButton : {})
+                          }}
+                          textStyle={{
+                            ...styles.continueButtonText,
+                            ...(!hasRequiredData ? styles.disabledButtonText : {})
+                          }}
+                        />
+                      </View>
+                    )}
+                  </LinearGradient>
+                </Animated.View>
+              </LinearGradient>
+            </ImageBackground>
+          )}
+        </TouchableOpacity>
       </KeyboardAvoidingView>
 
-      {/* Bank Selection Modal */}
       <BankSelectionModal
         visible={showBankSelection}
         onClose={() => setShowBankSelection(false)}
@@ -484,106 +652,85 @@ export default function BankTransferModal({
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(44, 44, 44, 0.74)',
-    justifyContent: 'flex-end',
   },
-  blurView: {
+  imageBackground: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  gradientOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
   },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
+  modalView: {
+    width: '100%',
   },
   modalContent: {
-    backgroundColor: '#000000',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 24,
     paddingHorizontal: 24,
-    paddingBottom: 40,
-    minHeight: '50%',
+    paddingBottom: Platform.select({ ios: 0, android: 30 }),
+    minHeight: '40%',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 32,
-  },
-  closeButton: {
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  spacer: {
-    width: 24,
-  },
-  headerText: {
-    fontSize: 24,
-    fontFamily: fontFamilies.clashDisplay.bold,
-    color: '#FFFFFF',
-    flex: 1,
-    textAlign: 'center',
-  },
-  detailsCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 16,
-    padding: 20,
+  detailsContainer: {
     marginBottom: 24,
+    alignItems: 'flex-start',
   },
   detailRow: {
     marginBottom: 20,
+    width: '100%',
+    alignItems: 'flex-start',
   },
   detailLabel: {
     fontSize: 14,
     fontFamily: fontFamilies.sora.regular,
     color: 'rgba(255, 255, 255, 0.6)',
-    marginBottom: 8,
+    marginBottom: 10,
+    textAlign: 'left',
   },
   nameValue: {
     fontSize: 20,
-    fontFamily: fontFamilies.sora.bold,
-    color: '#F5C842',
+    fontFamily: fontFamilies.sora.extraBold,
+    color: 'rgba(255, 255, 255, 0.4)',
     lineHeight: 24,
+    textAlign: 'left',
   },
   detailValue: {
     fontSize: 20,
-    fontFamily: fontFamilies.sora.bold,
+    fontFamily: fontFamilies.sora.extraBold,
     color: '#FFFFFF',
+    flex: 1,
   },
   detailValueContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    width: '100%',
   },
-  copyButton: {
+  chevronButton: {
     padding: 4,
-  },
-  editButton: {
-    padding: 4,
-    marginRight: 8,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginLeft: 'auto',
   },
   editContainer: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   editInput: {
     fontSize: 20,
-    fontFamily: fontFamilies.sora.bold,
+    fontFamily: fontFamilies.sora.extraBold,
     color: '#FFFFFF',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 0,
     paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#F5C842',
-    marginBottom: 8,
+    flex: 1,
+    marginRight: 12,
   },
   editButtons: {
     flexDirection: 'row',
@@ -600,7 +747,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(16, 185, 129, 0.2)',
     borderRadius: 6,
   },
-  // Skeleton loading styles
   skeletonContainer: {
     paddingVertical: 4,
   },
@@ -638,7 +784,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   warningText: {
-    textAlign: 'center',
+    textAlign: 'left',
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 14,
     fontFamily: fontFamilies.sora.regular,
@@ -648,50 +794,47 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flexDirection: 'row',
     gap: 16,
+    marginBottom: 34,
   },
   recheckButton: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#242424',
     borderRadius: 25,
-    borderWidth: 0,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0)',
   },
   recheckButtonText: {
     fontSize: 16,
     fontFamily: fontFamilies.sora.semiBold,
-    color: '#A7A7A7',
+    color: '#ffffff',
+    textAlign: 'center',
+    lineHeight: 24,
   },
   continueButton: {
     flex: 1,
-    backgroundColor: '#F5C842',
+    backgroundColor: '#FFE66C',
     borderRadius: 25,
   },
   continueButtonText: {
     fontSize: 16,
     fontFamily: fontFamilies.sora.semiBold,
     color: '#000000',
-  },
-  selectBankButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: 'rgba(108, 177, 255, 0.1)',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#6CB1FF',
+    fontWeight: 'bold',
+    textAlign: 'center',
+    lineHeight: 24,
   },
   selectBankText: {
     fontSize: 16,
     fontFamily: fontFamilies.sora.semiBold,
-    color: '#6CB1FF',
-    marginRight: 8,
+    color: 'rgba(255, 255, 255, 0.4)',
+    flex: 1,
   },
   disabledButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    opacity: 0.6,
+    backgroundColor: '#242424',
+    opacity: 1,
   },
   disabledButtonText: {
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: '#525252',
   },
   missingDataText: {
     fontSize: 16,
@@ -699,24 +842,28 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.4)',
     fontStyle: 'italic',
   },
-  warningContainer: {
-    backgroundColor: 'rgba(245, 200, 66, 0.1)',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    borderLeftWidth: 0,
-    borderLeftColor: '#F5C842',
+  editPillButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 62,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginLeft: 'auto',
   },
-  errorText: {
+  editPillText: {
     fontSize: 16,
-    fontFamily: fontFamilies.sora.bold,
-    color: '#F5C842',
-    marginBottom: 8,
+    fontFamily: fontFamilies.sora.semiBold,
+    color: '#FFFFFF',
   },
-  errorDetails: {
-    fontSize: 14,
+  accountNumberInput: {
+    flex: 1,
+  },
+  editingText: {
+    color: 'rgba(255, 255, 255, 0.2)',
+  },
+  resolvingText: {
+    fontSize: 16,
     fontFamily: fontFamilies.sora.regular,
-    color: 'rgba(255, 255, 255, 0.8)',
-    lineHeight: 20,
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontStyle: 'italic',
   },
 });

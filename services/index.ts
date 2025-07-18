@@ -1,5 +1,6 @@
 export { default as ChatService } from './ChatService';
 export { default as GeminiService } from './GeminiService';
+export { default as OpenAIService } from './OpenAIService';
 export { default as CloudVisionService } from './CloudVisionService';
 export { default as HybridVisionService } from './HybridVisionService';
 export { default as ImageOptimizationService } from './ImageOptimizationService';
@@ -17,6 +18,7 @@ export { default as WalletService } from './WalletService';
 export { default as ToastService } from './ToastService';
 export { default as NotificationService } from './NotificationService';
 export { default as PushNotificationService } from './PushNotificationService';
+export { default as ScanTrackingService } from './ScanTrackingService';
 export type { Message, UserData, AuthFlowStep } from './ChatService';
 export type { ExtractedBankData } from './GeminiService';
 
@@ -63,4 +65,5 @@ export type {
 export type {
   PushNotificationData,
   PushTokenRegistration
-} from './PushNotificationService'; 
+} from './PushNotificationService';
+export type { ScanUsage, ScanLimit } from './ScanTrackingService'; 

@@ -16,12 +16,15 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
 import { useVerifyOtp, useResendOtp } from '@/hooks';
+import { useAuth } from '@/providers/AuthProvider';
+import { AuthStorageService } from '@/services';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function VerifyOTPScreen() {
   const { email, phone } = useLocalSearchParams<{ email: string; phone: string }>();
   const verifyOtpMutation = useVerifyOtp();
   const resendOtpMutation = useResendOtp();
+  const { login } = useAuth();
   
   const [otp, setOtp] = useState('');
   const [hasNavigated, setHasNavigated] = useState(false);
@@ -91,11 +94,26 @@ export default function VerifyOTPScreen() {
         otp: otpToVerify,
       });
 
-      if (result.success) {
+      if (result.success && result.data) {
+        // Store auth data directly with correct expiration from backend
+        const authStorageService = AuthStorageService.getInstance();
+        await authStorageService.storeAuthData({
+          accessToken: result.data.accessToken,
+          refreshToken: result.data.refreshToken,
+          user: result.data.user,
+          expiresIn: result.data.expiresIn, // Use backend's expiration time
+        });
+        
+        // Update auth provider state
+        await login(result.data.user, result.data.accessToken);
+        
         // Set flag to indicate fresh registration completion
         await AsyncStorage.setItem('fresh_registration', 'true');
         
-        // Navigate directly to home screen like login does
+        // Clear any modal dismissed flags for fresh registration
+        await AsyncStorage.removeItem('modal_dismissed_by_user');
+        
+        // Navigate directly to home screen - no splash/biometric for new users
         router.replace('/(tabs)');
       } else {
         setHasNavigated(false); // Allow retry

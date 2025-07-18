@@ -390,7 +390,11 @@ export default function TransactionPinModal({
       animationType="fade"
       onRequestClose={handleClosePress}
     >
-      <View style={styles.overlay}>
+      <TouchableOpacity 
+        style={styles.overlay} 
+        activeOpacity={1}
+        onPress={handleClosePress}
+      >
         <BlurView intensity={8} style={styles.blurView}>
           <KeyboardAvoidingView 
             style={styles.keyboardAvoidingView}
@@ -476,7 +480,7 @@ export default function TransactionPinModal({
             </View>
           </KeyboardAvoidingView>
         </BlurView>
-      </View>
+      </TouchableOpacity>
     </Modal>
   );
 }
