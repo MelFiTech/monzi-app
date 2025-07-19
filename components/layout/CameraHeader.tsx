@@ -350,7 +350,7 @@ export function CameraHeader({
         <View style={styles.rightSection}>
           <TouchableOpacity style={styles.iconButton} onPress={handleAddPress}>
             <Image 
-              source={require('@/assets/icons/home/scan.png')}
+              source={require('@/assets/icons/home/qr.png')}
               style={{width: 20, height: 24}}
               tintColor="#FFFFFF"
             />

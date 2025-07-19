@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     marginTop: 'auto',
-    paddingBottom: 34,
+    paddingBottom: 24,
     paddingTop: 20,
   },
 }); 

@@ -193,6 +193,8 @@ const RegisterAuthInput = forwardRef<TextInput, RegisterAuthInputProps>(
               onBlur={() => setIsFocused(false)}
               maxLength={inputType === 'phone' ? 14 : (inputType === 'password' && label.toLowerCase().includes('passcode')) ? 6 : undefined}
               {...props}
+              cursorColor="#FFE66C"
+              selectionColor="#FFE66C"
             />
           )}
           
@@ -218,15 +220,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     height: 62,
-    borderWidth: 0,
   },
   inputFocused: {
-    borderWidth: 1,
-    borderColor: '#FFE66C',
+    backgroundColor: '#151515',
   },
   inputError: {
-    borderColor: '#FF6B6B',
-    borderWidth: 1,
+    backgroundColor: '#151515',
   },
   touchableInput: {
     // Additional styles for touchable inputs if needed

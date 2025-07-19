@@ -1,6 +1,7 @@
-import React, { useRef } from 'react';
-import { View, StyleSheet, Animated, Image, Text, Dimensions } from 'react-native';
+import React, { useRef, useState, useEffect } from 'react';
+import { View, StyleSheet, Animated, Image, Text, Dimensions, AppState } from 'react-native';
 import { CameraView } from 'expo-camera';
+import { BlurView } from 'expo-blur';
 import { fontFamilies } from '@/constants/fonts';
 
 const { width } = Dimensions.get('window');
@@ -15,6 +16,7 @@ interface CameraInterfaceProps {
   instructionAnimation: Animated.Value;
   isProcessing: boolean;
   dimViewfinderRings?: boolean;
+  isAppInBackground?: boolean;
 }
 
 export default function CameraInterface({
@@ -27,11 +29,12 @@ export default function CameraInterface({
   instructionAnimation,
   isProcessing,
   dimViewfinderRings = false,
+  isAppInBackground = false,
 }: CameraInterfaceProps) {
   const ringOpacity = dimViewfinderRings ? 0.1 : 1;
   return (
     <>
-      {/* Camera View */}
+      {/* Camera View - Always show but blur when app is in background */}
       <Animated.View style={[styles.camera, { transform: [{ scale: zoomAnimation }] }]}>
         <CameraView
           ref={cameraRef}
@@ -42,6 +45,28 @@ export default function CameraInterface({
           zoom={zoom}
         />
       </Animated.View>
+
+      {/* Blur overlay when app is in background for privacy */}
+      {isAppInBackground && (
+        <BlurView
+          intensity={100}
+          tint="dark"
+          style={styles.blurOverlay}
+        >
+          <View style={styles.splashOverlay}>
+            <Image 
+              source={require('@/assets/splash/splash.png')}
+              style={styles.splashImage}
+              resizeMode="contain"
+            />
+          </View>
+        </BlurView>
+      )}
+
+      {/* Fallback dark overlay when app is in background */}
+      {isAppInBackground && (
+        <View style={styles.darkOverlay} />
+      )}
 
       {/* Dark Overlay with Circular Cutout */}
       <View style={styles.overlay}>
@@ -159,5 +184,37 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.sora.semiBold,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  splashOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#FFE66C',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  splashImage: {
+    width: '80%',
+    height: '80%',
+  },
+  blurOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+  },
+  darkOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#000000',
+    zIndex: 999,
   },
 }); 

@@ -104,8 +104,19 @@ export default function VerifyOTPScreen() {
           expiresIn: result.data.expiresIn, // Use backend's expiration time
         });
         
-        // Update auth provider state
-        await login(result.data.user, result.data.accessToken);
+        // Update auth provider state and wait for it to complete
+        // Convert UserProfile to User format for AuthProvider
+        const userData = {
+          id: result.data.user.id,
+          firstName: result.data.user.firstName || '',
+          lastName: result.data.user.lastName || '',
+          email: result.data.user.email,
+          phone: result.data.user.phone,
+        };
+        await login(userData, result.data.accessToken);
+        
+        // Small delay to ensure auth state is fully updated
+        await new Promise(resolve => setTimeout(resolve, 100));
         
         // Set flag to indicate fresh registration completion
         await AsyncStorage.setItem('fresh_registration', 'true');

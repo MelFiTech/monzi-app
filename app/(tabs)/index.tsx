@@ -10,6 +10,7 @@ import {
   Image,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/providers/AuthProvider';
@@ -190,21 +191,7 @@ export default function CameraScreen() {
     }
   );
 
-  // Auto-lock polling effect
-  useEffect(() => {
-    let isActive = true;
-    const interval = setInterval(async () => {
-      const requireReauth = await AsyncStorage.getItem('requireReauth');
-      if (requireReauth === 'true' && isActive) {
-        clearInterval(interval);
-        router.replace('/(auth)/splash');
-      }
-    }, 1000);
-    return () => {
-      isActive = false;
-      clearInterval(interval);
-    };
-  }, []);
+
 
   // Request camera permissions on component mount
   useEffect(() => {
@@ -228,7 +215,7 @@ export default function CameraScreen() {
       {/* Header - Hide when transaction history is open */}
       {!cameraLogic.showTransactionHistory && <CameraHeader />}
 
-      {/* Camera Interface - Always show for immediate feedback */}
+      {/* Camera Interface - Always show but blur when app is in background */}
       <CameraInterface
         cameraRef={cameraLogic.cameraRef}
         cameraType={cameraLogic.cameraType}
@@ -239,7 +226,30 @@ export default function CameraScreen() {
         instructionAnimation={cameraLogic.instructionAnimation}
         isProcessing={cameraLogic.isProcessing}
         dimViewfinderRings={cameraLogic.showTransactionHistory}
+        isAppInBackground={cameraLogic.isAppInBackground}
       />
+
+      {/* Blur overlay when app is in background for privacy */}
+      {cameraLogic.isAppInBackground && (
+        <BlurView
+          intensity={100}
+          tint="dark"
+          style={styles.blurOverlay}
+        >
+          <View style={styles.splashOverlay}>
+            <Image 
+              source={require('@/assets/splash/splash.png')}
+              style={styles.splashImage}
+              resizeMode="contain"
+            />
+          </View>
+        </BlurView>
+      )}
+
+      {/* Fallback dark overlay when app is in background */}
+      {cameraLogic.isAppInBackground && (
+        <View style={styles.darkOverlay} />
+      )}
 
       {/* Show Pulsating Glow only when backend is not readily available */}
       {cameraLogic.showPulsatingGlow && (
@@ -361,6 +371,38 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    zIndex: 999,
+  },
+  splashOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#FFE66C',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  splashImage: {
+    width: '80%',
+    height: '80%',
+  },
+  blurOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+  },
+  darkOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#000000',
     zIndex: 999,
   },
 });

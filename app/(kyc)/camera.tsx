@@ -12,8 +12,10 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { BlurView } from 'expo-blur';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
 import { useAuth } from '@/hooks/useAuthService';
+import { useAppState } from '@/providers/AppStateProvider';
 import { X, RotateCcw, AlertCircle } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 
@@ -25,6 +27,7 @@ export default function CameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [isCapturing, setIsCapturing] = useState(false);
   const [showErrorOverlay, setShowErrorOverlay] = useState(false);
+  const { isAppInBackground } = useAppState();
   const cameraRef = useRef<CameraView>(null);
   const { logout } = useAuth();
   const params = useLocalSearchParams();
@@ -129,6 +132,8 @@ export default function CameraScreen() {
     setFacing((current: 'front' | 'back') => (current === 'back' ? 'front' : 'back'));
   };
 
+  // App state is now managed globally by AppStateProvider
+
   return (
     <View style={styles.container}>
       <CameraView
@@ -136,6 +141,24 @@ export default function CameraScreen() {
         facing={facing}
         ref={cameraRef}
       />
+
+      {/* Blur overlay when app is in background for privacy */}
+      {isAppInBackground && (
+        <BlurView
+          intensity={100}
+          tint="dark"
+          style={styles.blurOverlay}
+        >
+          <View style={styles.splashOverlay}>
+            <Text style={styles.splashText}>Camera Hidden</Text>
+          </View>
+        </BlurView>
+      )}
+
+      {/* Fallback dark overlay when app is in background */}
+      {isAppInBackground && (
+        <View style={styles.darkOverlay} />
+      )}
 
       {/* Header */}
       <SafeAreaView style={styles.headerOverlay}>
@@ -422,5 +445,38 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontSize: fontSizes.base,
     fontFamily: fontFamilies.sora.bold,
+  },
+  blurOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+  },
+  splashOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#FFE66C',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  splashText: {
+    fontSize: fontSizes.xl,
+    fontFamily: fontFamilies.sora.bold,
+    color: '#000000',
+  },
+  darkOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#000000',
+    zIndex: 999,
   },
 });

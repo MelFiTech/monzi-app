@@ -55,18 +55,32 @@ export default function BankTransferModal({
 
   const resolveAccountMutation = useResolveAccountMutation();
 
-  // Use selected bank name if available, otherwise fall back to extracted data
+  // Use only fresh data - no fallbacks to old data
   const bankName = selectedBankName || extractedData?.bankName || '';
-  const accountNumber = finalAccountNumber || editedAccountNumber || extractedData?.accountNumber || '';
+  const accountNumber = finalAccountNumber || editedAccountNumber || '';
   const accountHolderName = resolvedAccountName || extractedData?.accountHolderName || '';
   const extractedAmount = extractedData?.amount || amount;
 
-  // Initialize final account number when modal opens with extracted data
+  // Reset all state when modal opens to ensure fresh data
   useEffect(() => {
-    if (visible && extractedData?.accountNumber && !finalAccountNumber) {
-      setFinalAccountNumber(extractedData.accountNumber);
+    if (visible) {
+      // Reset all persistent state to ensure fresh data
+      setSelectedBankName('');
+      setResolvedAccountName(null);
+      setFinalAccountNumber('');
+      setEditedAccountNumber('');
+      setHasResolutionFailed(false);
+      setIsResolvingAccount(false);
+      setRetryCount(0);
+      setIsAutoRetrying(false);
+      setIsEditingAccountNumber(false);
+      
+      // Only set data from fresh extraction, no fallbacks
+      if (extractedData?.accountNumber) {
+        setFinalAccountNumber(extractedData.accountNumber);
+      }
     }
-  }, [visible, extractedData?.accountNumber, finalAccountNumber]);
+  }, [visible, extractedData]);
 
   // Debug logging for bank selection and account number
   useEffect(() => {

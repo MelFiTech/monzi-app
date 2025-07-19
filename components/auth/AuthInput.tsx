@@ -69,6 +69,8 @@ export function AuthInput({
           autoComplete={autoComplete}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
+          cursorColor="#FFE66C"
+          selectionColor="#FFE66C"
         />
         
         {isPassword && (

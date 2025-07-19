@@ -111,6 +111,8 @@ const PhoneNumberInput = forwardRef<TextInput, PhoneNumberInputProps>(
             onBlur={() => setIsFocused(false)}
             maxLength={15} // +234 + space + 10 digits
             {...props}
+            cursorColor="#FFE66C"
+            selectionColor="#FFE66C"
           />
         </View>
         
@@ -133,15 +135,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     height: 62,
-    borderWidth: 0,
   },
   inputFocused: {
-    borderWidth: 1,
-    borderColor: '#FFE66C',
+    backgroundColor: '#151515',
   },
   inputError: {
-    borderColor: '#FF6B6B',
-    borderWidth: 1,
+    backgroundColor: '#151515',
   },
   input: {
     flex: 1,

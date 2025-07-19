@@ -5,6 +5,7 @@ import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { ExtractedBankData } from '@/services';
+import { useAppState } from '@/providers/AppStateProvider';
 import { useHybridVisionExtractBankDataMutation } from '@/hooks';
 import { useResolveAccountMutation } from '@/hooks/useAccountService';
 import { useWalletRecovery } from '@/hooks/useWalletService';
@@ -53,6 +54,9 @@ export function useCameraLogic() {
   const walletRecoveryMutation = useWalletRecovery();
   const transactionsData = useTransactionsList();
   const recordScanMutation = useRecordScan();
+
+  // App state management for camera privacy
+  const { isAppInBackground } = useAppState();
 
   // Hide instructions after 3 seconds
   useEffect(() => {
@@ -116,6 +120,8 @@ export function useCameraLogic() {
       }
     }, [isInKYCFlow])
   );
+
+  // App state is now managed globally by AppStateProvider
 
   // Remove the polling effect that was causing infinite loops
 
@@ -181,7 +187,8 @@ export function useCameraLogic() {
         // Continue with extraction even if scan recording fails
       }
       
-      // Set captured image URI and show extraction loader immediately
+      // Clear old data and set captured image URI
+      setExtractedData(null);
       setCapturedImageUri(photo.uri);
       setIsCapturing(false);
       setShowExtractionLoader(true);
@@ -255,7 +262,8 @@ export function useCameraLogic() {
         // Continue with extraction even if scan recording fails
       }
       
-      // Set captured image URI and show extraction loader immediately
+      // Clear old data and set captured image URI
+      setExtractedData(null);
       setCapturedImageUri(imageUri);
       setShowExtractionLoader(true);
       
@@ -510,6 +518,7 @@ export function useCameraLogic() {
     showPulsatingGlow,
     showTransactionHistory,
     isInKYCFlow,
+    isAppInBackground,
     
     // Extraction loader state
     showExtractionLoader,
