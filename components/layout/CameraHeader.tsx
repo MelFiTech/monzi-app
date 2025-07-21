@@ -20,6 +20,7 @@ import Toast from '@/components/common/Toast';
 import { WalletHeaderSkeleton } from '@/components/common';
 import { useQueryClient } from '@tanstack/react-query';
 
+
 interface CameraHeaderProps {
   title?: string;
   showBackButton?: boolean;
@@ -71,6 +72,7 @@ export function CameraHeader({
   const [copied, setCopied] = useState(false);
   const [isBalanceHidden, setIsBalanceHidden] = useState(false);
   const [showToast, setShowToast] = useState(false);
+
   const queryClient = useQueryClient();
 
   // Check wallet access status
@@ -212,9 +214,7 @@ export function CameraHeader({
   const isWalletDataLoading = hasWalletAccess && (isBalanceLoading || isWalletLoading);
 
   const handleAddPress = () => {
-    // Show "Feature coming soon" toast
-    setShowToast(true);
-    // You can customize the toast message here
+    router.push('/qr-modal');
   };
 
   const handleModalPress = () => {
@@ -237,7 +237,6 @@ export function CameraHeader({
     try {
       await Clipboard.setStringAsync(walletDetails.virtualAccountNumber);
       setCopied(true);
-      setShowToast(true);
       
       // Reset copied state after 2 seconds
       setTimeout(() => {
@@ -357,6 +356,7 @@ export function CameraHeader({
           </TouchableOpacity>
         </View>
       </LinearGradient>
+      
     </>
   );
 }

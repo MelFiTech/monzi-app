@@ -171,12 +171,38 @@ class CloudVisionService {
       /(?:amount|total|sum)\s*:?\s*(?:₦|N|NGN)?\s*([0-9,]+(?:\.\d{2})?)/gi
     ];
 
-    // Extract account number
+    // Extract account number with improved logic
     const accountMatches = text.match(accountNumberPattern);
     if (accountMatches && accountMatches.length > 0) {
-      accountNumber = accountMatches[0];
+      // If multiple 10-digit numbers found, prioritize the one that's not part of other text
+      if (accountMatches.length > 1) {
+        console.log('🔍 CloudVision: Multiple account numbers found:', accountMatches);
+        
+        // Filter out numbers that are part of other words/phrases
+        const validAccountNumbers = accountMatches.filter(match => {
+          const context = text.substring(Math.max(0, text.indexOf(match) - 10), text.indexOf(match) + match.length + 10);
+          console.log('🔍 CloudVision: Context for', match, ':', context);
+          
+          // Exclude if it's part of "Frame" or other non-account contexts
+          const isPartOfFrame = /frame\s*\d{10}/i.test(context);
+          const isPartOfOtherWord = /[a-zA-Z]\d{10}|\d{10}[a-zA-Z]/.test(context);
+          
+          return !isPartOfFrame && !isPartOfOtherWord;
+        });
+        
+        if (validAccountNumbers.length > 0) {
+          accountNumber = validAccountNumbers[0];
+          console.log('✅ CloudVision: Selected valid account number:', accountNumber);
+        } else {
+          // Fallback to first match if no valid ones found
+          accountNumber = accountMatches[0];
+          console.log('⚠️ CloudVision: Using fallback account number:', accountNumber);
+        }
+      } else {
+        accountNumber = accountMatches[0];
+        console.log('✅ CloudVision: Found single account number:', accountNumber);
+      }
       confidence += 25;
-      console.log('✅ CloudVision: Found account number:', accountNumber);
     }
 
     // Extract bank name
@@ -296,29 +322,51 @@ class CloudVisionService {
       /(?:receive|send|transfer)\s*(?:₦|NGN|N)?\s*([0-9,]+(?:\.\d{2})?)/gi
     ];
 
-    // Extract account number with higher confidence scoring
+    // Extract account number with higher confidence scoring and context filtering
     const accountMatches = allText.match(accountNumberPattern);
     if (accountMatches && accountMatches.length > 0) {
-      // Prefer account numbers that appear with context keywords
-      const contextKeywords = ['account', 'number', 'acct', 'a/c'];
-      let bestMatch = accountMatches[0];
-      let bestScore = 1;
+      console.log('🔍 CloudVision: Found account number candidates:', accountMatches);
       
-      for (const match of accountMatches) {
-        const contextScore = contextKeywords.reduce((score, keyword) => {
-          const regex = new RegExp(`${keyword}.*${match}|${match}.*${keyword}`, 'gi');
-          return regex.test(allText) ? score + 1 : score;
-        }, 0);
+      // Filter out numbers that are part of other words/phrases
+      const validAccountNumbers = accountMatches.filter(match => {
+        const context = allText.substring(Math.max(0, allText.indexOf(match) - 15), allText.indexOf(match) + match.length + 15);
+        console.log('🔍 CloudVision: Context for', match, ':', context);
         
-        if (contextScore > bestScore) {
-          bestMatch = match;
-          bestScore = contextScore;
-        }
-      }
+        // Exclude if it's part of "Frame" or other non-account contexts
+        const isPartOfFrame = /frame\s*\d{10}/i.test(context);
+        const isPartOfOtherWord = /[a-zA-Z]\d{10}|\d{10}[a-zA-Z]/.test(context);
+        const isPartOfDate = /\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4}/.test(context);
+        
+        return !isPartOfFrame && !isPartOfOtherWord && !isPartOfDate;
+      });
       
-      accountNumber = bestMatch;
-      confidence += 30 + (bestScore * 5); // Bonus for context
-      console.log('✅ CloudVision: Found account number with context:', accountNumber);
+      if (validAccountNumbers.length > 0) {
+        // Prefer account numbers that appear with context keywords
+        const contextKeywords = ['account', 'number', 'acct', 'a/c', 'bank'];
+        let bestMatch = validAccountNumbers[0];
+        let bestScore = 1;
+        
+        for (const match of validAccountNumbers) {
+          const contextScore = contextKeywords.reduce((score, keyword) => {
+            const regex = new RegExp(`${keyword}.*${match}|${match}.*${keyword}`, 'gi');
+            return regex.test(allText) ? score + 1 : score;
+          }, 0);
+          
+          if (contextScore > bestScore) {
+            bestMatch = match;
+            bestScore = contextScore;
+          }
+        }
+        
+        accountNumber = bestMatch;
+        confidence += 30 + (bestScore * 5); // Bonus for context
+        console.log('✅ CloudVision: Selected valid account number with context:', accountNumber);
+      } else {
+        // Fallback to first match if no valid ones found
+        accountNumber = accountMatches[0];
+        confidence += 20; // Lower confidence for fallback
+        console.log('⚠️ CloudVision: Using fallback account number:', accountNumber);
+      }
     }
 
     // Extract bank name with PRIORITY-BASED matching and confidence scoring

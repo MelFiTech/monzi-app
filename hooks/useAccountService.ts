@@ -61,6 +61,25 @@ export function useResolveAccountMutation() {
   });
 }
 
+// Super Resolve Mutation Hook (for account-only resolution)
+export function useSuperResolveAccountMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ accountNumber }: { accountNumber: string }) =>
+      AccountService.superResolveAccount(accountNumber),
+    onSuccess: (data, variables) => {
+      // Cache the successful super resolution
+      queryClient.setQueryData(
+        accountQueryKeys.resolution(variables.accountNumber, data.bank_name),
+        data
+      );
+    },
+    retry: 1,
+    retryDelay: 2000,
+  });
+}
+
 // Prefetch Account Resolution Hook
 export function usePrefetchAccountResolution() {
   const queryClient = useQueryClient();

@@ -7,6 +7,7 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/providers/ThemeProvider';
 import { typography } from '@/constants/fonts';
 
@@ -22,6 +23,7 @@ interface ButtonProps {
   textStyle?: TextStyle;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  hapticFeedback?: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error' | 'none';
 }
 
 export function Button({
@@ -36,33 +38,34 @@ export function Button({
   textStyle,
   leftIcon,
   rightIcon,
+  hapticFeedback = 'light',
 }: ButtonProps) {
   const { colors } = useTheme();
 
   const getButtonStyles = (): ViewStyle[] => {
-    const baseStyle = [styles.button];
+    const baseStyle: ViewStyle[] = [styles.button];
     
     // Add size styles
     switch (size) {
       case 'xs':
-        baseStyle.push(styles.xs);
+        baseStyle.push(styles.xs as ViewStyle);
         break;
       case 'sm':
-        baseStyle.push(styles.sm);
+        baseStyle.push(styles.sm as ViewStyle);
         break;
       case 'lg':
-        baseStyle.push(styles.lg);
+        baseStyle.push(styles.lg as ViewStyle);
         break;
       case 'xl':
-        baseStyle.push(styles.xl);
+        baseStyle.push(styles.xl as ViewStyle);
         break;
       default:
-        baseStyle.push(styles.md);
+        baseStyle.push(styles.md as ViewStyle);
     }
 
     // Add width style
     if (fullWidth) {
-      baseStyle.push(styles.fullWidth);
+      baseStyle.push(styles.fullWidth as ViewStyle);
     }
 
     // Add variant styles
@@ -116,7 +119,7 @@ export function Button({
         break;
       case 'white':
         baseStyle.push({
-          backgroundColor: isDisabled ? '#242424' : colors.white,
+          backgroundColor: isDisabled ? '#242424' : '#FFFFFF',
           borderRadius: 100,
         });
         break;
@@ -131,20 +134,20 @@ export function Button({
   };
 
   const getTextStyles = (): TextStyle[] => {
-    const baseStyle = [styles.text];
+    const baseStyle: TextStyle[] = [styles.text];
 
     // Add size text styles from typography
     switch (size) {
       case 'xs':
       case 'sm':
-        baseStyle.push(typography.button.small);
+        baseStyle.push(typography.button.small as TextStyle);
         break;
       case 'lg':
       case 'xl':
-        baseStyle.push(typography.button.large);
+        baseStyle.push(typography.button.large as TextStyle);
         break;
       default:
-        baseStyle.push(typography.button.medium);
+        baseStyle.push(typography.button.medium as TextStyle);
     }
 
     // Add variant text styles
@@ -190,16 +193,53 @@ export function Button({
       case 'success':
       case 'error':
       case 'warning':
-        return colors.white;
+        return '#FFFFFF';
       default:
         return '#FFE66C';
     }
   };
 
+  const triggerHapticFeedback = async () => {
+    if (disabled || loading || hapticFeedback === 'none') {
+      return;
+    }
+
+    try {
+      switch (hapticFeedback) {
+        case 'light':
+          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          break;
+        case 'medium':
+          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          break;
+        case 'heavy':
+          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+          break;
+        case 'success':
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          break;
+        case 'warning':
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          break;
+        case 'error':
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          break;
+      }
+    } catch (error) {
+      // Silently handle haptic feedback errors
+      console.warn('Haptic feedback failed:', error);
+    }
+  };
+
+  const handlePress = async () => {
+    await triggerHapticFeedback();
+    onPress();
+  };
+
   return (
     <TouchableOpacity
       style={getButtonStyles()}
-      onPress={onPress}
+      onPress={handlePress}
       disabled={disabled || loading}
       activeOpacity={0.8}
     >

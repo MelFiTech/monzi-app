@@ -17,13 +17,14 @@ import { fontFamilies } from '@/constants/fonts';
 import { ArrowLeft } from 'lucide-react-native';
 import RecipientDetailCard from '@/components/common/RecipientDetailCard';
 import AmountPill from '@/components/common/AmountPill';
-import SlideToPayButton from '@/components/common/SlideToPayButton';
+import Button from '@/components/common/Button';
 import TransactionPinModal from '@/components/common/TransactionPinModal';
 import { PulsatingGlow } from '@/components/common';
 import { useWalletBalance, useRefreshWallet, useOptimisticBalance, useTransferFunds, useWalletAccessStatus } from '@/hooks/useWalletService';
 import { useNotificationService } from '@/hooks/useNotificationService';
 import { useQueryClient } from '@tanstack/react-query';
 import BiometricService from '@/services/BiometricService';
+import * as Haptics from 'expo-haptics';
 
 const predefinedAmounts = ['N5,000', 'N10,000', 'N20,000'];
 
@@ -46,7 +47,6 @@ export default function TransferScreen() {
   const [showPinModal, setShowPinModal] = useState(false);
   const [amountError, setAmountError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [buttonKey, setButtonKey] = useState(0); // Key to force button reset
 
   // Check wallet access status
   const { hasWalletAccess, statusMessage } = useWalletAccessStatus();
@@ -297,6 +297,9 @@ export default function TransferScreen() {
   };
 
   const handleTransferPress = async () => {
+    // Trigger heavy haptic feedback
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+
     // Check if user has wallet access first
     if (!hasWalletAccess) {
       Alert.alert(
@@ -404,8 +407,6 @@ export default function TransferScreen() {
 
   const handlePinModalClose = () => {
     setShowPinModal(false);
-    // Reset the slide button when PIN modal is closed
-    setButtonKey(prev => prev + 1);
   };
 
 
@@ -525,12 +526,11 @@ export default function TransferScreen() {
 
         {/* Pay Button */}
         <View style={styles.payButtonContainer}>
-          <SlideToPayButton
-            key={buttonKey} // Force re-render to reset position
-            title={transferFundsMutation.isPending ? "Processing..." : "Slide to pay..."}
-            onComplete={handleTransferPress}
+          <Button
+            title={transferFundsMutation.isPending ? "Processing..." : "Pay"}
+            onPress={handleTransferPress}
             disabled={!amount || amount === '0' || !!amountError || isBalanceLoading}
-            processing={transferFundsMutation.isPending}
+            loading={transferFundsMutation.isPending}
           />
         </View>
       </KeyboardAvoidingView>

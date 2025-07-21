@@ -6,6 +6,21 @@ interface AccountResolutionRequest {
   bank_name: string;
 }
 
+interface SuperResolveRequest {
+  account_number: string;
+}
+
+interface SuperResolveResponse {
+  success: boolean;
+  account_name: string;
+  account_number: string;
+  bank_name: string;
+  bank_code: string;
+  message: string;
+  banks_tested?: number;
+  execution_time?: number;
+}
+
 interface AccountResolutionResponse {
   status: boolean;
   account_name: string;
@@ -26,6 +41,7 @@ type AccountResolutionResult = AccountResolutionResponse | AccountResolutionErro
 class AccountService {
   private static readonly BASE_URL = Config.API.getBaseUrl();
   private static readonly RESOLVE_ENDPOINT = '/accounts/resolve';
+  private static readonly SUPER_RESOLVE_ENDPOINT = '/accounts/super-resolve';
   private static readonly BANKS_ENDPOINT = '/accounts/banks';
 
   /**
@@ -81,6 +97,68 @@ class AccountService {
       }
       
       throw new Error('Failed to resolve account: Unknown error');
+    }
+  }
+
+  /**
+   * Super resolve account number across all banks automatically
+   * Tests the account number against all available banks and returns the first successful match
+   */
+  static async superResolveAccount(accountNumber: string): Promise<AccountResolutionResponse> {
+    try {
+      console.log('🚀 Super resolving account:', { accountNumber });
+
+      const requestBody: SuperResolveRequest = {
+        account_number: accountNumber,
+      };
+
+      const response = await fetch(`${this.BASE_URL}${this.SUPER_RESOLVE_ENDPOINT}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data: SuperResolveResponse = await response.json();
+
+      console.log('📦 Super resolve response:', data);
+
+      if (!data.success) {
+        throw new Error(data.message || 'Super resolve failed');
+      }
+
+      // Convert the response to our expected format
+      const successData: AccountResolutionResponse = {
+        status: data.success,
+        account_name: data.account_name,
+        account_number: data.account_number,
+        bank_name: data.bank_name,
+        bank_code: data.bank_code,
+        message: data.message
+      };
+      
+      console.log('✅ Super resolve successful:', {
+        accountName: successData.account_name,
+        bankName: successData.bank_name,
+        bankCode: successData.bank_code,
+      });
+
+      return successData;
+    } catch (error) {
+      console.error('❌ Super resolve error:', error);
+      
+      // Re-throw with more context
+      if (error instanceof Error) {
+        throw new Error(`Failed to super resolve account: ${error.message}`);
+      }
+      
+      throw new Error('Failed to super resolve account: Unknown error');
     }
   }
 

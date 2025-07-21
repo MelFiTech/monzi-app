@@ -116,14 +116,37 @@ export default function CameraControls({
         colors={['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0.75)']}
         style={[styles.bottomContainer, showTransactionHistory && styles.bottomContainerPushedUp]}
       >
-        {/* Free scans text */}
+        {/* Zoom Controls */}
         <View style={styles.zoomContainer}>
-          <Text style={[
-            styles.zoomButtonText,
-            remainingFreeScans !== undefined && remainingFreeScans <= 3 && styles.warningText
-          ]}>
-            {scanStatusLoading ? 'Loading...' : scanStatusMessage || '20 free scans left this month'}
-          </Text>
+          <TouchableOpacity
+            style={[styles.zoomButton, zoom === 0.1 && styles.zoomButtonActive]}
+            onPress={() => onZoomChange(0.1)}
+            disabled={isConnectionDisabled || showTransactionHistory}
+          >
+            <Text style={[styles.zoomButtonText, zoom === 0.1 && styles.zoomButtonTextActive]}>
+              0.9x
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.zoomButton, zoom === 0.2 && styles.zoomButtonActive]}
+            onPress={() => onZoomChange(0.2)}
+            disabled={isConnectionDisabled || showTransactionHistory}
+          >
+            <Text style={[styles.zoomButtonText, zoom === 0.2 && styles.zoomButtonTextActive]}>
+              1x
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.zoomButton, zoom === 0.3 && styles.zoomButtonActive]}
+            onPress={() => onZoomChange(0.3)}
+            disabled={isConnectionDisabled || showTransactionHistory}
+          >
+            <Text style={[styles.zoomButtonText, zoom === 0.3 && styles.zoomButtonTextActive]}>
+              1.1x
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Bottom Controls */}
@@ -258,28 +281,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 20,
+    gap: 8,
     paddingHorizontal: 40,
-    marginBottom: 14,
+    marginBottom: 10,
   },
   zoomButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    padding: 10,
+    borderRadius: 33,
+    width: 53,
+    height: 33,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   zoomButtonActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   zoomButtonText: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontFamily: fontFamilies.sora.medium,
-  },
-  warningText: {
-    color: '#FF6B6B',
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontFamily: fontFamilies.sora.semiBold,
   },
   zoomButtonTextActive: {
-    color: '#FFFFFF',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   bottomContainer: {
     position: 'absolute',
