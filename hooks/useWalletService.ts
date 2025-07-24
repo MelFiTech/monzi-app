@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, UseQueryResult, UseMutationResult } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { useAuth } from './useAuthService';
+import { useAuth } from '@/providers/AuthProvider';
 import { useKYCStatus } from './useKYCService';
 import WalletService, { 
   WalletDetails, 
@@ -31,20 +31,31 @@ export const walletKeys = {
  * Optimized with useMemo to prevent unnecessary re-computations
  */
 const useWalletAccess = () => {
-  const { isAuthenticated } = useAuth();
-  const { data: kycStatus } = useKYCStatus();
+  const { isAuthenticated, authToken } = useAuth();
+  const { data: kycStatus, isLoading: kycLoading } = useKYCStatus();
   
   const walletAccessInfo = useMemo(() => {
-  const hasWalletAccess = isAuthenticated && 
-                         (kycStatus?.kycStatus === 'VERIFIED' || kycStatus?.kycStatus === 'APPROVED') && 
-                         kycStatus?.isVerified === true;
+    const hasWalletAccess = isAuthenticated && 
+                           (kycStatus?.kycStatus === 'VERIFIED' || kycStatus?.kycStatus === 'APPROVED') && 
+                           kycStatus?.isVerified === true;
+    
+    console.log('🔍 [WalletAccess] Status Check:', {
+      isAuthenticated,
+      hasAuthToken: !!authToken,
+      kycStatus: kycStatus?.kycStatus,
+      isVerified: kycStatus?.isVerified,
+      kycLoading,
+      hasWalletAccess,
+      timestamp: new Date().toISOString()
+    });
   
     return { 
       hasWalletAccess, 
-    isAuthenticated,
-      kycStatus 
+      isAuthenticated,
+      kycStatus,
+      kycLoading
     };
-  }, [isAuthenticated, kycStatus?.kycStatus, kycStatus?.isVerified]);
+  }, [isAuthenticated, authToken, kycStatus?.kycStatus, kycStatus?.isVerified, kycLoading]);
   
   return walletAccessInfo;
 };
@@ -132,6 +143,27 @@ export function useTransactionHistory(
     retryDelay: 1000,
     staleTime: 5 * 60 * 1000, // 5 minutes (transactions don't change after created)
     gcTime: 15 * 60 * 1000, // 15 minutes cache time
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnReconnect: true, // Refetch on reconnect
+    refetchInterval: false, // No automatic refetching
+  });
+}
+
+/**
+ * Hook to get individual transaction details
+ */
+export function useTransactionDetail(transactionId: string): UseQueryResult<Transaction, WalletError> {
+  const walletService = WalletService.getInstance();
+  const { hasWalletAccess } = useWalletAccess();
+
+  return useQuery({
+    queryKey: [...walletKeys.all, 'transaction', transactionId],
+    queryFn: () => walletService.getTransactionDetail(transactionId),
+    enabled: hasWalletAccess && !!transactionId, // Only fetch if user has wallet access and transactionId is provided
+    retry: 2,
+    retryDelay: 1000,
+    staleTime: 10 * 60 * 1000, // 10 minutes (transaction details rarely change)
+    gcTime: 30 * 60 * 1000, // 30 minutes cache time
     refetchOnWindowFocus: false, // Don't refetch on window focus
     refetchOnReconnect: true, // Refetch on reconnect
     refetchInterval: false, // No automatic refetching
@@ -403,7 +435,7 @@ export function useWalletOverview() {
  * Hook to check wallet access status for UI components
  */
 export function useWalletAccessStatus() {
-  const { hasWalletAccess, isAuthenticated, kycStatus } = useWalletAccess();
+  const { hasWalletAccess, isAuthenticated, kycStatus, kycLoading } = useWalletAccess();
   
   const getWalletStatusMessage = () => {
     if (!isAuthenticated) {
@@ -434,6 +466,7 @@ export function useWalletAccessStatus() {
     hasWalletAccess,
     isAuthenticated,
     kycStatus,
+    kycLoading,
     statusMessage: getWalletStatusMessage(),
   };
 } 

@@ -18,6 +18,10 @@ export interface Transaction {
   source?: string;
   timestamp: Date;
   reference?: string;
+  status?: 'successful' | 'pending' | 'failed';
+  senderName?: string;
+  senderAccount?: string;
+  senderBank?: string;
 }
 
 interface TransactionListItemProps {

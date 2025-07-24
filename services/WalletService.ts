@@ -34,10 +34,68 @@ export interface Transaction {
   status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
   reference: string;
   description: string;
-  fee: number;
+  fee: number | null | {
+    amount: number;
+    currency: string;
+    breakdown?: any;
+  };
   createdAt: string;
   sender?: TransactionParticipant;
   receiver?: TransactionParticipant;
+  // Additional fields for transaction details
+  senderName?: string;
+  senderAccount?: string;
+  senderBank?: string;
+  receiverName?: string;
+  receiverAccount?: string;
+  receiverBank?: string;
+  currency?: string;
+  updatedAt?: string;
+  // New fields from the API response
+  source?: {
+    type: string;
+    name: string;
+    provider?: string;
+    accountNumber: string;
+    bankName?: string;
+    bankCode?: string;
+  };
+  destination?: {
+    type: string;
+    name: string;
+    accountNumber: string;
+    provider?: string;
+    bankName?: string;
+    bankCode?: string;
+  };
+  balanceImpact?: number | null;
+  timeline?: {
+    createdAt: string;
+    completedAt: string;
+    updatedAt: string;
+  };
+  metadata?: {
+    feeType?: string;
+    provider?: string;
+    eventType?: string;
+    netAmount?: number;
+    fundingFee?: number;
+    grossAmount?: number;
+    accountNumber?: string;
+    webhookProcessedAt?: string;
+    walletTransactionId?: string;
+    // Additional fields for WITHDRAWAL transactions
+    fee?: number;
+    bankCode?: string;
+    providerFee?: number;
+    recipientBank?: string;
+    recipientName?: string;
+    recipientAccount?: string;
+    providerStatus?: string;
+    providerReference?: string;
+  };
+  providerReference?: string | null;
+  providerResponse?: any | null;
 }
 
 export interface TransactionHistoryParams {
@@ -244,6 +302,38 @@ class WalletService {
       return await this.handleResponse<Transaction[]>(response);
     } catch (error) {
       console.error('Get transaction history error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get individual transaction details
+   */
+  async getTransactionDetail(transactionId: string): Promise<Transaction> {
+    try {
+      const headers = await this.getAuthHeaders();
+      
+      console.log('🔍 Fetching transaction details for ID:', transactionId);
+      
+      const response = await fetch(`${this.baseUrl}/auth/transactions/${transactionId}`, {
+        method: 'GET',
+        headers,
+      });
+
+      const result = await this.handleResponse<{ success: boolean; transaction: Transaction }>(response);
+      
+      console.log('✅ Transaction details response:', {
+        id: result.transaction.id,
+        amount: result.transaction.amount,
+        type: result.transaction.type,
+        status: result.transaction.status,
+        reference: result.transaction.reference,
+        description: result.transaction.description
+      });
+      
+      return result.transaction;
+    } catch (error) {
+      console.error('❌ Get transaction detail error:', error);
       throw error;
     }
   }

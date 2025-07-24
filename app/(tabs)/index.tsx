@@ -299,7 +299,13 @@ export default function CameraScreen() {
           transactions={cameraLogic.transactionsData.transactions}
           onTransactionPress={(transaction: Transaction) => {
             console.log('Transaction pressed:', transaction);
-            // TODO: Navigate to transaction details
+            // Navigate to transaction detail screen with just the ID
+            router.push({
+              pathname: '/transaction-detail',
+              params: {
+                id: transaction.id,
+              }
+            });
           }}
           loading={cameraLogic.transactionsData.loading}
           refreshing={cameraLogic.transactionsData.refreshing}

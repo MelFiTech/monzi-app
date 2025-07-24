@@ -76,7 +76,7 @@ export function CameraHeader({
   const queryClient = useQueryClient();
 
   // Check wallet access status
-  const { hasWalletAccess, statusMessage } = useWalletAccessStatus();
+  const { hasWalletAccess, statusMessage, isAuthenticated, kycLoading } = useWalletAccessStatus();
 
   // Fetch wallet data only if user has access
   const { data: balanceData, isLoading: isBalanceLoading } = useWalletBalance();
@@ -192,26 +192,71 @@ export function CameraHeader({
   // Handle wallet data based on access status
   const getWalletBalance = () => {
     if (!hasWalletAccess) {
+      // If user is authenticated but wallet access is still being determined, return null to show skeleton
+      if (isAuthenticated) {
+        return null;
+      }
       return propWalletBalance || "₦0.00";
     }
-    return balanceData?.formattedBalance || propWalletBalance || "₦0.00";
+    // Only return balance if we have actual data, not fallback to zero
+    return balanceData?.formattedBalance || propWalletBalance || null;
   };
 
   const getAccountInfo = () => {
     if (!hasWalletAccess) {
+      // If user is authenticated but wallet access is still being determined, return null to show skeleton
+      if (isAuthenticated) {
+        return null;
+      }
       return propAccountInfo || "No account yet";
     }
     return walletDetails 
       ? `${walletDetails.bankName} • ${walletDetails.virtualAccountNumber}`
-      : propAccountInfo || "Loading...";
+      : propAccountInfo || null;
   };
 
   const rawBalance = getWalletBalance();
-  const walletBalance = formatBalance(rawBalance);
+  const walletBalance = rawBalance ? formatBalance(rawBalance) : null;
   const accountInfo = getAccountInfo();
 
-  // Check if we should show skeleton loader
-  const isWalletDataLoading = hasWalletAccess && (isBalanceLoading || isWalletLoading);
+  // Check if we should show skeleton loader - include case where we have access but no data yet
+  // Also show skeleton when user is authenticated but wallet access is still being determined
+  const isWalletDataLoading = (hasWalletAccess && (
+    isBalanceLoading || 
+    isWalletLoading || 
+    !balanceData?.formattedBalance || 
+    !walletDetails ||
+    !walletBalance ||
+    !accountInfo
+  )) || (
+    // Show skeleton when user is authenticated but wallet access is still being determined
+    isAuthenticated && 
+    !hasWalletAccess
+  ) || (
+    // Show skeleton when KYC status is still loading
+    isAuthenticated && 
+    kycLoading
+  );
+
+  // Debug loading states
+  console.log('🔍 [CameraHeader] Loading States:', {
+    isAuthenticated,
+    hasWalletAccess,
+    kycLoading,
+    isBalanceLoading,
+    isWalletLoading,
+    hasBalanceData: !!balanceData?.formattedBalance,
+    hasWalletDetails: !!walletDetails,
+    hasWalletBalance: !!walletBalance,
+    hasAccountInfo: !!accountInfo,
+    isWalletDataLoading,
+    rawBalance,
+    walletBalance: walletBalance ? 'has-balance' : 'no-balance',
+    balanceDataValue: balanceData?.formattedBalance,
+    propWalletBalance,
+    shouldShowSkeleton: isAuthenticated && !hasWalletAccess,
+    timestamp: new Date().toISOString()
+  });
 
   const handleAddPress = () => {
     router.push('/qr-modal');
@@ -304,7 +349,7 @@ export function CameraHeader({
               <TouchableOpacity onPress={toggleBalanceVisibility}>
                 {isBalanceHidden ? (
                   <Text style={styles.walletAmount}>********</Text>
-                ) : (
+                ) : walletBalance ? (
                   <View style={styles.balanceContainer}>
                     {(() => {
                       // Split balance into naira and kobo parts
@@ -327,20 +372,32 @@ export function CameraHeader({
                       );
                     })()}
                   </View>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.accountPill}
-                onPress={handleCopyAccount}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.accountText}>{accountInfo}</Text>
-                {copied ? (
-                  <Check size={16} color="#10B981" strokeWidth={1.5} />
                 ) : (
-                  <Copy size={16} color="rgba(255, 255, 255, 0.6)" strokeWidth={1.5} />
+                  // Show skeleton loader when balance is not available
+                  <View style={styles.balanceContainer}>
+                    <View style={styles.balanceSkeleton} />
+                  </View>
                 )}
               </TouchableOpacity>
+              {accountInfo ? (
+                <TouchableOpacity 
+                  style={styles.accountPill}
+                  onPress={handleCopyAccount}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.accountText}>{accountInfo}</Text>
+                  {copied ? (
+                    <Check size={16} color="#10B981" strokeWidth={1.5} />
+                  ) : (
+                    <Copy size={16} color="rgba(255, 255, 255, 0.6)" strokeWidth={1.5} />
+                  )}
+                </TouchableOpacity>
+              ) : (
+                // Show skeleton loader when account info is not available
+                <View style={styles.accountPill}>
+                  <View style={styles.accountSkeleton} />
+                </View>
+              )}
             </View>
           )}
         </View>
@@ -460,6 +517,18 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.97)',
     fontFamily: fontFamilies.sora.semiBold,
     letterSpacing: -0.3,
+  },
+  balanceSkeleton: {
+    width: 120,
+    height: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 4,
+  },
+  accountSkeleton: {
+    width: 140,
+    height: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 4,
   },
 });
 

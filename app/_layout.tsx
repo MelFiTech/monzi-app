@@ -137,6 +137,7 @@ function RootLayoutNav() {
                   <Stack.Screen name="transfer" options={{ headerShown: false }} />
                   <Stack.Screen name="transfer-success" options={{ headerShown: false }} />
                   <Stack.Screen name="transfer-loader" options={{ headerShown: false }} />
+                  <Stack.Screen name="transaction-detail" options={{ headerShown: false }} />
                   <Stack.Screen name="(kyc)" options={{ headerShown: false }} />
                   <Stack.Screen name="security" options={{ presentation: 'modal', headerShown: false }} />
                   <Stack.Screen name="change-pin" options={{ headerShown: false }} />

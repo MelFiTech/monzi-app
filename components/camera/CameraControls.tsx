@@ -118,35 +118,37 @@ export default function CameraControls({
       >
         {/* Zoom Controls */}
         <View style={styles.zoomContainer}>
-          <TouchableOpacity
-            style={[styles.zoomButton, zoom === 0.1 && styles.zoomButtonActive]}
-            onPress={() => onZoomChange(0.1)}
-            disabled={isConnectionDisabled || showTransactionHistory}
-          >
-            <Text style={[styles.zoomButtonText, zoom === 0.1 && styles.zoomButtonTextActive]}>
-              0.9x
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.zoomPill}>
+            <TouchableOpacity
+              style={[styles.zoomButton, zoom === 0.1 && styles.zoomButtonActive]}
+              onPress={() => onZoomChange(0.1)}
+              disabled={isConnectionDisabled || showTransactionHistory}
+            >
+              <Text style={[styles.zoomButtonText, zoom === 0.1 && styles.zoomButtonTextActive]}>
+                {zoom === 0.1 ? '0.9x' : '0.9'}
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.zoomButton, zoom === 0.2 && styles.zoomButtonActive]}
-            onPress={() => onZoomChange(0.2)}
-            disabled={isConnectionDisabled || showTransactionHistory}
-          >
-            <Text style={[styles.zoomButtonText, zoom === 0.2 && styles.zoomButtonTextActive]}>
-              1x
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.zoomButton, zoom === 0.2 && styles.zoomButtonActive]}
+              onPress={() => onZoomChange(0.2)}
+              disabled={isConnectionDisabled || showTransactionHistory}
+            >
+              <Text style={[styles.zoomButtonText, zoom === 0.2 && styles.zoomButtonTextActive]}>
+                {zoom === 0.2 ? '1x' : '1'}
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.zoomButton, zoom === 0.3 && styles.zoomButtonActive]}
-            onPress={() => onZoomChange(0.3)}
-            disabled={isConnectionDisabled || showTransactionHistory}
-          >
-            <Text style={[styles.zoomButtonText, zoom === 0.3 && styles.zoomButtonTextActive]}>
-              1.1x
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.zoomButton, zoom === 0.3 && styles.zoomButtonActive]}
+              onPress={() => onZoomChange(0.3)}
+              disabled={isConnectionDisabled || showTransactionHistory}
+            >
+              <Text style={[styles.zoomButtonText, zoom === 0.3 && styles.zoomButtonTextActive]}>
+                {zoom === 0.3 ? '1.1x' : '1.1'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Bottom Controls */}
@@ -281,28 +283,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 40,
     marginBottom: 10,
   },
+  zoomPill: {
+    width: 130,
+    height: 50,
+    backgroundColor: 'rgba(26, 26, 26, 0.5)',
+    borderRadius: 100,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-evenly',
+    padding: 4,
+  },
   zoomButton: {
-    padding: 10,
-    borderRadius: 33,
-    width: 53,
-    height: 33,
+    height: 36,
+    width: 36,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 18,
   },
   zoomButtonActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   zoomButtonText: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.6)',
     fontFamily: fontFamilies.sora.semiBold,
+    fontWeight: '600',
   },
   zoomButtonTextActive: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: '#FFE66C',
+    fontWeight: '700',
   },
   bottomContainer: {
     position: 'absolute',

@@ -494,8 +494,11 @@ class CloudVisionService {
 
 
   private validateExtractedData(data: any): ExtractedBankData {
+    // Remove all non-digits (spaces, dashes, etc.) and keep only numbers
     const accountNumber = data.accountNumber?.replace(/\D/g, '') || '';
     const isValidAccountNumber = accountNumber.length === 10;
+    
+    console.log(`[CloudVision] Account number sanitization: "${data.accountNumber}" → "${accountNumber}" (${accountNumber.length} digits)`);
 
     const amount = data.amount?.replace(/[^\d.]/g, '') || '';
 

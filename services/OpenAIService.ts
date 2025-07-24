@@ -343,15 +343,21 @@ Return JSON with this structure:
   private validateExtractedDataWithContext(data: any, cloudVisionContext: ExtractedBankData): ExtractedBankData {
     console.log('🔍 OpenAI: Validating extracted data with context...');
 
+    // Sanitize account number - remove spaces, dashes, etc., keep only digits
+    const rawAccountNumber = data.accountNumber || cloudVisionContext.accountNumber || '';
+    const sanitizedAccountNumber = rawAccountNumber.replace(/\D/g, '');
+    
+    console.log(`[OpenAI] Account number sanitization: "${rawAccountNumber}" → "${sanitizedAccountNumber}" (${sanitizedAccountNumber.length} digits)`);
+
     const validatedData: ExtractedBankData = {
       bankName: data.bankName || cloudVisionContext.bankName || '',
-      accountNumber: data.accountNumber || cloudVisionContext.accountNumber || '',
+      accountNumber: sanitizedAccountNumber,
       accountHolderName: data.accountHolderName || cloudVisionContext.accountHolderName || '',
       amount: data.amount || cloudVisionContext.amount || '',
       confidence: Math.min(Math.max(data.confidence || 0, 0), 100),
       extractedFields: {
         bankName: !!(data.bankName || cloudVisionContext.bankName),
-        accountNumber: !!(data.accountNumber || cloudVisionContext.accountNumber),
+        accountNumber: !!(sanitizedAccountNumber && sanitizedAccountNumber.length === 10),
         accountHolderName: !!(data.accountHolderName || cloudVisionContext.accountHolderName),
         amount: !!(data.amount || cloudVisionContext.amount),
       }

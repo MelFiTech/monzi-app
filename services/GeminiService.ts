@@ -336,9 +336,11 @@ Return JSON with this structure:
     // Start with CloudVision data as base
     let result = { ...cloudVisionContext };
     
-    // Gemini extracted data
+    // Gemini extracted data - sanitize account number (remove spaces, dashes, etc.)
     const geminiAccountNumber = data.accountNumber?.replace(/\D/g, '') || '';
     const isValidGeminiAccountNumber = geminiAccountNumber.length === 10;
+    
+    console.log(`[Gemini] Account number sanitization: "${data.accountNumber}" → "${geminiAccountNumber}" (${geminiAccountNumber.length} digits)`);
     
     // Account Number: Only change if Gemini found a valid one and CloudVision didn't
     if (isValidGeminiAccountNumber && (!cloudVisionContext.accountNumber || cloudVisionContext.accountNumber !== geminiAccountNumber)) {
