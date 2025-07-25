@@ -6,6 +6,7 @@ import {
   SafeAreaView,
   TouchableOpacity,
   Alert,
+  Linking,
   Dimensions,
   ActivityIndicator,
   Animated
@@ -78,6 +79,55 @@ export default function CameraScreen() {
     );
   }
 
+  const handleRequestPermission = async () => {
+    try {
+      console.log('📷 Requesting camera permission for KYC...');
+      
+      // If permission was denied and can't ask again, open settings directly
+      if (permission && permission.canAskAgain === false) {
+        console.log('🔧 Opening device settings for camera permission...');
+        await Linking.openSettings();
+        return;
+      }
+      
+      // Otherwise, try to request permission normally
+      await requestPermission();
+      
+      // Check if permission was granted after request
+      if (permission?.granted) {
+        console.log('✅ Camera permission granted for KYC');
+      } else if (permission && permission.canAskAgain === false) {
+        // Permission denied and can't ask again - guide user to settings
+        Alert.alert(
+          'Camera Permission Required',
+          'Camera access is required for identity verification. Please enable camera access in your device settings.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Open Settings', 
+              onPress: async () => {
+                try {
+                  await Linking.openSettings();
+                } catch (error) {
+                  console.error('❌ Failed to open settings:', error);
+                }
+              }
+            }
+          ]
+        );
+      } else {
+        console.log('❌ Camera permission denied for KYC, but can ask again');
+      }
+    } catch (error) {
+      console.error('❌ Error requesting camera permission for KYC:', error);
+      Alert.alert(
+        'Permission Error',
+        'Failed to request camera permission. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
   if (!permission.granted) {
     return (
       <SafeAreaView style={styles.container}>
@@ -88,8 +138,22 @@ export default function CameraScreen() {
         </View>
         <View style={styles.permissionContainer}>
           <Text style={styles.permissionText}>Camera access is required for identity verification</Text>
-          <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
-            <Text style={styles.permissionButtonText}>Enable Camera</Text>
+          
+          {/* Show different message if permission was denied and can't ask again */}
+          {permission && permission.canAskAgain === false && (
+            <Text style={[styles.permissionText, { fontSize: 14, marginBottom: 16, opacity: 0.8 }]}>
+              Camera access was denied. Please enable it in your device settings.
+            </Text>
+          )}
+          
+          <TouchableOpacity 
+            style={styles.permissionButton} 
+            onPress={handleRequestPermission}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.permissionButtonText}>
+              {permission && permission.canAskAgain === false ? 'Open Settings' : 'Enable Camera'}
+            </Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>

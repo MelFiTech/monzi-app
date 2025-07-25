@@ -294,7 +294,7 @@ export default function CameraScreen() {
           onCapture={cameraLogic.handleCapture}
           onOpenGallery={cameraLogic.openGallery}
           onViewHistory={cameraLogic.handleViewHistory}
-          isConnectionDisabled={!cameraLogic.areAllChecksComplete}
+          isConnectionDisabled={!cameraLogic.areAllChecksComplete || !backendChecks.isAuthenticated || !backendChecks.kycStatus?.isVerified}
           showTransactionHistory={cameraLogic.showTransactionHistory}
           transactions={cameraLogic.transactionsData.transactions}
           onTransactionPress={(transaction: Transaction) => {

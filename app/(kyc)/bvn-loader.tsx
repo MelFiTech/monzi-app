@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -6,8 +6,10 @@ import {
   SafeAreaView, 
   ActivityIndicator,
   TouchableOpacity,
+  BackHandler,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
 import { useKYCStatus } from '@/hooks/useKYCService';
 import { useAuth } from '@/hooks/useAuthService';
@@ -15,6 +17,33 @@ import { useAuth } from '@/hooks/useAuthService';
 export default function BVNLoaderScreen() {
   const { data: kycStatus } = useKYCStatus();
   const { logout } = useAuth();
+  const navigation = useNavigation();
+
+  // Block hardware back button on Android and disable gestures
+  useFocusEffect(
+    useCallback(() => {
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        console.log('🔒 Hardware back button blocked on BVN loader screen');
+        return true; // Prevent default behavior (going back)
+      });
+
+      // Disable swipe gestures using navigation options
+      navigation.setOptions({
+        gestureEnabled: false,
+      });
+
+      console.log('🔒 Swipe gestures disabled for BVN loader screen');
+
+      return () => {
+        backHandler.remove();
+        // Re-enable gestures when leaving screen
+        navigation.setOptions({
+          gestureEnabled: true,
+        });
+        console.log('✅ Swipe gestures re-enabled');
+      };
+    }, [navigation])
+  );
 
   useEffect(() => {
     // Monitor KYC status and navigate accordingly

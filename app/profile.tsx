@@ -8,6 +8,7 @@ import {
   ImageBackground,
   Alert,
   StatusBar,
+  Linking,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -107,9 +108,29 @@ export default function ProfileScreen() {
     router.push('/modal');
   };
 
-  const handleSupportPress = () => {
-    // TODO: Navigate to support screen
-    console.log('Support pressed');
+  const handleSupportPress = async () => {
+    const twitterUrl = 'https://x.com/monzimoney?s=21&t=0PIruWnjHvaTf7Y3zXT0cA';
+    
+    try {
+      const supported = await Linking.canOpenURL(twitterUrl);
+      
+      if (supported) {
+        await Linking.openURL(twitterUrl);
+      } else {
+        Alert.alert(
+          'Cannot Open Twitter',
+          'Twitter app is not installed on your device. Please install Twitter to contact support.',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Error opening Twitter:', error);
+      Alert.alert(
+        'Error',
+        'Failed to open Twitter. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const handleSignOut = () => {

@@ -10,6 +10,7 @@ import {
   TextInput,
   ScrollView,
   Alert,
+  TouchableOpacity,
 } from 'react-native';
 import { router } from 'expo-router';
 import Colors from '@/constants/colors';
@@ -72,6 +73,13 @@ export default function LoginScreen() {
     router.replace('/(auth)/onboarding');
   };
 
+  const handleForgotPasscode = () => {
+    router.push({
+      pathname: '/forgot-passcode',
+      params: { fromLogin: 'true' }
+    });
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
@@ -101,18 +109,18 @@ export default function LoginScreen() {
 
             {/* Form */}
             <View style={styles.form}>
-                              <RegisterAuthInput
-                  ref={emailRef}
-                  label="Email"
-                  value={email}
-                  onChangeText={(text) => setEmail(text.trim())}
-                  placeholder="justjames@gmail.com"
-                  inputType="email"
-                  style={styles.authInput}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  returnKeyType="next"
-                />
+              <RegisterAuthInput
+                ref={emailRef}
+                label="Email"
+                value={email}
+                onChangeText={(text) => setEmail(text.trim())}
+                placeholder="justjames@gmail.com"
+                inputType="email"
+                style={styles.authInput}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                returnKeyType="next"
+              />
 
               <RegisterAuthInput
                 label="Passcode"
@@ -132,6 +140,15 @@ export default function LoginScreen() {
                 keyboardType="number-pad"
                 maxLength={6}
               />
+
+              {/* Forgot Passcode Link */}
+              <TouchableOpacity
+                onPress={handleForgotPasscode}
+                style={styles.forgotPasscodeContainer}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.forgotPasscodeText}>Forgot passcode?</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -194,6 +211,19 @@ const styles = StyleSheet.create({
   },
   authInput: {
     marginBottom: 8,
+  },
+  forgotPasscodeContainer: {
+    alignSelf: 'flex-start',
+    marginTop: 2,
+    marginBottom: 4,
+    paddingVertical: 2,
+    paddingHorizontal: 0,
+  },
+  forgotPasscodeText: {
+    color: Colors.colors.primary[400] || '#FFE66C',
+    fontFamily: fontFamilies.sora.semiBold,
+    fontSize: fontSizes.sm,
+    textAlign: 'left',
   },
   bottomSection: {
     paddingHorizontal: 24,

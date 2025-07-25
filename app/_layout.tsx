@@ -18,6 +18,7 @@ import { AuthProvider } from '@/providers/AuthProvider';
 import ToastProvider from '@/providers/ToastProvider';
 import { AppStateProvider, useAppState } from '@/providers/AppStateProvider';
 import {
+  useFonts as useSoraFonts,
   Sora_300Light,
   Sora_400Regular,
   Sora_500Medium,
@@ -43,18 +44,19 @@ export const unstable_settings = {
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [loaded, error] = useFonts({
-    // Sora Google Fonts
+  // Load Sora fonts using Google Fonts package
+  const [soraLoaded, soraError] = useSoraFonts({
     Sora_300Light,
     Sora_400Regular,
     Sora_500Medium,
     Sora_600SemiBold,
     Sora_700Bold,
     Sora_800ExtraBold,
-    
-    // Clash Display Local Fonts
-    'ClashDisplay-Extralight': require('../assets/fonts/ClashDisplay-Extralight.otf'),
-    'ClashDisplay-Light': require('../assets/fonts/ClashDisplay-Light.otf'),
+  });
+
+  // Load other fonts
+  const [otherLoaded, otherError] = useFonts({
+    // Clash Display Local Fonts for headers
     'ClashDisplay-Regular': require('../assets/fonts/ClashDisplay-Regular.otf'),
     'ClashDisplay-Medium': require('../assets/fonts/ClashDisplay-Medium.otf'),
     'ClashDisplay-Semibold': require('../assets/fonts/ClashDisplay-Semibold.otf'),
@@ -65,9 +67,15 @@ export default function RootLayout() {
     ...FontAwesome.font,
   });
 
+  const loaded = soraLoaded && otherLoaded;
+  const error = soraError || otherError;
+
   // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
-    if (error) throw error;
+    if (error) {
+      console.warn('⚠️ Font loading error (continuing anyway):', error);
+      // Don't throw the error - continue with system fonts
+    }
   }, [error]);
 
   // Hide splash screen when fonts are loaded to prevent white flash
@@ -102,7 +110,8 @@ export default function RootLayout() {
   }, []);
 
   // Show a loading view while fonts are loading to prevent white flash
-  if (!loaded) {
+  // But continue even if fonts fail to load
+  if (!loaded && !error) {
     return (
       <View style={{ flex: 1, backgroundColor: '#FFE66C' }}>
         {/* Empty view with splash background color to prevent white flash */}
@@ -138,7 +147,7 @@ function RootLayoutNav() {
                   <Stack.Screen name="transfer-success" options={{ headerShown: false }} />
                   <Stack.Screen name="transfer-loader" options={{ headerShown: false }} />
                   <Stack.Screen name="transaction-detail" options={{ headerShown: false }} />
-                  <Stack.Screen name="(kyc)" options={{ headerShown: false }} />
+                  <Stack.Screen name="(kyc)" options={{ headerShown: false, gestureEnabled: false }} />
                   <Stack.Screen name="security" options={{ presentation: 'modal', headerShown: false }} />
                   <Stack.Screen name="change-pin" options={{ headerShown: false }} />
                   <Stack.Screen name="forgot-pin" options={{ headerShown: false }} />

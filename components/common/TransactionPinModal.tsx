@@ -28,6 +28,7 @@ interface TransactionPinModalProps {
   bankName: string;
   amount: string;
   fee?: string;
+  feeLoading?: boolean;
   pinError?: string;
 }
 
@@ -40,6 +41,7 @@ export default function TransactionPinModal({
   bankName,
   amount,
   fee = '10.00',
+  feeLoading = false,
   pinError,
 }: TransactionPinModalProps) {
   const { colors } = useTheme();
@@ -433,7 +435,13 @@ export default function TransactionPinModal({
                     </View>
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Fee</Text>
-                      <Text style={styles.feeValue}>N{fee}</Text>
+                      {feeLoading ? (
+                        <View style={{ width: 40, height: 18, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4 }} />
+                      ) : fee !== undefined ? (
+                        <Text style={styles.feeValue}>N{fee}</Text>
+                      ) : (
+                        <Text style={styles.feeValue}>--</Text>
+                      )}
                     </View>
                   </View>
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Linking } from 'react-native';
 import { CameraHeader } from '@/components/layout';
 import { typography, fontFamilies } from '@/constants/fonts';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -11,6 +11,55 @@ interface CameraPermissionsProps {
 
 export default function CameraPermissions({ permission, onRequestPermission }: CameraPermissionsProps) {
   const { colors } = useTheme();
+
+  const handleRequestPermission = async () => {
+    try {
+      console.log('📷 Requesting camera permission...');
+      
+      // If permission was denied and can't ask again, open settings directly
+      if (permission && permission.canAskAgain === false) {
+        console.log('🔧 Opening device settings for camera permission...');
+        await Linking.openSettings();
+        return;
+      }
+      
+      // Otherwise, try to request permission normally
+      await onRequestPermission();
+      
+      // Check if permission was granted after request
+      if (permission?.granted) {
+        console.log('✅ Camera permission granted');
+      } else if (permission && permission.canAskAgain === false) {
+        // Permission denied and can't ask again - guide user to settings
+        Alert.alert(
+          'Camera Permission Required',
+          'Camera access is required to scan account details. Please enable camera access in your device settings.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Open Settings', 
+              onPress: async () => {
+                try {
+                  await Linking.openSettings();
+                } catch (error) {
+                  console.error('❌ Failed to open settings:', error);
+                }
+              }
+            }
+          ]
+        );
+      } else {
+        console.log('❌ Camera permission denied, but can ask again');
+      }
+    } catch (error) {
+      console.error('❌ Error requesting camera permission:', error);
+      Alert.alert(
+        'Permission Error',
+        'Failed to request camera permission. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
 
   if (!permission) {
     return (
@@ -36,12 +85,21 @@ export default function CameraPermissions({ permission, onRequestPermission }: C
           <Text style={[styles.permissionSubtext, typography.body.medium, { color: colors.textSecondary }]}>
             We need camera access to scan account details
           </Text>
+          
+          {/* Show different message if permission was denied and can't ask again */}
+          {permission && permission.canAskAgain === false && (
+            <Text style={[styles.permissionSubtext, typography.body.small, { color: colors.textSecondary, marginBottom: 16 }]}>
+              Camera access was denied. Please enable it in your device settings.
+            </Text>
+          )}
+          
           <TouchableOpacity 
             style={[styles.permissionButton, { backgroundColor: colors.primary }]}
-            onPress={onRequestPermission}
+            onPress={handleRequestPermission}
+            activeOpacity={0.8}
           >
-            <Text style={[styles.permissionButtonText, typography.button.medium, { color: '#FFFFFF' }]}>
-              Grant Camera Access
+            <Text style={[styles.permissionButtonText, typography.button.medium, { color: '#000000' }]}>
+              {permission && permission.canAskAgain === false ? 'Open Settings' : 'Grant Camera Access'}
             </Text>
           </TouchableOpacity>
         </View>

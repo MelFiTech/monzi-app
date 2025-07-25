@@ -93,13 +93,13 @@ export function useBackendChecks(props: BackendChecksProps) {
         if (!props.showVerificationModal && !hasShownModal) {
           setHasShownModal(true);
           props.setShowPulsatingGlow(false);
-          props.setAreAllChecksComplete(true);
+          props.setAreAllChecksComplete(false); // Keep camera controls disabled for unverified users
           props.setIsWalletActivationMode(false);
           props.setIsPendingVerification(kycStatus.kycStatus === 'UNDER_REVIEW');
           props.setShowVerificationModal(true);
         } else {
           props.setShowPulsatingGlow(false);
-          props.setAreAllChecksComplete(true);
+          props.setAreAllChecksComplete(false); // Keep camera controls disabled for unverified users
         }
       } else {
         // No KYC data - allow camera usage

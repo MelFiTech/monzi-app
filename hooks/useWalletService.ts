@@ -617,3 +617,21 @@ export function useWebSocketCacheIntegration() {
     handleTransactionNotification,
   };
 }
+
+/**
+ * Hook to calculate transaction fee
+ */
+export function useCalculateFee(amount: number, transactionType: string, provider?: string) {
+  const walletService = WalletService.getInstance();
+  return useQuery({
+    queryKey: ['calculate-fee', amount, transactionType, provider],
+    queryFn: () => walletService.calculateFee({ amount, transactionType, provider }),
+    enabled: !!amount && !!transactionType,
+    retry: 1,
+    retryDelay: 1000,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+  });
+}

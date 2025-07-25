@@ -8,8 +8,10 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  BackHandler,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
 import RegisterAuthInput from '@/components/auth/Register-AuthInput';
 import Button from '@/components/common/Button';
@@ -21,6 +23,7 @@ export default function BVNScreen() {
   const [bvn, setBvn] = useState('');
   const [error, setError] = useState('');
   const bvnInputRef = useRef<TextInput>(null);
+  const navigation = useNavigation();
 
   // React Query hooks
   const verifyBVNMutation = useVerifyBVN();
@@ -59,6 +62,32 @@ export default function BVNScreen() {
       clearKYCFlowFlag();
     };
   }, []);
+
+  // Block hardware back button on Android and disable gestures
+  useFocusEffect(
+    useCallback(() => {
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        console.log('🔒 Hardware back button blocked on BVN screen');
+        return true; // Prevent default behavior (going back)
+      });
+
+      // Disable swipe gestures using navigation options
+      navigation.setOptions({
+        gestureEnabled: false,
+      });
+
+      console.log('🔒 Swipe gestures disabled for BVN screen');
+
+      return () => {
+        backHandler.remove();
+        // Re-enable gestures when leaving screen
+        navigation.setOptions({
+          gestureEnabled: true,
+        });
+        console.log('✅ Swipe gestures re-enabled');
+      };
+    }, [navigation])
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => {

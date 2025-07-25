@@ -486,6 +486,31 @@ class WalletService {
   }
 
   /**
+   * Calculate transaction fee
+   */
+  async calculateFee({ amount, transactionType, provider }: { amount: number; transactionType: string; provider?: string }): Promise<any> {
+    try {
+      const headers = await this.getAuthHeaders();
+      const payload: any = { amount, transactionType };
+      if (provider) payload.provider = provider;
+      
+      console.log('🧮 Calculating transaction fee:', payload);
+      const response = await fetch(`${this.baseUrl}/transactions/calculate-fee`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      const result = await this.handleResponse<{ success: boolean; message: string; data: any }>(response);
+      if (!result.success) throw new Error(result.message || 'Fee calculation failed');
+      console.log('✅ Fee calculation response:', result.data);
+      return result.data;
+    } catch (error) {
+      console.error('❌ Fee calculation error:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Format currency amount for display
    */
   static formatCurrency(amount: number, currency: string = 'NGN'): string {

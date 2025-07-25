@@ -1,8 +1,8 @@
 import { Platform } from 'react-native';
 
-// Font families
+// Font families - using Google Fonts package for Sora
 export const fontFamilies = {
-  // Body font - Sora (Google Font)
+  // Body font - Sora (Google Fonts package)
   sora: {
     light: 'Sora_300Light',
     regular: 'Sora_400Regular',
@@ -14,8 +14,8 @@ export const fontFamilies = {
   
   // Header font - Clash Display (Local)
   clashDisplay: {
-    extralight: 'ClashDisplay-Extralight',
-    light: 'ClashDisplay-Light',
+    extralight: 'ClashDisplay-Regular', // Fallback to regular
+    light: 'ClashDisplay-Regular', // Fallback to regular
     regular: 'ClashDisplay-Regular',
     medium: 'ClashDisplay-Medium',
     semibold: 'ClashDisplay-Semibold',

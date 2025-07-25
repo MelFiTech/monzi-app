@@ -20,29 +20,42 @@ import AmountPill from '@/components/common/AmountPill';
 import Button from '@/components/common/Button';
 import TransactionPinModal from '@/components/common/TransactionPinModal';
 import { PulsatingGlow } from '@/components/common';
-import { useWalletBalance, useRefreshWallet, useOptimisticBalance, useTransferFunds, useWalletAccessStatus } from '@/hooks/useWalletService';
+import { useWalletBalance, useRefreshWallet, useOptimisticBalance, useTransferFunds, useWalletAccessStatus, useCalculateFee } from '@/hooks/useWalletService';
 import { useNotificationService } from '@/hooks/useNotificationService';
 import { useQueryClient } from '@tanstack/react-query';
 import BiometricService from '@/services/BiometricService';
 import * as Haptics from 'expo-haptics';
 
 const predefinedAmounts = ['N5,000', 'N10,000', 'N20,000'];
+const MIN_TRANSFER_AMOUNT = 300;
+
+// Helper to validate extracted amount: must be all digits, not zero, not empty, not "NOT FOUND"
+function getValidExtractedAmount(raw: string | undefined): string {
+  if (!raw) return '';
+  if (typeof raw !== 'string') return '';
+  if (raw.trim().toUpperCase() === 'NOT FOUND') return '';
+  // Remove all non-digits
+  const digits = raw.replace(/[^\d]/g, '');
+  if (!digits || digits === '0') return '';
+  return digits;
+}
 
 export default function TransferScreen() {
   const { colors } = useTheme();
   const params = useLocalSearchParams();
   const queryClient = useQueryClient();
-  
+
   // Extract navigation params (from camera extraction)
   const extractedBankName = params.bankName as string || '';
   const extractedAccountNumber = params.accountNumber as string || '';
   const extractedAccountHolderName = params.accountHolderName as string || '';
-  const extractedAmount = params.amount as string || '';
+  const rawExtractedAmount = params.amount as string | undefined;
+  const extractedAmount = getValidExtractedAmount(rawExtractedAmount);
   const pinError = params.pinError as string || '';
   const transferError = params.transferError as string || '';
 
   // Set initial states based on extracted data
-  const [amount, setAmount] = useState(extractedAmount || '');
+  const [amount, setAmount] = useState<string>('');
   const [selectedPill, setSelectedPill] = useState<string | null>(null);
   const [showPinModal, setShowPinModal] = useState(false);
   const [amountError, setAmountError] = useState<string | null>(null);
@@ -226,13 +239,10 @@ export default function TransferScreen() {
     }
   }, [accountNumber, bankName, recipientName]);
 
+  // Prefill amount only if extractedAmount is valid (digits, not zero, not NOT FOUND)
   useEffect(() => {
-    // If we have an extracted amount, format it properly
-    if (extractedAmount && extractedAmount !== '0') {
-      const cleanAmount = extractedAmount.replace(/[^\d.]/g, '');
-      if (cleanAmount) {
-        setAmount(cleanAmount);
-      }
+    if (extractedAmount) {
+      setAmount(extractedAmount.replace(/\B(?=(\d{3})+(?!\d))/g, ','));
     }
   }, [extractedAmount]);
 
@@ -240,25 +250,26 @@ export default function TransferScreen() {
     router.back();
   };
 
+  // Only allow digits (no letters, no decimal)
   const handleAmountChange = (text: string) => {
-    // Remove any non-numeric characters except decimal point
-    const numericValue = text.replace(/[^\d.]/g, '');
-    
+    // Remove any non-digit characters
+    const numericValue = text.replace(/[^\d]/g, '');
+
     // Format with commas for thousands
-    const parts = numericValue.split('.');
-    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    const formattedValue = parts.join('.');
-    
-    // Check if amount exceeds balance
+    const formattedValue = numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+    // Check if amount exceeds balance or is below minimum
     const cleanAmount = numericValue.replace(/,/g, '');
     const enteredAmount = parseFloat(cleanAmount) || 0;
-    
+
     if (enteredAmount > walletBalanceNumeric) {
       setAmountError('Amount cannot exceed wallet balance');
+    } else if (enteredAmount > 0 && enteredAmount < MIN_TRANSFER_AMOUNT) {
+      setAmountError(`Minimum transfer amount is ₦${MIN_TRANSFER_AMOUNT}`);
     } else {
       setAmountError(null);
     }
-    
+
     setAmount(formattedValue);
     setSelectedPill(null);
   };
@@ -270,17 +281,19 @@ export default function TransferScreen() {
     setSelectedPill(pillAmount);
     // Remove N and keep commas for display
     const numericAmount = pillAmount.replace('N', '');
-    
-    // Check if pill amount exceeds balance
+
+    // Check if pill amount exceeds balance or is below minimum
     const cleanAmount = numericAmount.replace(/,/g, '');
     const enteredAmount = parseFloat(cleanAmount) || 0;
-    
+
     if (enteredAmount > walletBalanceNumeric) {
       setAmountError('Amount cannot exceed wallet balance');
+    } else if (enteredAmount > 0 && enteredAmount < MIN_TRANSFER_AMOUNT) {
+      setAmountError(`Minimum transfer amount is ₦${MIN_TRANSFER_AMOUNT}`);
     } else {
       setAmountError(null);
     }
-    
+
     setAmount(numericAmount);
   };
 
@@ -295,6 +308,18 @@ export default function TransferScreen() {
       maximumFractionDigits: 2
     });
   };
+
+  // Calculate numeric amount for fee calculation
+  const parsedAmount = parseFloat(amount.replace(/,/g, ''));
+  const isValidAmount = !isNaN(parsedAmount) && parsedAmount >= MIN_TRANSFER_AMOUNT;
+
+  // Use the fee calculation hook (provider hardcoded to NYRA for now)
+  const {
+    data: feeData,
+    isLoading: isFeeLoading,
+    isError: isFeeError,
+    error: feeError
+  } = useCalculateFee(isValidAmount ? parsedAmount : 0, 'TRANSFER', 'NYRA');
 
   const handleTransferPress = async () => {
     // Trigger heavy haptic feedback
@@ -313,16 +338,26 @@ export default function TransferScreen() {
     }
 
     // Validate amount
-    if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+    if (!amount || isNaN(parsedAmount) || parsedAmount <= 0) {
       setAmountError('Please enter a valid amount');
       return;
     }
-
-    const transferAmount = parseFloat(amount);
-
-    // Check if amount exceeds balance
-    if (transferAmount > walletBalanceNumeric) {
+    if (parsedAmount < MIN_TRANSFER_AMOUNT) {
+      setAmountError(`Minimum transfer amount is ₦${MIN_TRANSFER_AMOUNT}`);
+      return;
+    }
+    if (parsedAmount > walletBalanceNumeric) {
       setAmountError('Insufficient balance');
+      return;
+    }
+
+    // Wait for fee to load if not loaded yet
+    if (isFeeLoading) {
+      Alert.alert('Please wait', 'Calculating transaction fee...');
+      return;
+    }
+    if (isFeeError) {
+      Alert.alert('Fee Error', feeError?.message || 'Failed to calculate fee.');
       return;
     }
 
@@ -333,29 +368,19 @@ export default function TransferScreen() {
     try {
       const biometricService = BiometricService.getInstance();
       const isBiometricEnabled = await biometricService.isBiometricEnabled();
-      
       if (isBiometricEnabled) {
-        console.log('🔐 Attempting biometric authentication...');
         const biometricResult = await biometricService.authenticate('Authenticate to complete transfer');
-        
         if (biometricResult.success) {
-          console.log('✅ Biometric authentication successful');
-          // Get stored PIN and proceed with transfer
           const storedPin = await biometricService.getStoredPin();
           if (storedPin) {
             await handlePinConfirm(storedPin);
             return;
           }
-        } else {
-          console.log('❌ Biometric authentication failed:', biometricResult.error);
         }
       }
     } catch (error) {
-      console.error('❌ Biometric authentication error:', error);
+      // Ignore biometric errors, fallback to PIN
     }
-
-    // Fallback to PIN modal
-    console.log('🔑 Falling back to PIN modal');
     setShowPinModal(true);
   };
 
@@ -367,6 +392,11 @@ export default function TransferScreen() {
       
       if (transferAmount <= 0) {
         Alert.alert('Invalid Amount', 'Please enter a valid amount');
+        return;
+      }
+
+      if (transferAmount < MIN_TRANSFER_AMOUNT) {
+        Alert.alert('Minimum Amount', `Minimum transfer amount is ₦${MIN_TRANSFER_AMOUNT}`);
         return;
       }
 
@@ -408,8 +438,6 @@ export default function TransferScreen() {
   const handlePinModalClose = () => {
     setShowPinModal(false);
   };
-
-
 
   return (
     <SafeAreaView style={styles.container}>
@@ -453,12 +481,15 @@ export default function TransferScreen() {
                   style={styles.amountInput}
                   value={amount}
                   onChangeText={handleAmountChange}
-                  keyboardType="numeric"
+                  keyboardType="number-pad"
                   placeholder="0"
                   placeholderTextColor="rgba(245, 200, 66, 0.5)"
                   autoFocus={true}
                   selectionColor="#F5C842"
                   editable={!transferFundsMutation.isPending}
+                  maxLength={12}
+                  // Prevent pasting non-digit values
+                  contextMenuHidden={true}
                 />
               </View>
               <View style={styles.balanceContainer}>
@@ -497,13 +528,13 @@ export default function TransferScreen() {
               </View>
             </View>
             
-            {/* Show error if amount exceeds balance */}
+            {/* Show error if amount exceeds balance or is below minimum */}
             {amountError && (
               <Text style={styles.errorText}>{amountError}</Text>
             )}
             
-            {/* Show pre-filled amount indicator */}
-            {extractedAmount && extractedAmount !== '0' && (
+            {/* Show pre-filled amount indicator only if extractedAmount is valid */}
+            {extractedAmount && (
               <Text style={styles.prefilledText}>
                 Amount extracted from image: N{formatAmount(extractedAmount)}
               </Text>
@@ -529,7 +560,13 @@ export default function TransferScreen() {
           <Button
             title={transferFundsMutation.isPending ? "Processing..." : "Pay"}
             onPress={handleTransferPress}
-            disabled={!amount || amount === '0' || !!amountError || isBalanceLoading}
+            disabled={
+              !amount ||
+              amount === '0' ||
+              !!amountError ||
+              isBalanceLoading ||
+              (parseFloat(amount.replace(/,/g, '')) < MIN_TRANSFER_AMOUNT)
+            }
             loading={transferFundsMutation.isPending}
           />
         </View>
@@ -544,7 +581,8 @@ export default function TransferScreen() {
         accountNumber={accountNumber}
         bankName={bankName}
         amount={formatAmount(amount)}
-        fee="10.00"
+        fee={isFeeLoading ? undefined : (feeData?.feeAmount?.toString() || '0')}
+        feeLoading={isFeeLoading}
         pinError={pinError}
       />
 

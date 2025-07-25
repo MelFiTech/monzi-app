@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -7,8 +7,10 @@ import {
   TouchableOpacity,
   Linking,
   Alert,
+  BackHandler,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
 import Button from '@/components/common/Button';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -52,6 +54,7 @@ const initialSteps: VerificationStep[] = [
 export default function BridgeScreen() {
   const [steps, setSteps] = useState<VerificationStep[]>(initialSteps);
   const [requiresSupport, setRequiresSupport] = useState(false);
+  const navigation = useNavigation();
 
   // React Query hooks
   const { data: kycStatus, isLoading } = useKYCStatus();
@@ -84,6 +87,32 @@ export default function BridgeScreen() {
       clearKYCFlowFlag();
     };
   }, []);
+
+  // Block hardware back button on Android and disable gestures
+  useFocusEffect(
+    useCallback(() => {
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        console.log('🔒 Hardware back button blocked on Bridge screen');
+        return true; // Prevent default behavior (going back)
+      });
+
+      // Disable swipe gestures using navigation options
+      navigation.setOptions({
+        gestureEnabled: false,
+      });
+
+      console.log('🔒 Swipe gestures disabled for Bridge screen');
+
+      return () => {
+        backHandler.remove();
+        // Re-enable gestures when leaving screen
+        navigation.setOptions({
+          gestureEnabled: true,
+        });
+        console.log('✅ Swipe gestures re-enabled');
+      };
+    }, [navigation])
+  );
 
   useEffect(() => {
     if (kycStatus) {

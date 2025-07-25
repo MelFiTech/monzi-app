@@ -11,6 +11,7 @@ import { useResolveAccountMutation } from '@/hooks/useAccountService';
 import { useWalletRecovery } from '@/hooks/useWalletService';
 import { useTransactionsList } from '@/hooks/useTransactionService';
 import { useRecordScan } from '@/hooks/useScanTracking';
+import { useKYCStatus } from '@/hooks/useKYCService';
 import { Transaction } from '@/components/common';
 import ToastService from '@/services/ToastService';
 
@@ -57,6 +58,26 @@ export function useCameraLogic() {
 
   // App state management for camera privacy
   const { isAppInBackground } = useAppState();
+
+  // KYC status check
+  const { data: kycStatus } = useKYCStatus();
+
+  // Helper function to check if user is verified and show verification modal if not
+  const checkKYCAndShowModal = () => {
+    const isVerified = kycStatus?.isVerified && 
+                      kycStatus?.bvnVerified && 
+                      kycStatus?.selfieVerified && 
+                      (kycStatus?.kycStatus === 'VERIFIED' || kycStatus?.kycStatus === 'APPROVED');
+    
+    if (!isVerified) {
+      console.log('🔒 KYC verification required - showing verification modal');
+      setShowVerificationModal(true);
+      setIsPendingVerification(kycStatus?.kycStatus === 'UNDER_REVIEW');
+      setIsWalletActivationMode(false);
+      return false;
+    }
+    return true;
+  };
 
   // Hide instructions after 3 seconds
   useEffect(() => {
@@ -128,6 +149,11 @@ export function useCameraLogic() {
   // Handle capture
   const handleCapture = async () => {
     if (isCapturing || isProcessing || showExtractionLoader) return;
+    
+    // Check KYC verification before allowing capture
+    if (!checkKYCAndShowModal()) {
+      return;
+    }
     
     try {
       setIsCapturing(true);
@@ -330,6 +356,11 @@ export function useCameraLogic() {
   };
 
   const toggleFlash = () => {
+    // Check KYC verification before allowing flash toggle
+    if (!checkKYCAndShowModal()) {
+      return;
+    }
+    
     const modes: FlashMode[] = ['off', 'on', 'auto'];
     const currentIndex = modes.indexOf(flashMode);
     const nextIndex = (currentIndex + 1) % modes.length;
@@ -341,10 +372,20 @@ export function useCameraLogic() {
   };
 
   const handleViewHistory = () => {
+    // Check KYC verification before allowing history access
+    if (!checkKYCAndShowModal()) {
+      return;
+    }
+    
     setShowTransactionHistory(prev => !prev);
   };
 
   const openGallery = async () => {
+    // Check KYC verification before allowing gallery access
+    if (!checkKYCAndShowModal()) {
+      return;
+    }
+    
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -361,6 +402,11 @@ export function useCameraLogic() {
   };
 
   const handleZoomChange = (value: number) => {
+    // Check KYC verification before allowing zoom changes
+    if (!checkKYCAndShowModal()) {
+      return;
+    }
+    
     Animated.sequence([
       Animated.timing(zoomAnimation, {
         toValue: 1.05,

@@ -11,55 +11,69 @@ import {
   Keyboard,
   Platform,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation } from '@tanstack/react-query';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useToast } from '@/providers/ToastProvider';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
 import { AuthHeader } from '@/components/auth';
+import RegisterAuthInput from '@/components/auth/Register-AuthInput';
 import { AuthStorageService } from '@/services';
 import { getApiBaseUrl } from '@/constants/config';
 
 export default function ForgotPasscodeScreen() {
   const { colors } = useTheme();
   const { showToast } = useToast();
+  const params = useLocalSearchParams();
+  const fromLogin = params.fromLogin === 'true';
+  
   const [otp, setOtp] = useState('');
   const [countdown, setCountdown] = useState(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [emailInput, setEmailInput] = useState('');
   
   const otpInputRef = useRef<TextInput>(null);
+  const emailInputRef = useRef<TextInput>(null);
   const authStorageService = AuthStorageService.getInstance();
 
-  // Auto-focus OTP input after screen loads
+  // Auto-focus appropriate input after screen loads
   useEffect(() => {
     const timer = setTimeout(() => {
-      otpInputRef.current?.focus();
+      if (fromLogin) {
+        emailInputRef.current?.focus();
+      } else {
+        otpInputRef.current?.focus();
+      }
     }, 300);
     return () => clearTimeout(timer);
-  }, []);
+  }, [fromLogin]);
 
-  // Get user email on mount and automatically request OTP
+  // Get user email on mount and handle OTP request
   useEffect(() => {
-    const initializeAndRequestOTP = async () => {
+    const initializeScreen = async () => {
       try {
         const userProfile = await authStorageService.getUserProfile();
         if (userProfile?.email) {
           setUserEmail(userProfile.email);
-          // Automatically request OTP when screen opens
-          requestResetOtpMutation.mutate();
-        } else {
+          // Only auto-request OTP if not coming from login
+          if (!fromLogin) {
+            requestResetOtpMutation.mutate();
+          }
+        } else if (!fromLogin) {
           showToast('User email not found. Please login again.', 'error');
           router.back();
         }
       } catch (error) {
-        showToast('Failed to get user information', 'error');
-        router.back();
+        if (!fromLogin) {
+          showToast('Failed to get user information', 'error');
+          router.back();
+        }
       }
     };
 
-    initializeAndRequestOTP();
-  }, []);
+    initializeScreen();
+  }, [fromLogin]);
 
   // Countdown timer effect
   useEffect(() => {
@@ -95,8 +109,9 @@ export default function ForgotPasscodeScreen() {
 
   const requestResetOtpMutation = useMutation({
     mutationFn: async () => {
-      if (!userEmail) {
-        throw new Error('User email not found');
+      const emailToUse = fromLogin ? emailInput : userEmail;
+      if (!emailToUse) {
+        throw new Error('Email is required');
       }
 
       const baseUrl = getApiBaseUrl();
@@ -107,7 +122,7 @@ export default function ForgotPasscodeScreen() {
           'ngrok-skip-browser-warning': 'true',
         },
         body: JSON.stringify({
-          email: userEmail
+          email: emailToUse
         }),
       });
 
@@ -145,9 +160,10 @@ export default function ForgotPasscodeScreen() {
     },
     onSuccess: () => {
       // Navigate to reset passcode screen with OTP code and email
+      const emailToUse = fromLogin ? emailInput : userEmail;
       router.push({
         pathname: '/reset-passcode',
-        params: { otpCode: otp, email: userEmail }
+        params: { otpCode: otp, email: emailToUse }
       });
     },
     onError: (error: Error) => {
@@ -188,73 +204,118 @@ export default function ForgotPasscodeScreen() {
       {/* Title */}
       <View style={containerStyles.titleContainer}>
         <Text style={textStyles.title}>
-          Enter code sent{'\n'}to your email
+          {fromLogin && countdown === 0 ? 'Reset your passcode' : 'Enter code sent to your email'}
         </Text>
       </View>
 
       {/* Main Content */}
       <View style={containerStyles.content}>
-        <View style={containerStyles.inputContainer}>
-          <View style={containerStyles.otpInputWrapper}>
-            <TextInput
-              ref={otpInputRef}
-              style={[
-                containerStyles.otpInput,
-                verifyOtpMutation.isPending && containerStyles.otpInputDisabled
-              ]}
-              placeholder="••••••"
-              placeholderTextColor="rgba(255, 255, 255, 0.4)"
-              value={otp}
-              onChangeText={handleOtpChange}
-              keyboardType="numeric"
-              maxLength={6}
-              editable={!verifyOtpMutation.isPending}
-              autoFocus={true}
-              returnKeyType="done"
-              onSubmitEditing={() => handleVerify()}
-              textAlign="left"
-              textContentType="oneTimeCode"
-              autoComplete="sms-otp"
+        {/* Email Input - Only show when coming from login and OTP hasn't been sent yet */}
+        {fromLogin && countdown === 0 && (
+          <View style={containerStyles.emailContainer}>
+            <RegisterAuthInput
+              ref={emailInputRef}
+              label="Email"
+              value={emailInput}
+              onChangeText={(text) => setEmailInput(text.trim())}
+              placeholder="Enter your email address"
+              inputType="email"
+              style={containerStyles.emailInput}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              returnKeyType="next"
+              onSubmitEditing={() => {
+                if (emailInput.trim()) {
+                  requestResetOtpMutation.mutate();
+                }
+              }}
             />
+            
+            {/* Send Code Button */}
+            <TouchableOpacity
+              onPress={() => requestResetOtpMutation.mutate()}
+              style={[
+                buttonStyles.sendCodeButton,
+                (!emailInput.trim() || requestResetOtpMutation.isPending) && buttonStyles.sendCodeButtonDisabled
+              ]}
+              disabled={!emailInput.trim() || requestResetOtpMutation.isPending}
+            >
+              <Text style={[
+                textStyles.sendCodeText,
+                (!emailInput.trim() || requestResetOtpMutation.isPending) && textStyles.sendCodeTextDisabled
+              ]}>
+                {requestResetOtpMutation.isPending ? 'Sending...' : 'Send Code'}
+              </Text>
+            </TouchableOpacity>
           </View>
-          
-          {verifyOtpMutation.isPending && (
-            <View style={containerStyles.loaderContainer}>
-              <ActivityIndicator 
-                color="#FFE66C"
-                size="small"
+        )}
+
+        {/* OTP Input - Show when not coming from login, or when coming from login and OTP has been sent */}
+        {(!fromLogin || (fromLogin && countdown > 0)) && (
+          <View style={containerStyles.inputContainer}>
+            <View style={containerStyles.otpInputWrapper}>
+              <TextInput
+                ref={otpInputRef}
+                style={[
+                  containerStyles.otpInput,
+                  verifyOtpMutation.isPending && containerStyles.otpInputDisabled
+                ]}
+                placeholder="••••••"
+                placeholderTextColor="rgba(255, 255, 255, 0.4)"
+                value={otp}
+                onChangeText={handleOtpChange}
+                keyboardType="numeric"
+                maxLength={6}
+                editable={!verifyOtpMutation.isPending}
+                autoFocus={!fromLogin || (fromLogin && countdown > 0)}
+                returnKeyType="done"
+                onSubmitEditing={() => handleVerify()}
+                textAlign="left"
+                textContentType="oneTimeCode"
+                autoComplete="sms-otp"
               />
             </View>
-          )}
-        </View>
-      </View>
-
-      {/* Footer */}
-      <View style={[
-        containerStyles.footer,
-        keyboardHeight > 0 && {
-          position: 'absolute',
-          bottom: keyboardHeight + -20,
-          left: 0,
-          right: 0,
-        }
-      ]}>
-        {countdown > 0 ? (
-          <Text style={textStyles.countdownText}>
-            Resend code in 00:{countdown.toString().padStart(2, '0')}
-          </Text>
-        ) : (
-          <TouchableOpacity 
-            onPress={handleResendOtp} 
-            style={buttonStyles.resendButton}
-            disabled={requestResetOtpMutation.isPending}
-          >
-            <Text style={textStyles.resendText}>
-              {requestResetOtpMutation.isPending ? 'Sending...' : 'Resend'}
-            </Text>
-          </TouchableOpacity>
+            
+            {verifyOtpMutation.isPending && (
+              <View style={containerStyles.loaderContainer}>
+                <ActivityIndicator 
+                  color="#FFE66C"
+                  size="small"
+                />
+              </View>
+            )}
+          </View>
         )}
       </View>
+
+      {/* Footer - Only show when OTP input is visible */}
+      {(!fromLogin || (fromLogin && countdown > 0)) && (
+        <View style={[
+          containerStyles.footer,
+          keyboardHeight > 0 && {
+            position: 'absolute',
+            bottom: keyboardHeight + -20,
+            left: 0,
+            right: 0,
+          }
+        ]}>
+          {countdown > 0 ? (
+            <Text style={textStyles.countdownText}>
+              Resend code in 00:{countdown.toString().padStart(2, '0')}
+            </Text>
+          ) : (
+            <TouchableOpacity 
+              onPress={handleResendOtp} 
+              style={buttonStyles.resendButton}
+              disabled={requestResetOtpMutation.isPending}
+            >
+              <Text style={textStyles.resendText}>
+                {requestResetOtpMutation.isPending ? 'Sending...' : 'Resend'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -272,6 +333,12 @@ const containerStyles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
     paddingTop: 10,
+  },
+  emailContainer: {
+    marginBottom: 20,
+  },
+  emailInput: {
+    marginBottom: 16,
   },
   inputContainer: {
     marginTop: 20,
@@ -330,6 +397,15 @@ const textStyles = StyleSheet.create({
     color: '#FFE66C',
     textAlign: 'left',
   },
+  sendCodeText: {
+    fontFamily: fontFamilies.sora.medium,
+    fontSize: fontSizes.base,
+    color: '#000',
+    textAlign: 'center',
+  },
+  sendCodeTextDisabled: {
+    color: 'rgba(255, 255, 255, 0.4)',
+  },
 });
 
 const buttonStyles = StyleSheet.create({
@@ -337,5 +413,17 @@ const buttonStyles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'flex-start',
     justifyContent: 'flex-start',
+  },
+  sendCodeButton: {
+    backgroundColor: '#FFE66C',
+    borderRadius: 65,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  sendCodeButtonDisabled: {
+    backgroundColor: 'rgb(32, 32, 32)',
   },
 }); 
