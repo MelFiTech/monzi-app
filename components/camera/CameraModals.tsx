@@ -1,9 +1,10 @@
 import React from 'react';
-import { BankTransferModal, VerificationModal, SetPinModal } from '@/components/common';
+import { BankTransferModal, ManualBankTransferModal, VerificationModal, SetPinModal } from '@/components/common';
 import { ExtractedBankData } from '@/services';
 
 interface CameraModalsProps {
   showBankTransferModal: boolean;
+  showManualBankTransferModal: boolean;
   showVerificationModal: boolean;
   showSetPinModal: boolean;
   extractedData: ExtractedBankData | null;
@@ -12,6 +13,7 @@ interface CameraModalsProps {
   isPendingVerification: boolean;
   walletRecoveryPending: boolean;
   onBankModalClose: () => void;
+  onManualBankModalClose: () => void;
   onBankModalConfirm: (resolvedAccountName?: string, selectedBankName?: string, accountNumber?: string) => void;
   onBankModalSuccess: () => void;
   onVerificationModalClose: () => void;
@@ -22,6 +24,7 @@ interface CameraModalsProps {
 
 export default function CameraModals({
   showBankTransferModal,
+  showManualBankTransferModal,
   showVerificationModal,
   showSetPinModal,
   extractedData,
@@ -30,6 +33,7 @@ export default function CameraModals({
   isPendingVerification,
   walletRecoveryPending,
   onBankModalClose,
+  onManualBankModalClose,
   onBankModalConfirm,
   onBankModalSuccess,
   onVerificationModalClose,
@@ -43,6 +47,18 @@ export default function CameraModals({
       <BankTransferModal
         visible={showBankTransferModal}
         onClose={onBankModalClose}
+        onConfirmTransfer={onBankModalConfirm}
+        onSuccess={onBankModalSuccess}
+        amount={extractedData?.amount || '0'}
+        nairaAmount={`N${extractedData?.amount || '0'}`}
+        extractedData={extractedData || undefined}
+        capturedImageUri={capturedImageUri}
+      />
+
+      {/* Manual Bank Transfer Modal */}
+      <ManualBankTransferModal
+        visible={showManualBankTransferModal}
+        onClose={onManualBankModalClose}
         onConfirmTransfer={onBankModalConfirm}
         onSuccess={onBankModalSuccess}
         amount={extractedData?.amount || '0'}

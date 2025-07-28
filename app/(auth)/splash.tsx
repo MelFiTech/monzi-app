@@ -86,7 +86,7 @@ export default function SplashScreenComponent() {
     if (shouldTryBiometric) {
       await attemptBiometricAuth(true);
     } else {
-      router.replace('/(auth)/login');
+      router.replace('/(auth)/passcode-lock');
     }
   };
 
@@ -208,14 +208,14 @@ export default function SplashScreenComponent() {
       console.log('❌ Biometric authentication failed or cancelled');
       // Biometric failed or was cancelled
       if (isReauth) {
-        router.replace('/(auth)/login');
+        router.replace('/(auth)/passcode-lock');
       } else {
         setShowFallback(true);
       }
     } catch (error) {
       console.log('Biometric authentication error:', error);
       if (isReauth) {
-        router.replace('/(auth)/login');
+        router.replace('/(auth)/passcode-lock');
       } else {
         setShowFallback(true);
       }

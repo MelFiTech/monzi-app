@@ -91,11 +91,13 @@ const PasscodeLockScreen = () => {
         router.replace('/(tabs)');
       } else {
         setShowOverlay(false);
-        router.replace('/(auth)/login');
+        // Stay on passcode-lock screen if biometric fails
+        console.log('❌ Biometric authentication failed, staying on passcode-lock screen');
       }
     } catch (e) {
       setShowOverlay(false);
-      router.replace('/(auth)/login');
+      // Stay on passcode-lock screen if biometric fails
+      console.log('❌ Biometric authentication error, staying on passcode-lock screen');
     }
   };
 

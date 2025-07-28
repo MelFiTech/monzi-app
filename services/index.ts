@@ -19,6 +19,7 @@ export { default as ToastService } from './ToastService';
 export { default as NotificationService } from './NotificationService';
 export { default as PushNotificationService } from './PushNotificationService';
 export { default as ScanTrackingService } from './ScanTrackingService';
+export { default as LocationService } from './LocationService';
 export type { Message, UserData, AuthFlowStep } from './ChatService';
 export type { ExtractedBankData } from './GeminiService';
 
@@ -66,4 +67,5 @@ export type {
   PushNotificationData,
   PushTokenRegistration
 } from './PushNotificationService';
-export type { ScanUsage, ScanLimit } from './ScanTrackingService'; 
+export type { ScanUsage, ScanLimit } from './ScanTrackingService';
+export type { PaymentSuggestion, LocationMatch, LocationData, PreciseLocationResponse, NearbyLocationResponse } from './LocationService'; 

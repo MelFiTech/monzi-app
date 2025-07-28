@@ -24,6 +24,7 @@ export function useCameraLogic() {
   const [flashMode, setFlashMode] = useState<FlashMode>('off');
   const [cameraType, setCameraType] = useState<CameraType>('back');
   const [showBankTransferModal, setShowBankTransferModal] = useState(false);
+  const [showManualBankTransferModal, setShowManualBankTransferModal] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showInstructions, setShowInstructions] = useState(true);
@@ -90,6 +91,15 @@ export function useCameraLogic() {
     }, 3000);
 
     return () => clearTimeout(timer);
+  }, []);
+
+  // Cleanup effect - clear captured image when component unmounts
+  useEffect(() => {
+    return () => {
+      // Clear captured image from memory on unmount
+      setCapturedImageUri(null);
+      console.log('🧹 Component unmounting - cleared captured image');
+    };
   }, []);
 
   // Check for fresh registration
@@ -167,17 +177,17 @@ export function useCameraLogic() {
         return;
       }
 
-      // Flash animation
+      // Flash animation - optimized with native driver
       Animated.sequence([
         Animated.timing(flashAnimation, {
           toValue: 1,
           duration: 100,
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
         Animated.timing(flashAnimation, {
           toValue: 0,
           duration: 100,
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
       ]).start();
 
@@ -252,6 +262,7 @@ export function useCameraLogic() {
         
         // Show bank transfer modal with extracted data or empty state
         setShowBankTransferModal(true);
+        // Note: Don't clear capturedImageUri here - still needed for modal display
         
       } catch (error) {
         // Clear timeout on error
@@ -425,7 +436,9 @@ export function useCameraLogic() {
 
   const handleBankModalClose = () => {
     setShowBankTransferModal(false);
+    setShowManualBankTransferModal(false);
     setExtractedData(null);
+    setCapturedImageUri(null); // Clear captured image from memory
   };
 
   const handleBankModalConfirm = (resolvedAccountName?: string, selectedBankName?: string, accountNumber?: string) => {
@@ -443,11 +456,13 @@ export function useCameraLogic() {
       accountNumber: accountNumber || extractedData?.accountNumber || '',
       accountHolderName: resolvedAccountName || extractedData?.accountHolderName || '',
       amount: extractedData?.amount || '',
+      transferSource: extractedData ? 'image_extraction' : 'manual_entry', // Track if from image extraction
     };
 
     console.log('📤 [CameraLogic] Navigating to transfer with params:', {
       ...transferParams,
-      accountHolderName: transferParams.accountHolderName ? 'exists' : 'empty'
+      accountHolderName: transferParams.accountHolderName ? 'exists' : 'empty',
+      transferSource: transferParams.transferSource
     });
 
     router.push({
@@ -456,13 +471,16 @@ export function useCameraLogic() {
     });
     
     setShowBankTransferModal(false);
+    setShowManualBankTransferModal(false);
     setExtractedData(null);
   };
 
   const handleBankModalSuccess = () => {
     Alert.alert('Success!', 'Transfer completed successfully!');
     setShowBankTransferModal(false);
+    setShowManualBankTransferModal(false);
     setExtractedData(null);
+    setCapturedImageUri(null); // Clear captured image from memory
   };
 
   const handleVerificationModalClose = () => {
@@ -535,7 +553,21 @@ export function useCameraLogic() {
     setShowSetPinModal(false);
   };
 
+  // Handle manual bank transfer modal trigger
+  const handleManualBankTransfer = () => {
+    console.log('⌨️ Manual bank transfer modal triggered');
+    setExtractedData(null); // Clear any existing extracted data
+    setCapturedImageUri(null); // Clear captured image from memory
+    setShowManualBankTransferModal(true);
+  };
 
+
+
+  // Helper function to clear captured image from memory
+  const clearCapturedImage = () => {
+    setCapturedImageUri(null);
+    console.log('🧹 Cleared captured image from memory');
+  };
 
   // Handle extraction loader completion
   const handleExtractionComplete = (extractedData: ExtractedBankData | null) => {
@@ -543,6 +575,7 @@ export function useCameraLogic() {
     setShowExtractionLoader(false);
     setExtractedData(extractedData);
     setShowBankTransferModal(true);
+    // Note: Don't clear capturedImageUri here - still needed for modal display
   };
 
   return {
@@ -551,6 +584,7 @@ export function useCameraLogic() {
     flashMode,
     cameraType,
     showBankTransferModal,
+    showManualBankTransferModal,
     isCapturing,
     isProcessing,
     showInstructions,
@@ -596,6 +630,7 @@ export function useCameraLogic() {
     handleVerifyID,
     handleSetPinModalClose,
     handleSetPinSuccess,
+    handleManualBankTransfer,
     handleExtractionComplete,
     
     // State setters for backend checks
@@ -604,6 +639,8 @@ export function useCameraLogic() {
     setIsPendingVerification,
     setShowVerificationModal,
     setShowSetPinModal,
+    setShowBankTransferModal,
+    setShowManualBankTransferModal,
     setAreAllChecksComplete,
     setShowPulsatingGlow,
     setShowTransactionHistory,

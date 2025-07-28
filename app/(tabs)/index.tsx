@@ -15,15 +15,17 @@ import { router } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/providers/AuthProvider';
 import { CameraHeader } from '@/components/layout';
-import { PulsatingGlow, Transaction } from '@/components/common';
+import { PulsatingGlow, Transaction, LocationSuggestionModal, LocationFloatingButton, FloatingButton } from '@/components/common';
 import { CameraPermissions, CameraInterface, CameraControls, CameraModals, ExtractionLoader } from '@/components/camera';
 import { useCameraLogic } from '@/hooks/useCameraLogic';
 import { useBackendChecks } from '@/hooks/useBackendChecks';
 import { useNotificationService } from '@/hooks/useNotificationService';
 import { useWebSocketCacheIntegration } from '@/hooks/useWalletService';
+import { useGetCurrentLocation } from '@/hooks/useLocationService';
 import { fontFamilies } from '@/constants/fonts';
 import ToastService from '@/services/ToastService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
 
 const { width, height } = Dimensions.get('window');
 
@@ -31,6 +33,18 @@ export default function CameraScreen() {
   const { logout, user } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
   const queryClient = useQueryClient();
+
+  // Location suggestion state
+  const [showLocationSuggestion, setShowLocationSuggestion] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationPaymentData, setLocationPaymentData] = useState<any>(null); // Pre-fetched payment data
+  const getLocationMutation = useGetCurrentLocation();
+
+  // Location watching state
+  const [isLocationWatching, setIsLocationWatching] = useState(false);
+  const locationWatcherRef = useRef<Location.LocationSubscription | null>(null);
+  const lastKnownLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
+  const locationCheckInProgressRef = useRef(false);
 
   // Backend checks state
   const [backendChecksStarted, setBackendChecksStarted] = useState(false);
@@ -45,6 +59,10 @@ export default function CameraScreen() {
   // Initialize backend checks after delay (skip delay for fresh registration)
   useEffect(() => {
     if (!backendChecksStarted && !delayTimerComplete) {
+      // Clear location modal dismissed flag on fresh app load
+      AsyncStorage.removeItem('location_modal_minimized').catch(console.log);
+      console.log('🔄 [CameraScreen] Fresh app load - cleared location modal dismissed flag');
+      
       // Skip delay for fresh registration users
       if (cameraLogic.isFreshRegistration) {
         console.log('🆕 Fresh registration detected - skipping delays and starting immediately');
@@ -200,6 +218,269 @@ export default function CameraScreen() {
     }
   }, [permission]);
 
+  // Helper function to check if location has changed significantly
+  const hasLocationChangedSignificantly = (newLocation: { latitude: number; longitude: number }, oldLocation: { latitude: number; longitude: number } | null) => {
+    if (!oldLocation) return true;
+    
+    // Calculate distance between locations (in meters)
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = oldLocation.latitude * Math.PI / 180;
+    const φ2 = newLocation.latitude * Math.PI / 180;
+    const Δφ = (newLocation.latitude - oldLocation.latitude) * Math.PI / 180;
+    const Δλ = (newLocation.longitude - oldLocation.longitude) * Math.PI / 180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c;
+    
+    // Consider location changed if distance is more than 50 meters
+    return distance > 50;
+  };
+
+  // Check for minimized state on app load
+
+
+  // Function to start location watching
+  const startLocationWatching = async () => {
+    if (isLocationWatching || locationWatcherRef.current) {
+      console.log('📍 [CameraScreen] Location watching already active');
+      return;
+    }
+
+    try {
+      // Request location permissions
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('📍 [CameraScreen] Location permission denied');
+        return;
+      }
+
+      console.log('📍 [CameraScreen] Starting location watching...');
+      setIsLocationWatching(true);
+
+      // Start watching location with high accuracy
+      locationWatcherRef.current = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 10000, // Check every 10 seconds
+          distanceInterval: 50, // Update when moved 50 meters
+        },
+        async (location) => {
+          const newLocation = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          };
+
+          // Check if location has changed significantly
+          if (hasLocationChangedSignificantly(newLocation, lastKnownLocationRef.current)) {
+            console.log('📍 [CameraScreen] Location changed significantly:', newLocation);
+            
+            // Prevent multiple simultaneous checks
+            if (locationCheckInProgressRef.current) {
+              console.log('📍 [CameraScreen] Location check already in progress, skipping');
+              return;
+            }
+
+            locationCheckInProgressRef.current = true;
+            lastKnownLocationRef.current = newLocation;
+
+            try {
+              // Check for payment details at new location
+              const LocationService = (await import('@/services/LocationService')).default;
+              const locationService = LocationService.getInstance();
+              const preciseMatch = await locationService.getPreciseLocationSuggestions(
+                newLocation.latitude,
+                newLocation.longitude,
+                'Unknown'
+              );
+
+              // Only show modal if payment details found and modal wasn't dismissed
+              const isModalMinimized = await AsyncStorage.getItem('location_modal_minimized');
+              const wasManuallyDismissed = isModalMinimized === 'true';
+
+              if (preciseMatch && preciseMatch.paymentSuggestions && preciseMatch.paymentSuggestions.length > 0) {
+                setLocationPaymentData(preciseMatch);
+                setCurrentLocation(newLocation);
+                
+                if (!wasManuallyDismissed) {
+                  setShowLocationSuggestion(true);
+                  console.log('📍 [CameraScreen] Location change: Payment details found and modal shown');
+                } else {
+                  console.log('📍 [CameraScreen] Location change: Payment details found but modal was dismissed');
+                }
+              } else {
+                console.log('📍 [CameraScreen] Location change: No payment details available');
+              }
+            } catch (error) {
+              console.log('⚠️ [CameraScreen] Location change check failed:', error);
+            } finally {
+              locationCheckInProgressRef.current = false;
+            }
+          }
+        }
+      );
+
+      console.log('📍 [CameraScreen] Location watching started successfully');
+    } catch (error) {
+      console.log('❌ [CameraScreen] Failed to start location watching:', error);
+      setIsLocationWatching(false);
+    }
+  };
+
+  // Function to stop location watching
+  const stopLocationWatching = async () => {
+    if (locationWatcherRef.current) {
+      await locationWatcherRef.current.remove();
+      locationWatcherRef.current = null;
+      setIsLocationWatching(false);
+      console.log('📍 [CameraScreen] Location watching stopped');
+    }
+  };
+
+  // Location suggestion logic - check for location changes on app load
+  useEffect(() => {
+    const checkLocationSuggestion = async () => {
+      // Check location suggestions immediately after backend checks complete successfully
+      // Only check location if:
+      // 1. User is authenticated and verified
+      // 2. All backend checks are complete (wallet details check succeeded)
+      // 3. Not in KYC flow
+      // 4. Not showing verification modal
+      // 5. Not already showing modal
+      // 6. Modal hasn't been manually dismissed by user
+      if (
+        backendChecks.isAuthenticated &&
+        backendChecks.kycStatus?.isVerified &&
+        cameraLogic.areAllChecksComplete &&
+        !cameraLogic.isInKYCFlow &&
+        !cameraLogic.showVerificationModal &&
+        !showLocationSuggestion
+      ) {
+        console.log('📍 [CameraScreen] Backend checks complete, checking location suggestions...');
+        
+        // Check if user has manually dismissed the modal in this session
+        const isModalMinimized = await AsyncStorage.getItem('location_modal_minimized');
+        const wasManuallyDismissed = isModalMinimized === 'true';
+        
+        if (wasManuallyDismissed) {
+          console.log('📍 [CameraScreen] Modal was manually dismissed in this session, skipping auto-show');
+          return;
+        }
+        try {
+          // Get current location
+          const location = await getLocationMutation.mutateAsync();
+          
+          if (location) {
+            // Check if this is a new location (different from stored location)
+            const storedLocation = await AsyncStorage.getItem('last_location');
+            const storedLocationData = storedLocation ? JSON.parse(storedLocation) : null;
+            
+            const isNewLocation = !storedLocationData || 
+              storedLocationData.latitude !== location.latitude || 
+              storedLocationData.longitude !== location.longitude;
+            
+            if (isNewLocation) {
+              // Store new location
+              await AsyncStorage.setItem('last_location', JSON.stringify(location));
+              setCurrentLocation(location);
+              
+              // Pre-fetch payment details in background
+              try {
+                const LocationService = (await import('@/services/LocationService')).default;
+                const locationService = LocationService.getInstance();
+                const preciseMatch = await locationService.getPreciseLocationSuggestions(
+                  location.latitude,
+                  location.longitude,
+                  'Unknown' // We don't have business name, so use 'Unknown'
+                );
+                
+                // Store payment data for faster modal loading
+                if (preciseMatch && preciseMatch.paymentSuggestions && preciseMatch.paymentSuggestions.length > 0) {
+                  setLocationPaymentData(preciseMatch);
+                  setShowLocationSuggestion(true);
+                  console.log('📍 [CameraScreen] Payment details found and modal shown for:', location);
+                } else {
+                  console.log('📍 [CameraScreen] No payment details available for location:', location);
+                  setLocationPaymentData(null);
+                  // Don't show modal if no payment details
+                }
+              } catch (apiError) {
+                console.log('⚠️ [CameraScreen] Failed to check payment details:', apiError);
+                setLocationPaymentData(null);
+                // Don't show modal if API call fails
+              }
+            } else {
+              console.log('📍 [CameraScreen] Same location detected, not showing suggestion');
+            }
+          }
+        } catch (error) {
+          console.log('⚠️ [CameraScreen] Location suggestion failed:', error);
+          // Don't show error to user, just continue without suggestion
+        }
+      }
+    };
+
+    // Check location immediately when conditions are met (no delay needed)
+    checkLocationSuggestion();
+  }, [
+    backendChecks.isAuthenticated,
+    backendChecks.kycStatus?.isVerified,
+    cameraLogic.areAllChecksComplete,
+    cameraLogic.isInKYCFlow,
+    cameraLogic.showVerificationModal,
+    showLocationSuggestion
+  ]);
+
+  // Start location watching when backend checks complete and user is verified
+  useEffect(() => {
+    if (
+      backendChecks.isAuthenticated &&
+      backendChecks.kycStatus?.isVerified &&
+      cameraLogic.areAllChecksComplete &&
+      !cameraLogic.isInKYCFlow &&
+      !cameraLogic.showVerificationModal &&
+      !isLocationWatching
+    ) {
+      console.log('📍 [CameraScreen] Backend checks complete, starting location watching...');
+      startLocationWatching();
+    }
+  }, [
+    backendChecks.isAuthenticated,
+    backendChecks.kycStatus?.isVerified,
+    cameraLogic.areAllChecksComplete,
+    cameraLogic.isInKYCFlow,
+    cameraLogic.showVerificationModal,
+    isLocationWatching
+  ]);
+
+  // Stop location watching when app goes to background or user is not verified
+  useEffect(() => {
+    if (
+      !backendChecks.isAuthenticated ||
+      !backendChecks.kycStatus?.isVerified ||
+      cameraLogic.isInKYCFlow ||
+      cameraLogic.showVerificationModal
+    ) {
+      stopLocationWatching();
+    }
+  }, [
+    backendChecks.isAuthenticated,
+    backendChecks.kycStatus?.isVerified,
+    cameraLogic.isInKYCFlow,
+    cameraLogic.showVerificationModal
+  ]);
+
+  // Cleanup location watching on component unmount
+  useEffect(() => {
+    return () => {
+      stopLocationWatching();
+    };
+  }, []);
+
+
+
   // Handle camera permissions
   if (!permission || !permission.granted) {
     return (
@@ -228,6 +509,75 @@ export default function CameraScreen() {
         dimViewfinderRings={cameraLogic.showTransactionHistory}
         isAppInBackground={cameraLogic.isAppInBackground}
       />
+
+      {/* Location Floating Button - Always visible for authenticated and verified users */}
+      {backendChecks.isAuthenticated && backendChecks.kycStatus?.isVerified && (
+        <LocationFloatingButton
+          onPress={async () => {
+            console.log('📍 [CameraScreen] Location button pressed');
+            // Clear minimized flag when user manually opens modal
+            await AsyncStorage.removeItem('location_modal_minimized');
+            
+            try {
+              // Get fresh location when user taps floating button
+              const location = await getLocationMutation.mutateAsync();
+              if (location) {
+                setCurrentLocation(location);
+                
+                // Pre-fetch payment details for faster modal loading
+                try {
+                  const LocationService = (await import('@/services/LocationService')).default;
+                  const locationService = LocationService.getInstance();
+                  const preciseMatch = await locationService.getPreciseLocationSuggestions(
+                    location.latitude,
+                    location.longitude,
+                    'Unknown' // We don't have business name, so use 'Unknown'
+                  );
+                  
+                  // Store payment data and show modal if available
+                  if (preciseMatch && preciseMatch.paymentSuggestions && preciseMatch.paymentSuggestions.length > 0) {
+                    setLocationPaymentData(preciseMatch);
+                    setShowLocationSuggestion(true);
+                    console.log('📍 [CameraScreen] Payment details pre-fetched and modal shown for:', location);
+                  } else {
+                    console.log('📍 [CameraScreen] No payment details available for location:', location);
+                    setLocationPaymentData(null);
+                    ToastService.show('No payment details available for this location', 'info');
+                  }
+                } catch (apiError) {
+                  console.log('⚠️ [CameraScreen] Failed to check payment details:', apiError);
+                  setLocationPaymentData(null);
+                  ToastService.show('Failed to check location details', 'error');
+                }
+              } else {
+                ToastService.show('Unable to get your location', 'error');
+              }
+            } catch (error) {
+              console.log('Error getting location:', error);
+              ToastService.show('Failed to get location', 'error');
+            }
+          }}
+        />
+      )}
+
+      {/* Keyboard Floating Button - Right Side - For manual bank entry */}
+      {backendChecks.isAuthenticated && backendChecks.kycStatus?.isVerified && (
+        <FloatingButton
+          icon={<Image source={require('@/assets/icons/home/keyboard.png')} style={{ width: 24, height: 24 }} />}
+          onPress={() => {
+            console.log('⌨️ [CameraScreen] Keyboard button pressed');
+            cameraLogic.handleManualBankTransfer();
+          }}
+          style={{
+            position: 'absolute',
+            bottom: 40,
+            right: 30,
+            backgroundColor: 'rgba(0, 0, 0, 0.28)',
+            zIndex: 9999,
+            elevation: 9999,
+          }}
+        />
+      )}
 
       {/* Blur overlay when app is in background for privacy */}
       {cameraLogic.isAppInBackground && (
@@ -323,6 +673,7 @@ export default function CameraScreen() {
       {/* All Modals */}
       <CameraModals
         showBankTransferModal={cameraLogic.showBankTransferModal}
+        showManualBankTransferModal={cameraLogic.showManualBankTransferModal}
         showVerificationModal={cameraLogic.showVerificationModal}
         showSetPinModal={cameraLogic.showSetPinModal}
         extractedData={cameraLogic.extractedData}
@@ -331,6 +682,7 @@ export default function CameraScreen() {
         isPendingVerification={cameraLogic.isPendingVerification}
         walletRecoveryPending={cameraLogic.walletRecoveryMutation.isPending}
         onBankModalClose={cameraLogic.handleBankModalClose}
+        onManualBankModalClose={cameraLogic.handleBankModalClose}
         onBankModalConfirm={cameraLogic.handleBankModalConfirm}
         onBankModalSuccess={cameraLogic.handleBankModalSuccess}
         onVerificationModalClose={cameraLogic.handleVerificationModalClose}
@@ -338,6 +690,46 @@ export default function CameraScreen() {
         onSetPinModalClose={cameraLogic.handleSetPinModalClose}
         onSetPinSuccess={cameraLogic.handleSetPinSuccess}
       />
+
+      {/* Location Suggestion Modal */}
+      <LocationSuggestionModal
+        visible={showLocationSuggestion}
+        preFetchedData={locationPaymentData} // Pass pre-fetched payment data
+        onClose={() => {
+          setShowLocationSuggestion(false);
+          setLocationPaymentData(null); // Clear pre-fetched data when modal closes
+          // Mark modal as manually dismissed to prevent auto-showing
+          AsyncStorage.setItem('location_modal_minimized', 'true').catch(console.log);
+          console.log('📍 [CameraScreen] Location modal manually dismissed');
+        }}
+        onSuggestionSelected={(suggestion) => {
+          console.log('📍 [CameraScreen] Location suggestion selected:', suggestion);
+          // Reset minimized state when user successfully uses a suggestion
+          AsyncStorage.removeItem('location_modal_minimized').catch(console.log);
+          
+          // Store current location as "used" so it won't trigger again
+          if (currentLocation) {
+            AsyncStorage.setItem('last_location', JSON.stringify(currentLocation)).catch(console.log);
+          }
+          
+          // Navigate to transfer screen with pre-filled business details
+          router.push({
+            pathname: '/transfer',
+            params: {
+              bankName: suggestion.bankName,
+              accountNumber: suggestion.accountNumber,
+              accountHolderName: suggestion.accountName,
+              transferSource: 'suggestion_modal', // Track that this came from suggestion modal
+            }
+          });
+        }}
+      />
+
+
+      
+
+
+
     </View>
   );
 }
@@ -411,4 +803,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
     zIndex: 999,
   },
+
 });

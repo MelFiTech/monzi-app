@@ -35,9 +35,9 @@ const useWalletAccess = () => {
   const { data: kycStatus, isLoading: kycLoading } = useKYCStatus();
   
   const walletAccessInfo = useMemo(() => {
-    const hasWalletAccess = isAuthenticated && 
-                           (kycStatus?.kycStatus === 'VERIFIED' || kycStatus?.kycStatus === 'APPROVED') && 
-                           kycStatus?.isVerified === true;
+  const hasWalletAccess = isAuthenticated && 
+                         (kycStatus?.kycStatus === 'VERIFIED' || kycStatus?.kycStatus === 'APPROVED') && 
+                         kycStatus?.isVerified === true;
     
     console.log('🔍 [WalletAccess] Status Check:', {
       isAuthenticated,
@@ -51,7 +51,7 @@ const useWalletAccess = () => {
   
     return { 
       hasWalletAccess, 
-      isAuthenticated,
+    isAuthenticated,
       kycStatus,
       kycLoading
     };
@@ -633,5 +633,40 @@ export function useCalculateFee(amount: number, transactionType: string, provide
     gcTime: 10 * 60 * 1000, // 10 minutes
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
+  });
+}
+
+/**
+ * Hook for tagging transactions as business or personal
+ */
+export function useTagTransaction() {
+  const walletService = WalletService.getInstance();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ transactionId, isBusiness }: { transactionId: string; isBusiness: boolean }) =>
+      walletService.tagTransaction(transactionId, isBusiness),
+    onSuccess: (data, variables) => {
+      console.log('✅ Transaction tagged successfully:', {
+        transactionId: variables.transactionId,
+        isBusiness: variables.isBusiness,
+        response: data
+      });
+      
+      // Invalidate transaction history to refresh the list
+      queryClient.invalidateQueries({ queryKey: walletKeys.transactions() });
+      
+      // Also invalidate specific transaction detail if it exists
+      queryClient.invalidateQueries({ 
+        queryKey: [...walletKeys.all, 'transaction', variables.transactionId] 
+      });
+    },
+    onError: (error, variables) => {
+      console.error('❌ Transaction tagging failed:', {
+        transactionId: variables.transactionId,
+        isBusiness: variables.isBusiness,
+        error
+      });
+    },
   });
 }

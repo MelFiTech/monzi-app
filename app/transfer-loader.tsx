@@ -9,11 +9,13 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
 import { useTransferFunds } from '@/hooks/useWalletService';
+import { useGetCurrentLocation } from '@/hooks/useLocationService';
 import CircularLoader from '@/components/common/CircularLoader';
 
 export default function TransferLoaderScreen() {
   const params = useLocalSearchParams();
   const transferFundsMutation = useTransferFunds();
+  const getLocationMutation = useGetCurrentLocation();
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Extract transfer details from params
@@ -22,6 +24,7 @@ export default function TransferLoaderScreen() {
   const bankName = params.bankName as string || '';
   const accountName = params.accountName as string || '';
   const pin = params.pin as string || '';
+  const transferSource = params.transferSource as string || ''; // 'image_extraction', 'suggestion_modal', 'manual_entry'
 
   useEffect(() => {
     if (amount && accountNumber && bankName && accountName && pin) {
@@ -39,6 +42,15 @@ export default function TransferLoaderScreen() {
         pin: '****'
       });
 
+      // Capture current location for business payment tracking
+      let locationData = null;
+      try {
+        locationData = await getLocationMutation.mutateAsync();
+        console.log('📍 [TransferLoader] Location captured:', locationData);
+      } catch (locationError) {
+        console.log('⚠️ [TransferLoader] Location capture failed, continuing without location:', locationError);
+      }
+
       // Debug: Log exact transfer parameters being sent
       const transferParams = {
         amount,
@@ -46,7 +58,13 @@ export default function TransferLoaderScreen() {
         bankName,
         accountName,
         description: `Transfer to ${accountName}`,
-        pin
+        pin,
+        // Include location data if available
+        ...(locationData && {
+          locationName: accountName, // Use recipient name as location name
+          locationLatitude: locationData.latitude,
+          locationLongitude: locationData.longitude,
+        })
       };
       
       console.log('📤 [TransferLoader] Transfer parameters:', {
@@ -66,6 +84,8 @@ export default function TransferLoaderScreen() {
           recipientName: transferResult.recipientName,
           reference: transferResult.reference,
           newBalance: transferResult.newBalance.toLocaleString(),
+          transactionId: transferResult.transactionId || '', // Pass transaction ID for tagging
+          transferSource: transferSource, // Pass transfer source for toggle visibility
         }
       });
       

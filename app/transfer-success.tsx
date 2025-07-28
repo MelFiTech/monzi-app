@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -8,10 +8,13 @@ import {
   StatusBar,
   Animated,
   Share,
+  Switch,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { fontFamilies } from '@/constants/fonts';
 import { Check } from 'lucide-react-native';
+import { useTagTransaction } from '@/hooks/useWalletService';
+import ToastService from '@/services/ToastService';
 
 export default function TransferSuccessScreen() {
   const params = useLocalSearchParams();
@@ -21,6 +24,12 @@ export default function TransferSuccessScreen() {
   const recipientName = (params.recipientName as string || '').toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   const reference = params.reference as string || '';
   const newBalance = params.newBalance as string || '';
+  const transactionId = params.transactionId as string || '';
+  const transferSource = params.transferSource as string || ''; // Track transfer source
+
+  // Tag transaction state
+  const [isBusiness, setIsBusiness] = useState(false);
+  const tagTransactionMutation = useTagTransaction();
 
   // Animation values
   const scaleAnim = useRef(new Animated.Value(0)).current;
@@ -70,6 +79,28 @@ export default function TransferSuccessScreen() {
     }
   };
 
+  const handleTagToggle = async (value: boolean) => {
+    if (!transactionId) {
+      ToastService.error('Transaction ID not available');
+      return;
+    }
+
+    try {
+      await tagTransactionMutation.mutateAsync({
+        transactionId,
+        isBusiness: value,
+      });
+      
+      setIsBusiness(value);
+      ToastService.success(value ? 'Marked as business' : 'Marked as personal');
+    } catch (error) {
+      console.error('Error tagging transaction:', error);
+      ToastService.error('Failed to tag transaction');
+      // Revert the toggle if it fails
+      setIsBusiness(!value);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
@@ -103,6 +134,20 @@ export default function TransferSuccessScreen() {
             {recipientName}
           </Text>
         </View>
+
+        {/* Transaction Tag Toggle - Show for image extraction and manual entry */}
+        {transactionId && (transferSource === 'image_extraction' || transferSource === 'manual_entry') && (
+          <View style={styles.tagContainer}>
+            <Text style={styles.tagLabel}>Mark as business transaction</Text>
+            <Switch
+              value={isBusiness}
+              onValueChange={handleTagToggle}
+              trackColor={{ false: 'rgba(255, 255, 255, 0.2)', true: '#FFE66C' }}
+              thumbColor={isBusiness ? '#000000' : '#FFFFFF'}
+              disabled={tagTransactionMutation.isPending}
+            />
+          </View>
+        )}
       </View>
 
       {/* Share and Done Buttons */}
@@ -207,5 +252,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: fontFamilies.sora.semiBold,
     fontWeight: '600',
+  },
+  tagContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 62,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 44,
+    marginHorizontal: 20,
+  },
+  tagLabel: {
+    fontSize: 14,
+    fontFamily: fontFamilies.sora.medium,
+    color: 'rgba(255, 255, 255, 0.8)',
+    flex: 1,
+    marginRight: 12,
   },
 }); 

@@ -36,10 +36,8 @@
         "VIBRATE",
         "WAKE_LOCK",
         "android.permission.CAMERA",
-        "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE",
-        "WAKE_LOCK",
-        "android.permission.CAMERA"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
       ]
     },
     "web": {

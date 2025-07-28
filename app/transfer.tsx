@@ -53,6 +53,7 @@ export default function TransferScreen() {
   const extractedAmount = getValidExtractedAmount(rawExtractedAmount);
   const pinError = params.pinError as string || '';
   const transferError = params.transferError as string || '';
+  const transferSource = params.transferSource as string || ''; // Track transfer source for toggle visibility
 
   // Set initial states based on extracted data
   const [amount, setAmount] = useState<string>('');
@@ -351,11 +352,7 @@ export default function TransferScreen() {
       return;
     }
 
-    // Wait for fee to load if not loaded yet
-    if (isFeeLoading) {
-      Alert.alert('Please wait', 'Calculating transaction fee...');
-      return;
-    }
+
     if (isFeeError) {
       Alert.alert('Fee Error', feeError?.message || 'Failed to calculate fee.');
       return;
@@ -424,7 +421,8 @@ export default function TransferScreen() {
           accountNumber,
           bankName,
           accountName: recipientName,
-          pin
+          pin,
+          transferSource: transferSource || 'manual_entry' // Default to manual entry if no source specified
         }
       });
       

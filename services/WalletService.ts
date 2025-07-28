@@ -125,6 +125,10 @@ export interface TransferRequest {
   accountName: string;
   description?: string;
   pin: string;
+  // Location data for business payment tracking
+  locationName?: string;
+  locationLatitude?: number;
+  locationLongitude?: number;
 }
 
 export interface TransferResponse {
@@ -137,6 +141,7 @@ export interface TransferResponse {
   recipientName: string;
   recipientAccount: string;
   recipientBank: string;
+  transactionId?: string; // Transaction ID for tagging
 }
 
 export interface WalletRecoveryResponse {
@@ -405,6 +410,9 @@ class WalletService {
         bankName: data.bankName,
         accountName: data.accountName,
         description: data.description,
+        locationName: data.locationName,
+        locationLatitude: data.locationLatitude,
+        locationLongitude: data.locationLongitude,
         pin: '****'  // Don't log actual PIN
       });
 
@@ -506,6 +514,32 @@ class WalletService {
       return result.data;
     } catch (error) {
       console.error('❌ Fee calculation error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Tag transaction as business or personal
+   */
+  async tagTransaction(transactionId: string, isBusiness: boolean): Promise<{ success: boolean; message: string }> {
+    try {
+      const headers = await this.getAuthHeaders();
+      
+      console.log('🏷️ Tagging transaction:', { transactionId, isBusiness });
+      const response = await fetch(`${this.baseUrl}/wallet/tag-transaction`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          transactionId,
+          isBusiness,
+        }),
+      });
+      
+      const result = await this.handleResponse<{ success: boolean; message: string }>(response);
+      console.log('✅ Transaction tagging response:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Transaction tagging error:', error);
       throw error;
     }
   }

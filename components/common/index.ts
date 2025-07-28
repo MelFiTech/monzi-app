@@ -1,6 +1,7 @@
 export { default as AmountPill } from './AmountPill';
 export { default as BankSelectionModal } from './BankSelectionModal';
 export { default as BankTransferModal } from './BankTransferModal';
+export { default as ManualBankTransferModal } from './ManualBankTransferModal';
 export { default as BottomSheetModal } from './BottomSheetModal';
 export { default as Button } from './Button';
 export { default as CircularLoader } from './CircularLoader';
@@ -22,8 +23,14 @@ export { default as TransactionPinModal } from './TransactionPinModal';
 export { default as TransactionList } from './TransactionList';
 export { default as TransactionListItem } from './TransactionListItem';
 export { default as VerificationModal } from './VerificationModal';
+export { default as LocationCapture } from './LocationCapture';
+export { default as LocationSuggestionModal } from './LocationSuggestionModal';
+export { default as LocationFloatingButton } from './LocationFloatingButton';
+export { default as PaymentSuggestionCard } from './PaymentSuggestionCard';
+export { default as FloatingButton } from './FloatingButton';
 
 export type { Transaction } from './TransactionListItem';
+export type { PaymentSuggestion, LocationMatch } from '@/services/LocationService';
 
 export * from './useClientOnlyValue';
 export * from './useColorScheme'; 

@@ -7,7 +7,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AppState, TouchableWithoutFeedback, View, Image } from 'react-native';
 import { BlurView } from 'expo-blur';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { updateLastActivity, shouldRequireReauth, INACTIVITY_TIMEOUT_MS } from '@/hooks/useInactivityService';
+import { updateLastActivity, shouldRequireReauth, shouldRequireReauthFromBackground, updateBackgroundActivity, INACTIVITY_TIMEOUT_MS, BACKGROUND_TIMEOUT_MS } from '@/hooks/useInactivityService';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
@@ -87,16 +87,23 @@ export default function RootLayout() {
   }, [loaded]);
 
   useEffect(() => {
-    // Listen for app state changes - only check inactivity when app is reopened
+    // Listen for app state changes - check inactivity and background timeout
     const handleAppStateChange = async (nextAppState: string) => {
       if (nextAppState === 'active') {
         // On resume, check if user was inactive while app was closed
         const requireReauth = await shouldRequireReauth();
-        if (requireReauth) {
+        const requireReauthFromBackground = await shouldRequireReauthFromBackground();
+        
+        if (requireReauth || requireReauthFromBackground) {
+          console.log('🔒 Session expired - requiring reauth');
           await AsyncStorage.setItem('requireReauth', 'true');
         }
         // Update last activity on resume
         await updateLastActivity();
+      } else if (nextAppState === 'background') {
+        // On background, record the time
+        console.log('📱 App going to background - recording timestamp');
+        await updateBackgroundActivity();
       }
     };
     const sub = AppState.addEventListener('change', handleAppStateChange);

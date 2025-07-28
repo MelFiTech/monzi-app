@@ -43,7 +43,7 @@ export default function ForgotPasscodeScreen() {
       if (fromLogin) {
         emailInputRef.current?.focus();
       } else {
-        otpInputRef.current?.focus();
+      otpInputRef.current?.focus();
       }
     }, 300);
     return () => clearTimeout(timer);
@@ -58,7 +58,7 @@ export default function ForgotPasscodeScreen() {
           setUserEmail(userProfile.email);
           // Only auto-request OTP if not coming from login
           if (!fromLogin) {
-            requestResetOtpMutation.mutate();
+          requestResetOtpMutation.mutate();
           }
         } else if (!fromLogin) {
           showToast('User email not found. Please login again.', 'error');
@@ -66,8 +66,8 @@ export default function ForgotPasscodeScreen() {
         }
       } catch (error) {
         if (!fromLogin) {
-          showToast('Failed to get user information', 'error');
-          router.back();
+        showToast('Failed to get user information', 'error');
+        router.back();
         }
       }
     };
@@ -252,69 +252,69 @@ export default function ForgotPasscodeScreen() {
 
         {/* OTP Input - Show when not coming from login, or when coming from login and OTP has been sent */}
         {(!fromLogin || (fromLogin && countdown > 0)) && (
-          <View style={containerStyles.inputContainer}>
-            <View style={containerStyles.otpInputWrapper}>
-              <TextInput
-                ref={otpInputRef}
-                style={[
-                  containerStyles.otpInput,
-                  verifyOtpMutation.isPending && containerStyles.otpInputDisabled
-                ]}
-                placeholder="••••••"
-                placeholderTextColor="rgba(255, 255, 255, 0.4)"
-                value={otp}
-                onChangeText={handleOtpChange}
-                keyboardType="numeric"
-                maxLength={6}
-                editable={!verifyOtpMutation.isPending}
+        <View style={containerStyles.inputContainer}>
+          <View style={containerStyles.otpInputWrapper}>
+            <TextInput
+              ref={otpInputRef}
+              style={[
+                containerStyles.otpInput,
+                verifyOtpMutation.isPending && containerStyles.otpInputDisabled
+              ]}
+              placeholder="••••••"
+              placeholderTextColor="rgba(255, 255, 255, 0.4)"
+              value={otp}
+              onChangeText={handleOtpChange}
+              keyboardType="numeric"
+              maxLength={6}
+              editable={!verifyOtpMutation.isPending}
                 autoFocus={!fromLogin || (fromLogin && countdown > 0)}
-                returnKeyType="done"
-                onSubmitEditing={() => handleVerify()}
-                textAlign="left"
-                textContentType="oneTimeCode"
-                autoComplete="sms-otp"
+              returnKeyType="done"
+              onSubmitEditing={() => handleVerify()}
+              textAlign="left"
+              textContentType="oneTimeCode"
+              autoComplete="sms-otp"
+            />
+          </View>
+          
+          {verifyOtpMutation.isPending && (
+            <View style={containerStyles.loaderContainer}>
+              <ActivityIndicator 
+                color="#FFE66C"
+                size="small"
               />
             </View>
-            
-            {verifyOtpMutation.isPending && (
-              <View style={containerStyles.loaderContainer}>
-                <ActivityIndicator 
-                  color="#FFE66C"
-                  size="small"
-                />
-              </View>
-            )}
-          </View>
+          )}
+        </View>
         )}
       </View>
 
       {/* Footer - Only show when OTP input is visible */}
       {(!fromLogin || (fromLogin && countdown > 0)) && (
-        <View style={[
-          containerStyles.footer,
-          keyboardHeight > 0 && {
-            position: 'absolute',
-            bottom: keyboardHeight + -20,
-            left: 0,
-            right: 0,
-          }
-        ]}>
-          {countdown > 0 ? (
-            <Text style={textStyles.countdownText}>
-              Resend code in 00:{countdown.toString().padStart(2, '0')}
+      <View style={[
+        containerStyles.footer,
+        keyboardHeight > 0 && {
+          position: 'absolute',
+          bottom: keyboardHeight + -20,
+          left: 0,
+          right: 0,
+        }
+      ]}>
+        {countdown > 0 ? (
+          <Text style={textStyles.countdownText}>
+            Resend code in 00:{countdown.toString().padStart(2, '0')}
+          </Text>
+        ) : (
+          <TouchableOpacity 
+            onPress={handleResendOtp} 
+            style={buttonStyles.resendButton}
+            disabled={requestResetOtpMutation.isPending}
+          >
+            <Text style={textStyles.resendText}>
+              {requestResetOtpMutation.isPending ? 'Sending...' : 'Resend'}
             </Text>
-          ) : (
-            <TouchableOpacity 
-              onPress={handleResendOtp} 
-              style={buttonStyles.resendButton}
-              disabled={requestResetOtpMutation.isPending}
-            >
-              <Text style={textStyles.resendText}>
-                {requestResetOtpMutation.isPending ? 'Sending...' : 'Resend'}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
+          </TouchableOpacity>
+        )}
+      </View>
       )}
     </SafeAreaView>
   );
