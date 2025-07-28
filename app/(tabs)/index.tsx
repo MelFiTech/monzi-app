@@ -571,7 +571,7 @@ export default function CameraScreen() {
           style={{
             position: 'absolute',
             bottom: 40,
-            right: 30,
+            right: 25,
             backgroundColor: 'rgba(0, 0, 0, 0.28)',
             zIndex: 9999,
             elevation: 9999,

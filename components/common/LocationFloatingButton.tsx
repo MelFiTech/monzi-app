@@ -18,7 +18,7 @@ export default function LocationFloatingButton({ onPress }: LocationFloatingButt
       }}
       style={{
         position: 'absolute',
-        bottom: 50,
+        bottom: 40,
         left: 25,
         backgroundColor: 'rgba(0, 0, 0, 0.28)',
         zIndex: 9999,

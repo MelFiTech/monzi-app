@@ -195,7 +195,7 @@ function GlobalAppPrivacyOverlay() {
             left: 0,
             right: 0,
             bottom: 0,
-            zIndex: 9999,
+            zIndex: 99999,
           }}
         >
           <View style={{
@@ -229,7 +229,7 @@ function GlobalAppPrivacyOverlay() {
           right: 0,
           bottom: 0,
           backgroundColor: '#000000',
-          zIndex: 9998,
+          zIndex: 99998,
         }} />
       )}
     </>

@@ -224,9 +224,6 @@ export default function BankTransferModal({
         setRetryCount(0);
         setIsAutoRetrying(false);
         
-        // Show success message
-        ToastService.success(`Found: ${result.bank_name}`);
-        
       } catch (error) {
         if (!isModalActiveRef.current || isEditingAccountNumberRef.current) return;
         console.error('❌ Super resolve failed:', error);
@@ -437,7 +434,6 @@ export default function BankTransferModal({
           setResolvedAccountName(result.account_name);
           setIsResolvingAccount(false);
           setIsAutoRetrying(false);
-          ToastService.success('Account verified successfully');
         } catch (error) {
           if (!isModalActiveRef.current || isEditingAccountNumberRef.current) return;
           console.error('❌ Account resolution failed for edited account:', error);
@@ -496,7 +492,6 @@ export default function BankTransferModal({
           setResolvedAccountName(result.account_name);
           setIsResolvingAccount(false);
           setIsAutoRetrying(false);
-          ToastService.success(`Found: ${result.bank_name}`);
           
         } catch (error) {
           if (!isModalActiveRef.current || isEditingAccountNumberRef.current) return;
@@ -537,8 +532,6 @@ export default function BankTransferModal({
           }
         }
       }
-    } else {
-      ToastService.success('Account number updated');
     }
   };
 
