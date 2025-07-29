@@ -1,6 +1,7 @@
 // Re-export all hooks for easier importing
 export * from './useAuthService';
 export * from './useAccountService';
+export * from './useBankServices';
 export * from './useBiometricService';
 export * from './useGeminiService';
 export * from './useCloudVisionService';

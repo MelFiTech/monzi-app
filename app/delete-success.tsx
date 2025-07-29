@@ -11,14 +11,23 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
 import { AuthHeader } from '@/components/auth';
 import { Button } from '@/components/common';
+import { useAuth } from '@/hooks/useAuthService';
 
 export default function DeleteSuccessScreen() {
   const { colors } = useTheme();
+  const { logout } = useAuth();
 
-  const handleDone = () => {
-    // Navigate back to profile or close all modals
-    router.dismissAll();
-    router.replace('/profile');
+  const handleDone = async () => {
+    try {
+      // Logout the user since account is deleted
+      await logout.mutateAsync({ clearAllData: true });
+      // Navigate to auth screen
+      router.replace('/(auth)/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force navigation even if logout fails
+      router.replace('/(auth)/login');
+    }
   };
 
   return (

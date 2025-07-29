@@ -1,13 +1,52 @@
 import React from 'react';
 import { TouchableOpacity, Image, StyleSheet } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 interface FloatingButtonProps {
   icon: any; // Image source or React element
   onPress: () => void;
   style?: any;
+  hapticFeedback?: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error' | 'none';
 }
 
-export default function FloatingButton({ icon, onPress, style }: FloatingButtonProps) {
+export default function FloatingButton({ icon, onPress, style, hapticFeedback = 'light' }: FloatingButtonProps) {
+  const triggerHapticFeedback = async () => {
+    if (hapticFeedback === 'none') {
+      return;
+    }
+
+    try {
+      switch (hapticFeedback) {
+        case 'light':
+          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          break;
+        case 'medium':
+          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          break;
+        case 'heavy':
+          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+          break;
+        case 'success':
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          break;
+        case 'warning':
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          break;
+        case 'error':
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          break;
+      }
+    } catch (error) {
+      // Silently handle haptic feedback errors
+      console.warn('Haptic feedback failed:', error);
+    }
+  };
+
+  const handlePress = async () => {
+    await triggerHapticFeedback();
+    onPress();
+  };
+
   return (
     <TouchableOpacity
       style={[
@@ -21,7 +60,7 @@ export default function FloatingButton({ icon, onPress, style }: FloatingButtonP
         },
         style,
       ]}
-      onPress={onPress}
+      onPress={handlePress}
       activeOpacity={0.7}
     >
       {React.isValidElement(icon) ? icon : <Image source={icon} style={styles.icon} />}

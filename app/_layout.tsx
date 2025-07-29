@@ -163,6 +163,7 @@ function RootLayoutNav() {
                   <Stack.Screen name="forgot-passcode" options={{ headerShown: false }} />
                   <Stack.Screen name="delete-account" options={{ headerShown: false }} />
                   <Stack.Screen name="delete-reason" options={{ headerShown: false }} />
+                  <Stack.Screen name="delete-otp" options={{ headerShown: false }} />
                   <Stack.Screen name="delete-success" options={{ headerShown: false }} />
 
                 </Stack>

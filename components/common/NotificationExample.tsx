@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import AccountService from '../../services/AccountService';
 import { SMEPlugBanksService, PushNotificationService } from '../../services';
-import { useBanks } from '../../hooks/useAccountService';
+import { useBankList } from '../../hooks/useBankServices';
 import { useAuth } from '../../providers/AuthProvider';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
@@ -18,9 +18,10 @@ export default function NetworkDiagnosticTool() {
   const [isLoadingSMEPlug, setIsLoadingSMEPlug] = useState(false);
   const [pushResult, setPushResult] = useState<any>(null);
   const [isTestingPush, setIsTestingPush] = useState(false);
+  const [backendBanksResult, setBackendBanksResult] = useState<string>('');
 
   // React Query hook for banks
-  const { data: banksData, isLoading: isQueryLoading, error: queryError, refetch } = useBanks();
+  const { data: banksData, isLoading: isQueryLoading, error: queryError, refetch } = useBankList();
   
   // Auth context for push notifications
   const {
@@ -63,17 +64,49 @@ export default function NetworkDiagnosticTool() {
     }
   };
 
-  const testSMEPlugDirect = async () => {
-    setIsLoadingSMEPlug(true);
+  const testBackendBanksDirect = async () => {
+    setBackendBanksResult('Testing...');
     try {
-      const banks = await SMEPlugBanksService.getBanks();
-      setSmePlugResult({ success: true, count: banks.length, banks: banks.slice(0, 3) });
-      console.log('✅ SME Plug direct fetch successful:', banks.length, 'banks');
+      console.log('🧪 Testing backend banks directly...');
+      const response = await fetch('https://655f12858ff3.ngrok-free.app/accounts/banks', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+          'User-Agent': 'MonziApp/1.0.0',
+        },
+      });
+      
+      console.log('📨 Response status:', response.status);
+      const data = await response.json();
+      console.log('📦 Response data:', data);
+      
+      setBackendBanksResult(`Success: ${data.banks?.length || 0} banks found`);
     } catch (error) {
-      console.error('❌ SME Plug direct fetch failed:', error);
-      setSmePlugResult({ success: false, error: error instanceof Error ? error.message : 'Unknown error' });
-    } finally {
-      setIsLoadingSMEPlug(false);
+      console.error('❌ Backend banks test failed:', error);
+      setBackendBanksResult(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const testBasicConnectivity = async () => {
+    setBackendBanksResult('Testing basic connectivity...');
+    try {
+      console.log('🧪 Testing basic connectivity...');
+      const response = await fetch('https://httpbin.org/get', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      console.log('📨 Basic connectivity response status:', response.status);
+      const data = await response.json();
+      console.log('📦 Basic connectivity response data:', data);
+      
+      setBackendBanksResult(`Basic connectivity: Success (${response.status})`);
+    } catch (error) {
+      console.error('❌ Basic connectivity test failed:', error);
+      setBackendBanksResult(`Basic connectivity: Error - ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -190,40 +223,16 @@ export default function NetworkDiagnosticTool() {
         )}
       </View>
 
-      {/* SME Plug Direct Test */}
+      {/* Backend Banks Direct Test */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>2. SME Plug Banks (Direct Test)</Text>
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: '#4CAF50' }]} 
-          onPress={testSMEPlugDirect}
-          disabled={isLoadingSMEPlug}
-        >
-          {isLoadingSMEPlug ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Test SME Plug</Text>
-          )}
+        <Text style={styles.sectionTitle}>Backend Banks Test</Text>
+        <TouchableOpacity onPress={testBackendBanksDirect} style={styles.button}>
+          <Text style={styles.buttonText}>Test Backend Banks</Text>
         </TouchableOpacity>
-
-        {smePlugResult && (
-          <View style={styles.result}>
-            <Text style={styles.resultTitle}>SME Plug Direct Result:</Text>
-            <Text style={[styles.resultText, { color: smePlugResult.success ? '#4CAF50' : '#F44336' }]}>
-              Status: {smePlugResult.success ? 'Success ✅' : 'Failed ❌'}
-            </Text>
-            {smePlugResult.success ? (
-              <>
-                <Text style={styles.resultText}>Banks Count: {smePlugResult.count}</Text>
-                <Text style={styles.resultText}>Sample Banks:</Text>
-                {smePlugResult.banks.map((bank: any, index: number) => (
-                  <Text key={index} style={styles.bankText}>• {bank.name}</Text>
-                ))}
-              </>
-            ) : (
-              <Text style={[styles.resultText, { color: '#F44336' }]}>Error: {smePlugResult.error}</Text>
-            )}
-          </View>
-        )}
+        <TouchableOpacity onPress={testBasicConnectivity} style={styles.button}>
+          <Text style={styles.buttonText}>Test Basic Connectivity</Text>
+        </TouchableOpacity>
+        <Text style={styles.resultText}>{backendBanksResult}</Text>
       </View>
 
       {/* Push Notifications Test */}

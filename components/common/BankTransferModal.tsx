@@ -8,7 +8,7 @@ import Button from './Button';
 import BankSelectionModal from './BankSelectionModal';
 import { Copy, Check, Edit3, Save, XCircle, ChevronDown, RefreshCw } from 'lucide-react-native';
 import { ExtractedBankData } from '@/services';
-import { useResolveAccountMutation, useSuperResolveAccountMutation } from '@/hooks/useAccountService';
+import { useResolveBankAccountMutation, useSuperResolveBankAccountMutation } from '@/hooks/useBankServices';
 import { ToastService } from '@/services';
 import { router } from 'expo-router';
 
@@ -56,8 +56,8 @@ export default function BankTransferModal({
   const MAX_RETRIES = 5;
   const isEditingAccountNumberRef = useRef(false);
 
-  const resolveAccountMutation = useResolveAccountMutation();
-  const superResolveAccountMutation = useSuperResolveAccountMutation();
+  const resolveAccountMutation = useResolveBankAccountMutation();
+  const superResolveAccountMutation = useSuperResolveBankAccountMutation();
 
   // Use only fresh data - no fallbacks to old data
   const bankName = selectedBankName || extractedData?.bankName || '';

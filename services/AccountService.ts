@@ -1,5 +1,4 @@
 import { Config } from '../constants/config';
-import SMEPlugBanksService from './SMEPlugBanksService';
 
 interface AccountResolutionRequest {
   account_number: string;
@@ -39,199 +38,41 @@ interface AccountResolutionError {
 type AccountResolutionResult = AccountResolutionResponse | AccountResolutionError;
 
 class AccountService {
-  private static readonly BASE_URL = Config.API.getBaseUrl();
-  private static readonly RESOLVE_ENDPOINT = '/accounts/resolve';
-  private static readonly SUPER_RESOLVE_ENDPOINT = '/accounts/super-resolve';
-  private static readonly BANKS_ENDPOINT = '/accounts/banks';
+  // Bank-related endpoints have been moved to BankListService and BankResolutionService
 
-  /**
-   * Resolve account name using account number and bank name
-   */
-  static async resolveAccount(
-    accountNumber: string, 
-    bankName: string
-  ): Promise<AccountResolutionResponse> {
-    try {
-      console.log('🔍 Resolving account:', { accountNumber, bankName });
-
-      const requestBody: AccountResolutionRequest = {
-        account_number: accountNumber,
-        bank_name: bankName,
-      };
-
-      const response = await fetch(`${this.BASE_URL}${this.RESOLVE_ENDPOINT}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data: AccountResolutionResult = await response.json();
-
-      console.log('📦 Account resolution response:', data);
-
-      if (!data.status) {
-        throw new Error(data.message || 'Account resolution failed');
-      }
-
-      const successData = data as AccountResolutionResponse;
-      
-      console.log('✅ Account resolved successfully:', {
-        accountName: successData.account_name,
-        bankName: successData.bank_name,
-      });
-
-      return successData;
-    } catch (error) {
-      console.error('❌ Account resolution error:', error);
-      
-      // Re-throw with more context
-      if (error instanceof Error) {
-        throw new Error(`Failed to resolve account: ${error.message}`);
-      }
-      
-      throw new Error('Failed to resolve account: Unknown error');
-    }
+  private static getBaseUrl(): string {
+    console.log('🔧 getBaseUrl called');
+    console.log('🔧 Config.API:', Config.API);
+    console.log('🔧 Config.API.getBaseUrl:', Config.API.getBaseUrl);
+    const url = Config.API.getBaseUrl();
+    console.log('🔧 getBaseUrl returning:', url);
+    return url;
   }
+
+  // Bank resolution methods have been moved to BankResolutionService
+  // Use BankResolutionService.resolveAccount() instead
 
   /**
    * Super resolve account number across all banks automatically
    * Tests the account number against all available banks and returns the first successful match
    */
-  static async superResolveAccount(accountNumber: string): Promise<AccountResolutionResponse> {
-    try {
-      console.log('🚀 Super resolving account:', { accountNumber });
-
-      const requestBody: SuperResolveRequest = {
-        account_number: accountNumber,
-      };
-
-      const response = await fetch(`${this.BASE_URL}${this.SUPER_RESOLVE_ENDPOINT}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data: SuperResolveResponse = await response.json();
-
-      console.log('📦 Super resolve response:', data);
-
-      if (!data.success) {
-        throw new Error(data.message || 'Super resolve failed');
-      }
-
-      // Convert the response to our expected format
-      const successData: AccountResolutionResponse = {
-        status: data.success,
-        account_name: data.account_name,
-        account_number: data.account_number,
-        bank_name: data.bank_name,
-        bank_code: data.bank_code,
-        message: data.message
-      };
-      
-      console.log('✅ Super resolve successful:', {
-        accountName: successData.account_name,
-        bankName: successData.bank_name,
-        bankCode: successData.bank_code,
-      });
-
-      return successData;
-    } catch (error) {
-      console.error('❌ Super resolve error:', error);
-      
-      // Re-throw with more context
-      if (error instanceof Error) {
-        throw new Error(`Failed to super resolve account: ${error.message}`);
-      }
-      
-      throw new Error('Failed to super resolve account: Unknown error');
-    }
-  }
+  // Super resolve method has been moved to BankResolutionService
+  // Use BankResolutionService.superResolveAccount() instead
 
 
 
   /**
-   * Get list of supported banks with fallback strategy
-   * Primary: SME Plug API (more reliable)
-   * Fallback: Current backend
+   * Get list of supported banks from backend API
    */
-  static async getBanks(): Promise<any[]> {
-    console.log('🎯 Starting intelligent banks fetch with fallback strategy...');
-    
-    // Try SME Plug first (primary source)
-    try {
-      console.log('1️⃣ Trying SME Plug API (primary)...');
-      const banks = await SMEPlugBanksService.getBanks();
-      console.log('✅ SME Plug banks fetch successful');
-      return banks;
-    } catch (smePlugError) {
-      console.log('⚠️ SME Plug failed, trying backend fallback...');
-      console.error('SME Plug error:', smePlugError);
-      
-      // Try backend as fallback
-      try {
-        console.log('2️⃣ Trying backend API (fallback)...');
-        
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-          controller.abort();
-          console.log('⏰ Backend banks request timed out after 15 seconds');
-        }, 15000);
-
-        const response = await fetch(`${this.BASE_URL}${this.BANKS_ENDPOINT}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'ngrok-skip-browser-warning': 'true',
-            'User-Agent': 'MonziApp/1.0.0',
-          },
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
-
-        if (data.status && Array.isArray(data.banks)) {
-          console.log(`✅ Backend: Found ${data.banks.length} banks`);
-          return data.banks;
-        } else {
-          throw new Error('Invalid response format: missing banks array');
-        }
-      } catch (backendError) {
-        console.error('❌ Both SME Plug and backend failed');
-        console.error('Backend error:', backendError);
-        
-        // Both failed, throw comprehensive error
-        throw new Error(`Failed to fetch banks from both sources. SME Plug: ${smePlugError instanceof Error ? smePlugError.message : 'Unknown error'}. Backend: ${backendError instanceof Error ? backendError.message : 'Unknown error'}`);
-      }
-    }
-  }
+  // Bank-related methods have been moved to BankListService and BankResolutionService
+  // Use those services instead for bank operations
 
   /**
    * Check if account resolution is available (network connectivity test)
    */
   static async isServiceAvailable(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.BASE_URL}/health`, {
+      const response = await fetch(`${AccountService.getBaseUrl()}/health`, {
         method: 'GET',
       });
       
@@ -257,7 +98,7 @@ class AccountService {
     };
   }> {
     const startTime = Date.now();
-    const testEndpoint = `${this.BASE_URL}/health`;
+          const testEndpoint = `${AccountService.getBaseUrl()}/health`;
     
     console.log('🔍 Testing network connectivity...');
     console.log('📍 Testing endpoint:', testEndpoint);
@@ -285,7 +126,7 @@ class AccountService {
         isReachable: response.ok,
         latency,
         details: {
-          baseUrl: this.BASE_URL,
+          baseUrl: AccountService.getBaseUrl(),
           endpoint: testEndpoint,
           userAgent: 'MonziApp/1.0.0',
           timestamp: new Date().toISOString(),
@@ -313,7 +154,7 @@ class AccountService {
         latency,
         error: errorMessage,
         details: {
-          baseUrl: this.BASE_URL,
+          baseUrl: AccountService.getBaseUrl(),
           endpoint: testEndpoint,
           userAgent: 'MonziApp/1.0.0',
           timestamp: new Date().toISOString(),

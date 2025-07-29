@@ -71,6 +71,26 @@ export interface ResendOtpResponse {
   };
 }
 
+export interface RequestAccountDeletionRequest {
+  reason: string;
+}
+
+export interface RequestAccountDeletionResponse {
+  success: boolean;
+  message: string;
+  expiresAt: string;
+}
+
+export interface ConfirmAccountDeletionRequest {
+  otpCode: string;
+  reason?: string;
+}
+
+export interface ConfirmAccountDeletionResponse {
+  success: boolean;
+  message: string;
+}
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -476,6 +496,90 @@ class AuthService {
       if (error instanceof Error) {
         throw {
           error: 'Failed to sign out',
+          message: error.message,
+          statusCode: 400,
+        } as AuthError;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Request account deletion OTP (requires authentication)
+   */
+  async requestAccountDeletion(
+    accessToken: string,
+    data: RequestAccountDeletionRequest
+  ): Promise<RequestAccountDeletionResponse> {
+    try {
+      const response = await fetch(`${this.baseUrl}/auth/request-account-deletion`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw {
+          error: 'Failed to request account deletion',
+          message: result.message || 'Failed to request account deletion',
+          statusCode: response.status,
+          details: result.details,
+        } as AuthError;
+      }
+
+      return result;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw {
+          error: 'Failed to request account deletion',
+          message: error.message,
+          statusCode: 400,
+        } as AuthError;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Confirm account deletion with OTP (requires authentication)
+   */
+  async confirmAccountDeletion(
+    accessToken: string,
+    data: ConfirmAccountDeletionRequest
+  ): Promise<ConfirmAccountDeletionResponse> {
+    try {
+      const response = await fetch(`${this.baseUrl}/auth/confirm-account-deletion`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw {
+          error: 'Failed to confirm account deletion',
+          message: result.message || 'Failed to confirm account deletion',
+          statusCode: response.status,
+          details: result.details,
+        } as AuthError;
+      }
+
+      return result;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw {
+          error: 'Failed to confirm account deletion',
           message: error.message,
           statusCode: 400,
         } as AuthError;

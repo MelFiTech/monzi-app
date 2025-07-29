@@ -7,12 +7,14 @@ import {
   TouchableOpacity,
   StatusBar,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/providers/ThemeProvider';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
 import { AuthHeader } from '@/components/auth';
 import { Button } from '@/components/common';
+import { useAuth } from '@/hooks/useAuthService';
 
 const reasons = [
   'Poor Customer Services',
@@ -26,12 +28,30 @@ const reasons = [
 
 export default function DeleteReasonScreen() {
   const { colors } = useTheme();
+  const { requestAccountDeletion } = useAuth();
   const [selectedReason, setSelectedReason] = useState<string>('');
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!selectedReason) return;
     
-    router.push('/delete-success');
+    try {
+      const result = await requestAccountDeletion.mutateAsync({
+        reason: selectedReason,
+      });
+
+      if (result.success) {
+        // Navigate to OTP verification screen with the reason
+        router.push({
+          pathname: '/delete-otp',
+          params: { reason: selectedReason }
+        });
+      } else {
+        Alert.alert('Error', result.message || 'Failed to request account deletion');
+      }
+    } catch (error: any) {
+      console.error('Delete account request error:', error);
+      Alert.alert('Error', error.message || 'Failed to request account deletion. Please try again.');
+    }
   };
 
   const ReasonOption = ({ reason }: { reason: string }) => (

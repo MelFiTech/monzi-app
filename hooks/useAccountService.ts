@@ -15,10 +15,12 @@ export function useBanks() {
   return useQuery({
     queryKey: accountQueryKeys.banks(),
     queryFn: AccountService.getBanks,
-    staleTime: 24 * 60 * 60 * 1000, // 24 hours (banks don't change often)
-    gcTime: 48 * 60 * 60 * 1000, // 48 hours cache
-    retry: 2,
+    staleTime: 0, // Always fetch fresh data for now
+    gcTime: 5 * 60 * 1000, // 5 minutes cache
+    retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -120,6 +122,8 @@ export function useInvalidateAccountQueries() {
       queryClient.invalidateQueries({ 
         queryKey: accountQueryKeys.resolution(accountNumber, bankName) 
       }),
+    clearBanksCache: () => queryClient.removeQueries({ queryKey: accountQueryKeys.banks() }),
+    clearAllCache: () => queryClient.clear(),
   };
 }
 

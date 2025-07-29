@@ -17,7 +17,7 @@ export const Config = {
       // Check if we're in production (EAS Build production profile)
       const isProduction = process.env.EXPO_PUBLIC_ENV === 'production' ||
         process.env.NODE_ENV === 'production' ||
-        __DEV__ === false;
+        (typeof __DEV__ !== 'undefined' && __DEV__ === false);
 
       return isProduction ? this.PRODUCTION_URL : this.DEVELOPMENT_URL;
     },

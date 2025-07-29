@@ -3,7 +3,8 @@ import { StyleSheet, View, Text, TouchableOpacity, Modal, FlatList, TextInput, A
 import { BlurView } from 'expo-blur';
 import { fontFamilies } from '@/constants/fonts';
 import { X, ChevronRight, Building2, RefreshCw } from 'lucide-react-native';
-import { useBanks } from '@/hooks/useAccountService';
+import { useBankList } from '@/hooks/useBankServices';
+// import BankPillSelector from './BankPillSelector'; // Pills temporarily removed
 
 interface Bank {
   name: string;
@@ -16,56 +17,65 @@ interface BankSelectionModalProps {
   onSelectBank: (bankName: string) => void;
 }
 
-// Fallback banks in case API fails
-const FALLBACK_BANKS: Bank[] = [
-  { name: 'Opay', code: '999' },
-  { name: 'Moniepoint', code: '090' },
-  { name: 'Palmpay', code: '999' },
-  { name: 'GT Bank', code: '058' },
-  { name: 'Access Bank', code: '044' },
-  { name: 'Zenith Bank', code: '057' },
-  { name: 'United Bank for Africa', code: '033' },
-  { name: 'First Bank', code: '011' },
-  { name: 'Fidelity Bank', code: '070' },
-  { name: 'Stanbic IBTC Bank', code: '221' },
-  { name: 'Sterling Bank', code: '232' },
-  { name: 'Union Bank', code: '032' },
-  { name: 'Wema Bank', code: '035' },
-  { name: 'FCMB', code: '214' },
-  { name: 'Ecobank', code: '050' },
-  { name: 'Polaris Bank', code: '076' },
-  { name: 'Keystone Bank', code: '082' },
-  { name: 'Unity Bank', code: '215' },
-  { name: 'Jaiz Bank', code: '301' },
-  { name: 'Kuda', code: '090' },
-  { name: 'VFD Microfinance Bank', code: '090' },
-];
+// Helper to truncate bank names that are too long
+const truncateBankName = (name: string, maxLength: number = 32) => {
+  if (name.length > maxLength) {
+    return name.slice(0, maxLength - 1) + '…';
+  }
+  return name;
+};
+
+// Custom sort: numbers first, then alphabets (case-insensitive)
+const bankSort = (a: Bank, b: Bank) => {
+  const aFirstChar = a.name.trim().charAt(0);
+  const bFirstChar = b.name.trim().charAt(0);
+  const aIsNum = /^[0-9]/.test(aFirstChar);
+  const bIsNum = /^[0-9]/.test(bFirstChar);
+
+  if (aIsNum && !bIsNum) return -1;
+  if (!aIsNum && bIsNum) return 1;
+  // Both numbers or both letters: sort alphabetically, case-insensitive
+  return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+};
 
 export default function BankSelectionModal({
   visible,
   onClose,
   onSelectBank
 }: BankSelectionModalProps) {
+  // const [selectedBankFromPill, setSelectedBankFromPill] = useState<string>(''); // Pills temporarily removed
   const [slideAnim] = useState(new Animated.Value(0));
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredBanks, setFilteredBanks] = useState<Bank[]>([]);
   
   // Fetch banks from API
-  const { data: apiBanks, isLoading, error, refetch } = useBanks();
+  const { data: apiBanks, isLoading, error, refetch } = useBankList();
+  
+  // Debug logging
+  React.useEffect(() => {
+    console.log('🏦 BankSelectionModal Debug:', {
+      apiBanks: apiBanks ? apiBanks.length : 'null',
+      isLoading,
+      error: error ? error.message : 'null',
+      hasData: !!apiBanks,
+    });
+  }, [apiBanks, isLoading, error]);
 
-  // Process banks data - convert API response to expected format
+  // Process banks data - convert API response to expected format and sort (numbers first, then alphabets)
   const processedBanks: Bank[] = React.useMemo(() => {
     if (apiBanks && Array.isArray(apiBanks)) {
-      return apiBanks.map((bank: any) => ({
-        name: bank.name || bank.bankName || bank.bank_name || 'Unknown Bank',
-        code: bank.code || bank.bankCode || bank.bank_code || '000'
-      }));
+      return apiBanks
+        .map((bank: any) => ({
+          name: bank.name || bank.bankName || bank.bank_name || 'Unknown Bank',
+          code: bank.code || bank.bankCode || bank.bank_code || '000'
+        }))
+        .sort(bankSort);
     }
-    return FALLBACK_BANKS;
+    return [];
   }, [apiBanks]);
 
-  // Use processed banks or fallback if API fails
-  const banksToUse = error ? FALLBACK_BANKS : processedBanks;
+  // Use processed banks only (no fallback)
+  const banksToUse = processedBanks;
 
   // Slide animation effect
   useEffect(() => {
@@ -80,7 +90,7 @@ export default function BankSelectionModal({
     }
   }, [visible, slideAnim]);
 
-  // Filter banks based on search query
+  // Filter banks based on search query and keep sorted (numbers first, then alphabets)
   useEffect(() => {
     if (searchQuery.trim() === '') {
       setFilteredBanks(banksToUse);
@@ -99,10 +109,18 @@ export default function BankSelectionModal({
   const handleBankSelect = (bankName: string) => {
     onSelectBank(bankName);
     setSearchQuery('');
+    // setSelectedBankFromPill(''); // Pills temporarily removed
     onClose();
   };
 
+  // const handlePillBankSelect = (bankName: string) => {
+  //   setSelectedBankFromPill(bankName);
+  //   // Filter the search to show this bank
+  //   setSearchQuery(bankName);
+  // };
+
   const handleRetry = () => {
+    console.log('🔄 Retrying bank fetch...');
     refetch();
   };
 
@@ -114,7 +132,13 @@ export default function BankSelectionModal({
     >
       <View style={styles.bankContent}>
         <Building2 size={24} color="rgba(255, 255, 255, 0.6)" style={styles.bankIcon} />
-        <Text style={styles.bankName}>{item.name}</Text>
+        <Text
+          style={styles.bankName}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {truncateBankName(item.name)}
+        </Text>
       </View>
       <ChevronRight size={20} color="rgba(255, 255, 255, 0.4)" />
     </TouchableOpacity>
@@ -134,7 +158,6 @@ export default function BankSelectionModal({
       return (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Failed to load banks</Text>
-          <Text style={styles.errorSubtext}>Using offline bank list</Text>
           <TouchableOpacity onPress={handleRetry} style={styles.retryButton}>
             <RefreshCw size={16} color="#F5C842" />
             <Text style={styles.retryText}>Retry</Text>
@@ -206,6 +229,19 @@ export default function BankSelectionModal({
                   />
                 </View>
 
+                {/* Pills after search */}
+                {/*
+                <BankPillSelector
+                  onSelectBank={handlePillBankSelect}
+                  selectedBank={selectedBankFromPill}
+                  availableBanks={processedBanks}
+                  isLoading={isLoading}
+                />
+                */}
+
+                {/* Divider below pills */}
+                {/* <View style={styles.pillsDivider} /> */}
+
                 {/* Bank List / Loading / Error */}
                 {renderContent()}
 
@@ -272,12 +308,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 20,
     paddingVertical: 16,
-    marginBottom: 24,
+    marginBottom: 16, // reduced margin to tighten up with pills
   },
   searchInput: {
     fontSize: 16,
     fontFamily: fontFamilies.sora.regular,
     color: '#FFFFFF',
+  },
+  pillsDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginVertical: 18,
+    marginHorizontal: -24, // stretch divider edge-to-edge
   },
   banksList: {
     flex: 1,
@@ -306,6 +348,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: fontFamilies.sora.medium,
     color: '#FFFFFF',
+    flexShrink: 1,
+    maxWidth: '80%',
+    // Ensure single line, truncate with ellipsis, and prevent wrapping
+    numberOfLines: 1,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   loadingContainer: {
     flex: 1,

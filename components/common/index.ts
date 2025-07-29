@@ -1,6 +1,7 @@
 export { default as AmountPill } from './AmountPill';
 export { default as BankSelectionModal } from './BankSelectionModal';
 export { default as BankTransferModal } from './BankTransferModal';
+export { default as BankPillSelector } from './BankPillSelector';
 export { default as ManualBankTransferModal } from './ManualBankTransferModal';
 export { default as BottomSheetModal } from './BottomSheetModal';
 export { default as Button } from './Button';

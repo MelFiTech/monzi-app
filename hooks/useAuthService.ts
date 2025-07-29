@@ -12,6 +12,10 @@ import {
   VerifyOtpResponse,
   ResendOtpRequest,
   ResendOtpResponse,
+  RequestAccountDeletionRequest,
+  RequestAccountDeletionResponse,
+  ConfirmAccountDeletionRequest,
+  ConfirmAccountDeletionResponse,
   UserProfile,
   AuthError
 } from '@/services';
@@ -397,6 +401,55 @@ export const useBiometricSettings = () => {
 };
 
 /**
+ * Hook for requesting account deletion OTP
+ */
+export const useRequestAccountDeletion = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<RequestAccountDeletionResponse, AuthError, RequestAccountDeletionRequest>({
+    mutationFn: async (data: RequestAccountDeletionRequest) => {
+      const accessToken = await authStorageService.getAccessToken();
+      if (!accessToken) {
+        throw new Error('No access token available');
+      }
+      return await authService.requestAccountDeletion(accessToken, data);
+    },
+    onSuccess: (response, variables) => {
+      console.log('Account deletion request successful:', response);
+    },
+    onError: (error) => {
+      console.log('Account deletion request failed:', error);
+    },
+  });
+};
+
+/**
+ * Hook for confirming account deletion with OTP
+ */
+export const useConfirmAccountDeletion = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<ConfirmAccountDeletionResponse, AuthError, ConfirmAccountDeletionRequest>({
+    mutationFn: async (data: ConfirmAccountDeletionRequest) => {
+      const accessToken = await authStorageService.getAccessToken();
+      if (!accessToken) {
+        throw new Error('No access token available');
+      }
+      return await authService.confirmAccountDeletion(accessToken, data);
+    },
+    onSuccess: async (response, variables) => {
+      console.log('Account deletion confirmed:', response);
+      // Clear all auth data and cache
+      await authStorageService.clearAuthData();
+      queryClient.clear();
+    },
+    onError: (error) => {
+      console.log('Account deletion confirmation failed:', error);
+    },
+  });
+};
+
+/**
  * Combined auth hook with common operations
  */
 export const useAuth = () => {
@@ -410,6 +463,8 @@ export const useAuth = () => {
   const biometricAuth = useBiometricAuth();
   const biometricSettings = useBiometricSettings();
   const cacheManagement = useAuthCacheManagement();
+  const requestAccountDeletion = useRequestAccountDeletion();
+  const confirmAccountDeletion = useConfirmAccountDeletion();
 
   const isLoading = authStatus.isLoading || profile.isLoading;
   const isAuthenticated = authStatus.data?.isAuthenticated || false;
@@ -430,6 +485,8 @@ export const useAuth = () => {
     logout,
     biometricAuth,
     biometricSettings,
+    requestAccountDeletion,
+    confirmAccountDeletion,
     
     // Cache Management
     cacheManagement,

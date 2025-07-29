@@ -70,8 +70,13 @@ export default function LocationSuggestionModal({
   const hasPreFetchedData = preFetchedData && preFetchedData.paymentSuggestions && preFetchedData.paymentSuggestions.length > 0;
   const hasPreciseSuggestions = preciseSuggestions.length > 0;
   const suggestions = hasPreFetchedData ? preFetchedData.paymentSuggestions : (hasPreciseSuggestions ? preciseSuggestions : nearbySuggestions);
+  
+  // Only show loading when we don't have pre-fetched data AND we're waiting for API response
   const isSuggestionLoading = !hasPreFetchedData && (isPreciseLoading || isNearbyLoading);
   const suggestionError = !hasPreFetchedData && (preciseError || nearbyError);
+  
+  // Check if we have any suggestions available (either from pre-fetched or API)
+  const hasSuggestions = suggestions.length > 0;
 
   useEffect(() => {
     if (visible) {
@@ -168,23 +173,9 @@ export default function LocationSuggestionModal({
             bounces={false}
             keyboardShouldPersistTaps="handled"
           >
-            {getLocationMutation.isPending && !preFetchedData && (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#FFE66C" />
-                <Text style={styles.loadingText}>Getting your location...</Text>
-              </View>
-            )}
-
-            {isSuggestionLoading && (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#FFE66C" />
-                <Text style={styles.loadingText}>Finding payment details...</Text>
-              </View>
-            )}
-
-            {suggestions.length > 0 && (
+            {/* Show suggestions immediately if available (from pre-fetched or API) */}
+            {hasSuggestions && (
               <View style={styles.suggestionsContainer}>
-                {/* Section titles removed as per instruction */}
                 {suggestions.map((suggestion: PaymentSuggestion, index: number) => (
                   <PaymentSuggestionCard
                     key={`${suggestion.accountNumber}-${suggestion.bankName}-${index}`}
@@ -195,7 +186,22 @@ export default function LocationSuggestionModal({
               </View>
             )}
 
-            {!isSuggestionLoading && suggestions.length === 0 && (preciseMatch || (nearbyLocations && nearbyLocations.length > 0)) && (
+            {/* Show loading only when waiting for backend API response */}
+            {!hasSuggestions && getLocationMutation.isPending && !preFetchedData && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#FFE66C" />
+                <Text style={styles.loadingText}>Getting your location...</Text>
+              </View>
+            )}
+
+            {!hasSuggestions && isSuggestionLoading && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#FFE66C" />
+                <Text style={styles.loadingText}>Finding payment details...</Text>
+              </View>
+            )}
+
+            {!hasSuggestions && !isSuggestionLoading && (preciseMatch || (nearbyLocations && nearbyLocations.length > 0)) && (
               <View style={styles.noSuggestionContainer}>
                 <Text style={styles.noSuggestionTitle}>Location Found</Text>
                 <Text style={styles.noSuggestionText}>
@@ -206,7 +212,7 @@ export default function LocationSuggestionModal({
                   )}
                 </Text>
                 <Button
-                  title="Continue Manually"
+                  title="Go Back"
                   variant="secondary"
                   size="lg"
                   fullWidth
@@ -216,14 +222,14 @@ export default function LocationSuggestionModal({
               </View>
             )}
 
-            {!getLocationMutation.isPending && !isSuggestionLoading && suggestions.length === 0 && (
+            {!hasSuggestions && !getLocationMutation.isPending && !isSuggestionLoading && (
               <View style={styles.noSuggestionContainer}>
                 <Text style={styles.noSuggestionTitle}>No Payment Details Found</Text>
                 <Text style={styles.noSuggestionText}>
                   We couldn't find payment details for this location. You can still make a payment by entering the details manually.
                 </Text>
                 <Button
-                  title="Continue Manually"
+                  title="Go Back"
                   variant="secondary"
                   size="lg"
                   fullWidth
@@ -240,7 +246,7 @@ export default function LocationSuggestionModal({
                   There was an issue loading payment suggestions. You can continue with manual entry.
                 </Text>
                 <Button
-                  title="Continue Manually"
+                  title="Go Back"
                   variant="secondary"
                   size="lg"
                   fullWidth

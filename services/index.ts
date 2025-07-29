@@ -10,6 +10,8 @@ export { BankCorrectionService } from './BankCorrectionService';
 
 export { default as AccountService } from './AccountService';
 export { default as SMEPlugBanksService } from './SMEPlugBanksService';
+export { default as BankListService } from './BankListService';
+export { default as BankResolutionService } from './BankResolutionService';
 export { default as BiometricService } from './BiometricService';
 export { default as AuthService } from './AuthService';
 export { default as AuthStorageService } from './AuthStorageService';
@@ -33,6 +35,10 @@ export type {
   VerifyOtpResponse, 
   ResendOtpRequest, 
   ResendOtpResponse, 
+  RequestAccountDeletionRequest,
+  RequestAccountDeletionResponse,
+  ConfirmAccountDeletionRequest,
+  ConfirmAccountDeletionResponse,
   UserProfile, 
   AuthError 
 } from './AuthService';
@@ -43,6 +49,15 @@ export type {
   AccountResolutionError,
   AccountResolutionResult 
 } from './AccountService';
+export type { Bank, BankListResponse } from './BankListService';
+export type { 
+  AccountResolutionRequest as BankResolutionRequest, 
+  AccountResolutionResponse as BankResolutionResponse, 
+  AccountResolutionError as BankResolutionError,
+  AccountResolutionResult as BankResolutionResult,
+  SuperResolveRequest,
+  SuperResolveResponse
+} from './BankResolutionService';
 export type {
   WalletDetails,
   WalletBalance,

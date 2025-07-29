@@ -1,21 +1,30 @@
 import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { ActivityIndicator } from 'react-native';
 import FloatingButton from './FloatingButton';
 
 interface LocationFloatingButtonProps {
   onPress: () => void;
+  isLoading?: boolean;
 }
 
-export default function LocationFloatingButton({ onPress }: LocationFloatingButtonProps) {
+export default function LocationFloatingButton({ onPress, isLoading = false }: LocationFloatingButtonProps) {
   console.log('📍 LocationFloatingButton rendered');
   
   return (
     <FloatingButton
-      icon={<Ionicons name="location" size={24} color="#FFF" />}
+      icon={
+        isLoading ? (
+          <ActivityIndicator size="small" color="#FFF" />
+        ) : (
+          <Ionicons name="location" size={24} color="#FFF" />
+        )
+      }
       onPress={() => {
         console.log('📍 LocationFloatingButton pressed');
         onPress();
       }}
+      hapticFeedback="light"
       style={{
         position: 'absolute',
         bottom: 40,

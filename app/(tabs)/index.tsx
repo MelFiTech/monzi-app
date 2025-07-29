@@ -38,6 +38,7 @@ export default function CameraScreen() {
   const [showLocationSuggestion, setShowLocationSuggestion] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationPaymentData, setLocationPaymentData] = useState<any>(null); // Pre-fetched payment data
+  const [isLocationButtonLoading, setIsLocationButtonLoading] = useState(false);
   const getLocationMutation = useGetCurrentLocation();
 
   // Location watching state
@@ -513,48 +514,42 @@ export default function CameraScreen() {
       {/* Location Floating Button - Always visible for authenticated and verified users */}
       {backendChecks.isAuthenticated && backendChecks.kycStatus?.isVerified && (
         <LocationFloatingButton
+          isLoading={isLocationButtonLoading}
           onPress={async () => {
             console.log('📍 [CameraScreen] Location button pressed');
-            // Clear minimized flag when user manually opens modal
-            await AsyncStorage.removeItem('location_modal_minimized');
             
             try {
-              // Get fresh location when user taps floating button
-              const location = await getLocationMutation.mutateAsync();
-              if (location) {
-                setCurrentLocation(location);
-                
-                // Pre-fetch payment details for faster modal loading
-                try {
-                  const LocationService = (await import('@/services/LocationService')).default;
-                  const locationService = LocationService.getInstance();
-                  const preciseMatch = await locationService.getPreciseLocationSuggestions(
-                    location.latitude,
-                    location.longitude,
-                    'Unknown' // We don't have business name, so use 'Unknown'
-                  );
-                  
-                  // Store payment data and show modal if available
-                  if (preciseMatch && preciseMatch.paymentSuggestions && preciseMatch.paymentSuggestions.length > 0) {
-                    setLocationPaymentData(preciseMatch);
-                    setShowLocationSuggestion(true);
-                    console.log('📍 [CameraScreen] Payment details pre-fetched and modal shown for:', location);
-                  } else {
-                    console.log('📍 [CameraScreen] No payment details available for location:', location);
-                    setLocationPaymentData(null);
-                    ToastService.show('No payment details available for this location', 'info');
-                  }
-                } catch (apiError) {
-                  console.log('⚠️ [CameraScreen] Failed to check payment details:', apiError);
-                  setLocationPaymentData(null);
-                  ToastService.show('Failed to check location details', 'error');
-                }
+              // Clear minimized flag when user manually opens modal
+              await AsyncStorage.removeItem('location_modal_minimized');
+              
+              // Check if we have cached location data first
+              const storedLocation = await AsyncStorage.getItem('last_location');
+              const storedLocationData = storedLocation ? JSON.parse(storedLocation) : null;
+              
+              if (storedLocationData) {
+                console.log('📍 [CameraScreen] Using cached location data');
+                setCurrentLocation(storedLocationData);
+                setLocationPaymentData(null); // Let modal handle the API call
+                setShowLocationSuggestion(true);
               } else {
-                ToastService.show('Unable to get your location', 'error');
+                // No cached data, need to get fresh location
+                console.log('📍 [CameraScreen] Getting fresh location data');
+                setIsLocationButtonLoading(true);
+                
+                const location = await getLocationMutation.mutateAsync();
+                if (location) {
+                  setCurrentLocation(location);
+                  setLocationPaymentData(null); // Let modal handle the API call
+                  setShowLocationSuggestion(true);
+                } else {
+                  ToastService.show('Unable to get your location', 'error');
+                }
               }
             } catch (error) {
               console.log('Error getting location:', error);
               ToastService.show('Failed to get location', 'error');
+            } finally {
+              setIsLocationButtonLoading(false);
             }
           }}
         />
@@ -568,6 +563,7 @@ export default function CameraScreen() {
             console.log('⌨️ [CameraScreen] Keyboard button pressed');
             cameraLogic.handleManualBankTransfer();
           }}
+          hapticFeedback="light"
           style={{
             position: 'absolute',
             bottom: 40,
