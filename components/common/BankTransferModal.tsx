@@ -378,7 +378,7 @@ export default function BankTransferModal({
       onBankSelect(bankName);
     }
     // Show success feedback
-    ToastService.success(`${bankName} selected`);
+            // ToastService.success(`${bankName} selected`); // Removed - no toast on bank selection
     
     // If we have an account number, trigger resolution immediately
     if (accountNumber) {

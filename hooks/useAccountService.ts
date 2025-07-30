@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AccountService, type AccountResolutionResponse } from '@/services';
+import { AccountService, BankListService, BankResolutionService, type AccountResolutionResponse } from '@/services';
 
 // Query Keys
 export const accountQueryKeys = {
@@ -14,7 +14,7 @@ export const accountQueryKeys = {
 export function useBanks() {
   return useQuery({
     queryKey: accountQueryKeys.banks(),
-    queryFn: AccountService.getBanks,
+    queryFn: BankListService.getBanks,
     staleTime: 0, // Always fetch fresh data for now
     gcTime: 5 * 60 * 1000, // 5 minutes cache
     retry: 3,
@@ -28,10 +28,10 @@ export function useBanks() {
 export function useAccountResolution(accountNumber: string, bankName: string, enabled = false) {
   return useQuery({
     queryKey: accountQueryKeys.resolution(accountNumber, bankName),
-    queryFn: () => AccountService.resolveAccount(accountNumber, bankName),
+    queryFn: () => BankResolutionService.resolveAccount(accountNumber, bankName),
     enabled: enabled && !!accountNumber && !!bankName && 
-             AccountService.isValidAccountNumber(accountNumber) &&
-             AccountService.isValidBankName(bankName),
+             BankResolutionService.isValidAccountNumber(accountNumber) &&
+             BankResolutionService.isValidBankName(bankName),
     staleTime: 30 * 60 * 1000, // 30 minutes
     gcTime: 60 * 60 * 1000, // 1 hour cache
     retry: (failureCount, error: any) => {
@@ -50,7 +50,7 @@ export function useResolveAccountMutation() {
 
   return useMutation({
     mutationFn: ({ accountNumber, bankName }: { accountNumber: string; bankName: string }) =>
-      AccountService.resolveAccount(accountNumber, bankName),
+      BankResolutionService.resolveAccount(accountNumber, bankName),
     onSuccess: (data, variables) => {
       // Cache the successful resolution
       queryClient.setQueryData(
@@ -69,7 +69,7 @@ export function useSuperResolveAccountMutation() {
 
   return useMutation({
     mutationFn: ({ accountNumber }: { accountNumber: string }) =>
-      AccountService.superResolveAccount(accountNumber),
+      BankResolutionService.superResolveAccount(accountNumber),
     onSuccess: (data, variables) => {
       // Cache the successful super resolution
       queryClient.setQueryData(
@@ -87,13 +87,13 @@ export function usePrefetchAccountResolution() {
   const queryClient = useQueryClient();
 
   return (accountNumber: string, bankName: string) => {
-    if (!AccountService.isValidAccountNumber(accountNumber) || !AccountService.isValidBankName(bankName)) {
+    if (!BankResolutionService.isValidAccountNumber(accountNumber) || !BankResolutionService.isValidBankName(bankName)) {
       return;
     }
 
     queryClient.prefetchQuery({
       queryKey: accountQueryKeys.resolution(accountNumber, bankName),
-      queryFn: () => AccountService.resolveAccount(accountNumber, bankName),
+      queryFn: () => BankResolutionService.resolveAccount(accountNumber, bankName),
       staleTime: 30 * 60 * 1000,
     });
   };

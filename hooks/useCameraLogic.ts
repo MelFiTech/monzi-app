@@ -7,7 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { ExtractedBankData } from '@/services';
 import { useAppState } from '@/providers/AppStateProvider';
 import { useHybridVisionExtractBankDataMutation } from '@/hooks';
-import { useResolveAccountMutation } from '@/hooks/useAccountService';
+import { useResolveBankAccountMutation } from '@/hooks/useBankServices';
 import { useWalletRecovery } from '@/hooks/useWalletService';
 import { useTransactionsList } from '@/hooks/useTransactionService';
 import { useRecordScan } from '@/hooks/useScanTracking';
@@ -52,7 +52,7 @@ export function useCameraLogic() {
 
   // React Query hooks
   const extractBankDataMutation = useHybridVisionExtractBankDataMutation();
-  const resolveAccountMutation = useResolveAccountMutation();
+  const resolveAccountMutation = useResolveBankAccountMutation();
   const walletRecoveryMutation = useWalletRecovery();
   const transactionsData = useTransactionsList();
   const recordScanMutation = useRecordScan();
