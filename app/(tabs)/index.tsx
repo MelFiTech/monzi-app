@@ -20,6 +20,7 @@ import { CameraPermissions, CameraInterface, CameraControls, CameraModals, Extra
 import { useCameraLogic } from '@/hooks/useCameraLogic';
 import { useBackendChecks } from '@/hooks/useBackendChecks';
 import { useNotificationService } from '@/hooks/useNotificationService';
+import { usePushNotificationService } from '@/hooks/usePushNotificationService';
 import { useWebSocketCacheIntegration } from '@/hooks/useWalletService';
 import { useGetCurrentLocation } from '@/hooks/useLocationService';
 import { fontFamilies } from '@/constants/fonts';
@@ -30,7 +31,7 @@ import * as Location from 'expo-location';
 const { width, height } = Dimensions.get('window');
 
 export default function CameraScreen() {
-  const { logout, user } = useAuth();
+  const { logout, user, authToken } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
   const queryClient = useQueryClient();
 
@@ -210,6 +211,26 @@ export default function CameraScreen() {
     }
   );
 
+  // Push notification service for handling notification taps
+  const {
+    isRegistered: isPushRegistered,
+    hasPermissions: hasPushPermissions,
+  } = usePushNotificationService(
+    authToken || null,
+    {
+      autoRequestPermissions: true,
+      showToasts: false,
+      onLocationPayment: (data) => {
+        console.log('📍 Location payment notification received:', data);
+        
+        // Show the manual transfer modal with pre-filled data
+        cameraLogic.setShowManualBankTransferModal(true);
+        
+        // The modal will automatically pick up the payment data from AsyncStorage
+        // and pre-fill the form when it opens
+      }
+    }
+  );
 
 
   // Request camera permissions on component mount

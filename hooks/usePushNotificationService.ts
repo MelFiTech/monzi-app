@@ -3,6 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
 import PushNotificationService from '@/services/PushNotificationService';
 import { ToastService, AuthStorageService } from '@/services';
+import { router } from 'expo-router';
 
 interface PushNotificationState {
   expoPushToken: string | null;
@@ -20,6 +21,7 @@ interface UsePushNotificationOptions {
   autoRequestPermissions?: boolean; // New option to auto-request permissions
   onWalletFunding?: (data: any) => void;
   onTransaction?: (data: any) => void;
+  onLocationPayment?: (data: any) => void; // New callback for location payments
 }
 
 // Query keys for push notifications
@@ -39,6 +41,7 @@ export function usePushNotificationService(
     autoRequestPermissions = true, // Auto-request permissions by default
     onWalletFunding,
     onTransaction,
+    onLocationPayment,
   } = options;
 
   // State
@@ -311,12 +314,59 @@ export function usePushNotificationService(
   const handleNotificationResponse = useCallback((response: Notifications.NotificationResponse) => {
     const data = response.notification.request.content.data;
     
+    console.log('📱 Notification tap received:', data);
+    
+    // Handle location payment notification tap
+    if (data?.type === 'location_payment' || 
+        (data?.accountNumber && data?.bankName && data?.accountName)) {
+      
+      console.log('📍 Location payment notification tapped:', {
+        accountNumber: data.accountNumber,
+        bankName: data.bankName,
+        accountName: data.accountName,
+        bankCode: data.bankCode
+      });
+      
+      // Navigate to camera screen (main screen) where manual transfer modal is available
+      router.push('/(tabs)');
+      
+      // Store the payment data for the manual transfer modal to use
+      // We'll use AsyncStorage to pass data between notification tap and modal
+      const paymentData = {
+        accountNumber: data.accountNumber,
+        bankName: data.bankName,
+        accountName: data.accountName,
+        bankCode: data.bankCode,
+        frequency: data.frequency,
+        lastTransactionDate: data.lastTransactionDate,
+        source: 'notification_tap'
+      };
+      
+      // Store payment data for manual transfer modal to pick up
+      import('@react-native-async-storage/async-storage').then(({ default: AsyncStorage }) => {
+        AsyncStorage.setItem('notification_payment_data', JSON.stringify(paymentData))
+          .then(() => {
+            console.log('💾 Payment data stored for manual transfer modal');
+          })
+          .catch((error) => {
+            console.error('❌ Failed to store payment data:', error);
+          });
+      });
+      
+      // Call the callback if provided
+      if (onLocationPayment) {
+        onLocationPayment(data);
+      }
+      
+      return;
+    }
+    
     // Handle notification tap/interaction
     if (data?.action) {
       // Navigate based on notification action
       console.log('📱 Notification interaction:', data.action);
     }
-  }, []);
+  }, [onLocationPayment]);
 
   // Set up notification listeners
   useEffect(() => {

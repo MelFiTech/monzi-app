@@ -21,7 +21,8 @@
         "NSCameraUsageDescription": "Monzi uses the camera to capture selfies for KYC verification and to scan payment account numbers for quick and accurate money transfers.",
         "NSPhotoLibraryUsageDescription": "Monzi needs access to your photo library to allow you to select and upload written or typed account details for easy payment.",
         "NSFaceIDUsageDescription": "Monzi uses Face ID to provide secure and convenient access to your financial account.",
-        "NSLocationWhenInUseUsageDescription": "Monzi may access location data to enhance security features and provide location-based services for your financial transactions."
+        "NSLocationWhenInUseUsageDescription": "Monzi may access location data to enhance security features and provide location-based services for your financial transactions.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Monzi uses background location to notify you when you're near payment locations and to provide location-based payment suggestions."
       }
     },
     "android": {
@@ -37,7 +38,10 @@
         "WAKE_LOCK",
         "android.permission.CAMERA",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION"
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
       ]
     },
     "web": {
@@ -50,6 +54,7 @@
       "expo-splash-screen",
       "expo-notifications",
       "expo-updates",
+      "expo-location",
       [
         "react-native-vision-camera",
         {

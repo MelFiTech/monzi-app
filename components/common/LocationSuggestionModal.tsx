@@ -226,7 +226,7 @@ export default function LocationSuggestionModal({
               <View style={styles.noSuggestionContainer}>
                 <Text style={styles.noSuggestionTitle}>No Payment Details Found</Text>
                 <Text style={styles.noSuggestionText}>
-                  We couldn't find payment details for this location. You can still make a payment by entering the details manually.
+                  We couldn't find payment details for this location.
                 </Text>
                 <Button
                   title="Go Back"

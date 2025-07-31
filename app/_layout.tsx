@@ -27,6 +27,9 @@ import {
   Sora_800ExtraBold,
 } from '@expo-google-fonts/sora';
 
+// Initialize background location task
+import '@/services/BackgroundLocationTask';
+
 // Import NativeWind styles (temporarily disabled)
 // import '../global.css';
 

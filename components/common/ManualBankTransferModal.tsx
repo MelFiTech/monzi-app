@@ -8,9 +8,10 @@ import Button from './Button';
 import BankSelectionModal from './BankSelectionModal';
 import { Copy, Check, Edit3, Save, XCircle, ChevronDown, RefreshCw } from 'lucide-react-native';
 import { ExtractedBankData } from '@/services';
-import { useResolveBankAccountMutation, useSuperResolveBankAccountMutation } from '@/hooks/useBankServices';
+import { useResolveBankAccountMutation } from '@/hooks/useBankServices';
 import { ToastService } from '@/services';
 import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface ManualBankTransferModalProps {
   visible: boolean;
@@ -55,25 +56,20 @@ export default function ManualBankTransferModal({
   const resolveTimeoutRef = useRef<number | null>(null);
   const isResolvingRef = useRef(false);
   const resolutionDebounceRef = useRef<number | null>(null);
-  // Retry state variables (kept for compatibility but not used)
-  const [retryCount, setRetryCount] = useState(0);
-  const [isAutoRetrying, setIsAutoRetrying] = useState(false);
-  const MAX_RETRIES = 5; // Kept for compatibility but not used
 
   const resolveAccountMutation = useResolveBankAccountMutation();
-  // const superResolveAccountMutation = useSuperResolveBankAccountMutation();
 
   // Use only fresh data - no fallbacks to old data
-  const bankName = selectedBankName || extractedData?.bankName || '';
+  const bankName = selectedBankName || '';
   // Prioritize edited/final account number over extracted data
-  const accountNumber = finalAccountNumber || editedAccountNumber || extractedData?.accountNumber || '';
-  const accountHolderName = resolvedAccountName || extractedData?.accountHolderName || '';
+  const accountNumber = finalAccountNumber || editedAccountNumber || '';
+  const accountHolderName = resolvedAccountName || '';
   const extractedAmount = extractedData?.amount || amount;
 
   // Reset all state when modal opens to ensure fresh data
   useEffect(() => {
     if (visible) {
-      console.log('🔄 Manual Modal opened - resetting all state');
+      console.log('🔄 Manual Modal opened - resetting all state and entering edit mode');
       setIsModalActive(true);
       isModalActiveRef.current = true;
       // Reset all persistent state to ensure fresh data
@@ -83,13 +79,13 @@ export default function ManualBankTransferModal({
       setEditedAccountNumber('');
       setHasResolutionFailed(false);
       setIsResolvingAccount(false);
-      setIsEditingAccountNumber(false);
-      isEditingAccountNumberRef.current = false;
       
-      // Only set data from fresh extraction, no fallbacks
-      if (extractedData?.accountNumber) {
-        setFinalAccountNumber(extractedData.accountNumber);
-      }
+      // Check for notification payment data and pre-fill if available
+      checkForNotificationPaymentData();
+      
+      // Auto-enter edit mode when modal opens
+      setIsEditingAccountNumber(true);
+      isEditingAccountNumberRef.current = true;
     } else {
       // When modal closes, ensure all resolution stops
       console.log('🛑 Manual Modal closed - stopping all resolution');
@@ -104,26 +100,70 @@ export default function ManualBankTransferModal({
       }
       isResolvingRef.current = false;
     }
-  }, [visible, extractedData]);
+  }, [visible]);
+
+  // Check for notification payment data and pre-fill the form
+  const checkForNotificationPaymentData = async () => {
+    try {
+      console.log('🔍 Checking for notification payment data...');
+      const notificationData = await AsyncStorage.getItem('notification_payment_data');
+      
+      if (notificationData) {
+        const paymentData = JSON.parse(notificationData);
+        console.log('📱 Found notification payment data:', paymentData);
+        
+        // Pre-fill the form with notification data
+        if (paymentData.bankName) {
+          setSelectedBankName(paymentData.bankName);
+          console.log('🏦 Pre-filled bank name:', paymentData.bankName);
+        }
+        
+        if (paymentData.accountNumber) {
+          setFinalAccountNumber(paymentData.accountNumber);
+          setEditedAccountNumber(paymentData.accountNumber);
+          console.log('📱 Pre-filled account number:', paymentData.accountNumber);
+        }
+        
+        if (paymentData.accountName) {
+          setResolvedAccountName(paymentData.accountName);
+          console.log('👤 Pre-filled account name:', paymentData.accountName);
+        }
+        
+        // Clear the notification data after using it
+        await AsyncStorage.removeItem('notification_payment_data');
+        console.log('🧹 Cleared notification payment data');
+        
+        // Show success message
+        ToastService.success('Payment details loaded from notification');
+        
+        // Exit edit mode since we have pre-filled data
+        setIsEditingAccountNumber(false);
+        isEditingAccountNumberRef.current = false;
+        console.log('✅ Pre-fill complete, exited edit mode');
+      } else {
+        console.log('📱 No notification payment data found');
+      }
+    } catch (error) {
+      console.error('❌ Error checking for notification payment data:', error);
+    }
+  };
 
   // Debug logging for bank selection and account number
   useEffect(() => {
     console.log('🏦 Manual Bank name state:', {
       selectedBankName,
-      extractedBankName: extractedData?.bankName,
       finalBankName: bankName
     });
-  }, [selectedBankName, extractedData?.bankName, bankName]);
+  }, [selectedBankName, bankName]);
 
   useEffect(() => {
     console.log('📱 Manual Account number state:', {
       finalAccountNumber,
       editedAccountNumber,
-      extractedAccountNumber: extractedData?.accountNumber,
       finalAccountNumberUsed: accountNumber,
       isEditing: isEditingAccountNumber
     });
-  }, [finalAccountNumber, editedAccountNumber, extractedData?.accountNumber, accountNumber, isEditingAccountNumber]);
+  }, [finalAccountNumber, editedAccountNumber, accountNumber, isEditingAccountNumber]);
 
   // Check if we have minimum required data
   const hasBankName = Boolean(bankName);
@@ -134,11 +174,6 @@ export default function ManualBankTransferModal({
     // Prevent resolution if modal is not active
     if (!isModalActiveRef.current) {
       console.log('🚫 Skipping account resolution - manual modal not active');
-      return;
-    }
-    // Prevent resolution if we're currently editing
-    if (isEditingAccountNumberRef.current) {
-      console.log('🚫 Skipping account resolution - currently editing account number');
       return;
     }
     
@@ -166,76 +201,54 @@ export default function ManualBankTransferModal({
       return;
     }
 
-    // Check if we have bank name for normal resolution or need super resolve
-    const hasBankName = bankName && bankName.trim().length > 0;
+    console.log('🔄 Starting account resolution for bank:', bankName, 'account:', accountNumber);
+    setIsResolvingAccount(true);
+    setHasResolutionFailed(false);
     
-    if (hasBankName) {
-      console.log('🔄 Starting normal account resolution for bank:', bankName, 'account:', accountNumber);
-      setIsResolvingAccount(true);
-      setHasResolutionFailed(false);
-      
-      try {
-        const result = await resolveAccountMutation.mutateAsync({
-          accountNumber,
-          bankName
-        });
-        if (!isModalActiveRef.current || isEditingAccountNumberRef.current) return;
-        console.log('✅ Normal account resolution successful:', result);
-        setResolvedAccountName(result.account_name);
-        setIsResolvingAccount(false);
-        setRetryCount(0); // Reset retry count on success
-        setIsAutoRetrying(false);
-      } catch (error) {
-        if (!isModalActiveRef.current || isEditingAccountNumberRef.current) return;
-        console.error('❌ Normal account resolution failed:', error);
-        
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        
-        // Only show error and stop retrying if it's a backend error (400, 401, 403, etc.)
-        if (errorMessage?.includes('statusCode: 400') || 
-            errorMessage?.includes('statusCode: 401') ||
-            errorMessage?.includes('statusCode: 403') ||
-            errorMessage?.includes('statusCode: 404') ||
-            errorMessage?.includes('statusCode: 500')) {
-          
-          console.log('🚨 Backend error detected, stopping retries');
-          setIsResolvingAccount(false);
-          setHasResolutionFailed(true);
-          setIsAutoRetrying(false);
-          ToastService.error('Invalid account details');
-          return;
-        }
-        
-        // For any error, just stop and let user retry manually
-        console.log('❌ Account resolution failed, stopping - user can retry manually');
-        setIsResolvingAccount(false);
-        isResolvingRef.current = false;
-        setHasResolutionFailed(true);
-        setIsAutoRetrying(false);
-        // Don't show error toast - let user retry by editing
-      }
-    } else {
-      // No bank name available, skip resolution
-      console.log('🚫 Skipping account resolution - no bank name selected');
+    try {
+      const result = await resolveAccountMutation.mutateAsync({
+        accountNumber,
+        bankName
+      });
+      if (!isModalActiveRef.current || isEditingAccountNumberRef.current) return;
+      console.log('✅ Account resolution successful:', result);
+      setResolvedAccountName(result.account_name);
       setIsResolvingAccount(false);
       isResolvingRef.current = false;
-      setHasResolutionFailed(false);
-      setIsAutoRetrying(false);
-      return;
+    } catch (error) {
+      if (!isModalActiveRef.current || isEditingAccountNumberRef.current) return;
+      console.error('❌ Account resolution failed:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Only show error and stop retrying if it's a backend error (400, 401, 403, etc.)
+      if (errorMessage?.includes('statusCode: 400') || 
+          errorMessage?.includes('statusCode: 401') ||
+          errorMessage?.includes('statusCode: 403') ||
+          errorMessage?.includes('statusCode: 404') ||
+          errorMessage?.includes('statusCode: 500')) {
+        
+        console.log('🚨 Backend error detected, stopping retries');
+        setIsResolvingAccount(false);
+        setHasResolutionFailed(true);
+        isResolvingRef.current = false;
+        ToastService.error('Invalid account details');
+        return;
+      }
+      
+      // For any error, just stop and let user retry manually
+      console.log('❌ Account resolution failed, stopping - user can retry manually');
+      setIsResolvingAccount(false);
+      isResolvingRef.current = false;
+      setHasResolutionFailed(true);
     }
   };
 
-  // Start account resolution in background when modal opens or when bank/account changes
+  // Start account resolution when both bank and account number are provided
   useEffect(() => {
     // Don't start resolution if modal is not visible or not active
     if (!visible || !isModalActive) {
       console.log('🚫 Skipping account resolution - manual modal not visible or not active');
-      return;
-    }
-    
-    // Don't start resolution if we're currently editing
-    if (isEditingAccountNumber) {
-      console.log('🚫 Skipping account resolution - currently in edit mode');
       return;
     }
     
@@ -245,32 +258,46 @@ export default function ManualBankTransferModal({
       return;
     }
     
-    if (hasRequiredData && !isResolvingAccount) {
-      // Additional validation to prevent resolution with invalid data
-      if (accountNumber && accountNumber.length === 10 && /^\d{10}$/.test(accountNumber) && bankName) {
-        // Allow resolution only if we have both bank name and account number
-        console.log('🔄 useEffect triggered resolution for:', { accountNumber, bankName });
-        
-        // Clear any existing debounce timeout
-        if (resolutionDebounceRef.current) {
-          clearTimeout(resolutionDebounceRef.current);
-        }
-        
-        // Debounce resolution to prevent rapid-fire calls
-        resolutionDebounceRef.current = setTimeout(() => {
-          if (!isModalActiveRef.current || isEditingAccountNumberRef.current) return;
-          resolveAccount();
-        }, 500); // 500ms debounce
-      } else {
-        console.log('🚫 Skipping account resolution - data validation failed:', {
-          accountNumber,
-          accountNumberLength: accountNumber?.length,
-          bankName,
-          bankNameLength: bankName?.length
-        });
-      }
+    // Don't start resolution if we're currently editing (but allow when user taps Done)
+    if (isEditingAccountNumber) {
+      console.log('🚫 Skipping account resolution - currently in edit mode');
+      return;
     }
-  }, [visible, accountNumber, isEditingAccountNumber, isModalActive]);
+    
+    // Check if we have both criteria met: bank selected AND 10-digit account number
+    const hasBankSelected = Boolean(bankName && bankName.trim().length > 0);
+    const hasValidAccountNumber = Boolean(accountNumber && accountNumber.length === 10 && /^\d{10}$/.test(accountNumber));
+    
+    console.log('🔍 Checking resolution criteria:', {
+      hasBankSelected,
+      hasValidAccountNumber,
+      bankName,
+      accountNumber,
+      accountNumberLength: accountNumber?.length,
+      isEditing: isEditingAccountNumber
+    });
+    
+    // Only start resolution if BOTH criteria are met
+    if (hasBankSelected && hasValidAccountNumber && !isResolvingAccount) {
+      console.log('✅ Both criteria met - starting immediate resolution for:', { accountNumber, bankName });
+      
+      // Clear any existing debounce timeout
+      if (resolutionDebounceRef.current) {
+        clearTimeout(resolutionDebounceRef.current);
+      }
+      
+      // Immediate resolution (no debounce for manual modal)
+      resolveAccount();
+    } else if (!hasBankSelected || !hasValidAccountNumber) {
+      console.log('🚫 Skipping account resolution - criteria not met:', {
+        hasBankSelected,
+        hasValidAccountNumber,
+        bankName: bankName || 'not selected',
+        accountNumber: accountNumber || 'not entered',
+        accountNumberLength: accountNumber?.length || 0
+      });
+    }
+  }, [visible, accountNumber, bankName, isModalActive, isEditingAccountNumber]);
 
   // Keyboard visibility listeners
   useEffect(() => {
@@ -349,23 +376,19 @@ export default function ManualBankTransferModal({
     setResolvedAccountName(null);
     setHasResolutionFailed(false);
     setIsResolvingAccount(false); // Ensure we can start a new resolution
-    setRetryCount(0); // Reset retry count
+    
     // Notify parent component if callback provided
     if (onBankSelect) {
       onBankSelect(bankName);
     }
-    // Show success feedback
-            // ToastService.success(`${bankName} selected`); // Removed - no toast on bank selection
     
-    // If we have an account number, trigger resolution immediately
-    if (accountNumber) {
-      console.log('🔄 Triggering immediate resolution for new bank selection');
-    }
+    // Resolution will be handled automatically by useEffect when both criteria are met
+    console.log('✅ Bank selected:', bankName);
   };
 
   const handleEditAccountNumber = () => {
     // Use the current account number (either final, edited, or extracted)
-    const currentAccountNumber = finalAccountNumber || editedAccountNumber || extractedData?.accountNumber || '';
+    const currentAccountNumber = finalAccountNumber || editedAccountNumber || '';
     setEditedAccountNumber(currentAccountNumber);
     setIsEditingAccountNumber(true);
     isEditingAccountNumberRef.current = true;
@@ -374,8 +397,6 @@ export default function ManualBankTransferModal({
     console.log('🛑 Stopping all resolution due to edit mode');
     setIsResolvingAccount(false);
     isResolvingRef.current = false;
-    setIsAutoRetrying(false);
-    setRetryCount(0);
     setHasResolutionFailed(false);
     
     // Clear any pending timeouts
@@ -400,85 +421,10 @@ export default function ManualBankTransferModal({
     
     setIsEditingAccountNumber(false);
     isEditingAccountNumberRef.current = false;
-    setRetryCount(0); // Reset retry count
-    setIsAutoRetrying(false);
     setFinalAccountNumber(editedAccountNumber); // Set the final account number immediately
     
-    // Clear any pending timeouts before starting fresh resolution
-    if (resolveTimeoutRef.current) {
-      clearTimeout(resolveTimeoutRef.current);
-      resolveTimeoutRef.current = null;
-    }
-    
-    // Clear any pending debounce timeouts
-    if (resolutionDebounceRef.current) {
-      clearTimeout(resolutionDebounceRef.current);
-      resolutionDebounceRef.current = null;
-    }
-    
-    // If we have account number, trigger resolution (with or without bank name)
-    if (editedAccountNumber) {
-      const hasBankNameForEdit = bankName && bankName.trim().length > 0;
-      
-      if (hasBankNameForEdit) {
-        console.log('🔄 Starting fresh resolution for edited account number:', editedAccountNumber, 'bank:', bankName);
-        setIsResolvingAccount(true);
-        isResolvingRef.current = true;
-        setHasResolutionFailed(false);
-        setResolvedAccountName(null);
-        
-        try {
-          const result = await resolveAccountMutation.mutateAsync({
-            accountNumber: editedAccountNumber,
-            bankName
-          });
-          if (!isModalActiveRef.current || isEditingAccountNumberRef.current) return;
-          console.log('✅ Account resolution successful for edited account:', result);
-          setResolvedAccountName(result.account_name);
-          setIsResolvingAccount(false);
-          isResolvingRef.current = false;
-          setIsAutoRetrying(false);
-        } catch (error) {
-          if (!isModalActiveRef.current || isEditingAccountNumberRef.current) return;
-          console.error('❌ Account resolution failed for edited account:', error);
-          
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          
-          // Only show error and stop retrying if it's a backend error
-          if (errorMessage?.includes('statusCode: 400') || 
-              errorMessage?.includes('statusCode: 401') ||
-              errorMessage?.includes('statusCode: 403') ||
-              errorMessage?.includes('statusCode: 404') ||
-              errorMessage?.includes('statusCode: 500')) {
-            
-            console.log('🚨 Backend error detected for edited account, stopping retries');
-            setIsResolvingAccount(false);
-            isResolvingRef.current = false;
-            setHasResolutionFailed(true);
-            setIsAutoRetrying(false);
-            ToastService.error('Invalid account number');
-            return;
-          }
-          
-          // For any error, just stop and let user retry manually
-          console.log('❌ Account resolution failed, stopping - user can retry manually');
-          setIsResolvingAccount(false);
-          isResolvingRef.current = false;
-          setHasResolutionFailed(true);
-          setIsAutoRetrying(false);
-          // Don't show error toast - let user retry by editing
-        }
-      } else {
-        // No bank name, skip resolution
-        console.log('🚫 Skipping account resolution for edited account - no bank name selected');
-        setIsResolvingAccount(false);
-        isResolvingRef.current = false;
-        setHasResolutionFailed(false);
-        setResolvedAccountName(null);
-        setIsAutoRetrying(false);
-        return;
-      }
-    }
+    // Resolution will be handled automatically by useEffect when both criteria are met
+    console.log('✅ Account number saved and edit mode exited:', editedAccountNumber);
   };
 
   const handleCancelEdit = () => {
@@ -487,25 +433,8 @@ export default function ManualBankTransferModal({
     isEditingAccountNumberRef.current = false;
     // Don't reset finalAccountNumber as it should persist
     
-    // Clear any pending timeouts
-    if (resolveTimeoutRef.current) {
-      clearTimeout(resolveTimeoutRef.current);
-      resolveTimeoutRef.current = null;
-    }
-    
-    // Clear any pending debounce timeouts
-    if (resolutionDebounceRef.current) {
-      clearTimeout(resolutionDebounceRef.current);
-      resolutionDebounceRef.current = null;
-    }
-    
-    // Resume resolution if we have valid data and not editing
-    if (hasRequiredData && !isResolvingAccount && !isEditingAccountNumber && isModalActive) {
-      console.log('🔄 Resuming resolution after canceling edit');
-      setTimeout(() => {
-        resolveAccount();
-      }, 100);
-    }
+    // Resolution will be handled automatically by useEffect when both criteria are met
+    console.log('✅ Edit cancelled');
   };
 
   const handleConfirmPress = async () => {
@@ -533,8 +462,6 @@ export default function ManualBankTransferModal({
         console.log('✅ Account resolution completed:', result);
         setResolvedAccountName(result.account_name);
         setIsResolvingAccount(false);
-        setRetryCount(0); // Reset retry count on success
-        setIsAutoRetrying(false);
         
         // Continue with transfer
         setTimeout(() => {
@@ -558,27 +485,13 @@ export default function ManualBankTransferModal({
           
           console.log('🚨 Backend error detected during confirm, stopping retries');
           setHasResolutionFailed(true);
-          setIsAutoRetrying(false);
           ToastService.error('Invalid account details');
           return;
         }
         
-        // For network errors or temporary failures, auto-retry
-        if (retryCount < MAX_RETRIES && isModalActiveRef.current) {
-          console.log(`🔄 Auto-retrying resolution during confirm (attempt ${retryCount + 1}/${MAX_RETRIES})`);
-          setRetryCount(prev => prev + 1);
-          setIsAutoRetrying(true);
-          
-          setTimeout(() => {
-            if (!isModalActiveRef.current || isEditingAccountNumberRef.current) return;
-            handleConfirmPress();
-          }, 2000);
-        } else {
-          console.log('❌ Max retries reached during confirm, but not showing error');
-          setHasResolutionFailed(false); // Don't show error state
-          setIsAutoRetrying(false);
-          // Don't show error toast or navigate away
-        }
+        // For network errors or temporary failures, just show error
+        console.log('❌ Account resolution failed during confirm');
+        setHasResolutionFailed(true);
         return;
       }
     } else {
@@ -595,7 +508,7 @@ export default function ManualBankTransferModal({
     if (isResolvingAccount) {
       return (
         <Text style={[styles.nameValue, {color: 'rgba(255, 255, 255, 0.4)'}]}>
-          {isAutoRetrying ? `Retrying (${retryCount}/${MAX_RETRIES})...` : 'Verifying...'}
+          Verifying...
         </Text>
       );
     }
@@ -617,7 +530,6 @@ export default function ManualBankTransferModal({
               console.log('🚫 Skipping retry - currently editing account number');
               return;
             }
-            setRetryCount(0);
             setHasResolutionFailed(false);
             resolveAccount();
           }}>
@@ -707,9 +619,7 @@ export default function ManualBankTransferModal({
                         {hasBankName ? (
                           <Text style={styles.detailValue}>
                             {bankName}
-                            {isResolvingAccount && (
-                              <Text style={styles.resolvingText}> • Resolving...</Text>
-                            )}
+                            {/* Resolving text removed as per instruction */}
                           </Text>
                         ) : (
                           <Text style={styles.nameValue}>Select bank</Text>
@@ -758,15 +668,6 @@ export default function ManualBankTransferModal({
                         )}
                       </View>
                     </View>
-
-                    {/* Show extraction confidence if available and keyboard is not visible */}
-                    {extractedData && !isKeyboardVisible && (
-                      <View style={styles.confidenceRow}>
-                        <Text style={styles.confidenceText}>
-                          Extraction confidence: {extractedData.confidence}%
-                        </Text>
-                      </View>
-                    )}
                   </View>
 
                   {!isKeyboardVisible && (
