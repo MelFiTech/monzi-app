@@ -682,7 +682,8 @@ export default function CameraScreen() {
           onRequestStatement={() => {
             console.log('Request statement');
             // TODO: Handle statement request
-            cameraLogic.setShowTransactionHistory(false);
+            // Don't close modal immediately to allow toast to show
+            // cameraLogic.setShowTransactionHistory(false);
           }}
         />
       )}

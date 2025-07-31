@@ -7,6 +7,7 @@ import TransactionList from '@/components/common/TransactionList';
 import { Transaction } from '@/components/common/TransactionListItem';
 import { Button } from '@/components/common';
 import { useScanStatusMessage, useRemainingFreeScans } from '@/hooks/useScanTracking';
+import ToastService from '@/services/ToastService';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -92,8 +93,8 @@ export default function CameraControls({
   // Check if capture should be disabled
   const isCaptureDisabled = isCapturing || isProcessing || isConnectionDisabled || showTransactionHistory;
 
-  // Limit to first 6 recent transactions
-  const recentTransactions = transactions.slice(0, 6);
+  // Limit to first 20 recent transactions
+  const recentTransactions = transactions.slice(0, 20);
 
   return (
     <>
@@ -257,7 +258,10 @@ export default function CameraControls({
 
             <TouchableOpacity
               style={styles.requestStatementButton}
-              onPress={onRequestStatement}
+              onPress={() => {
+                ToastService.success('Feature coming soon');
+                onRequestStatement?.();
+              }}
             >
               <Text style={styles.requestStatementText}>
                 Request Statement

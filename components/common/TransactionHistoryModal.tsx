@@ -12,6 +12,7 @@ import { fontFamilies, fontSizes } from '@/constants/fonts';
 import { Button } from '@/components/common';
 import TransactionList from './TransactionList';
 import { Transaction } from './TransactionListItem';
+import ToastService from '@/services/ToastService';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -59,7 +60,11 @@ export default function TransactionHistoryModal({
   }, [visible, slideAnim]);
 
   const handleRequestStatement = () => {
-    onRequestStatement?.();
+    ToastService.success('Feature coming soon');
+    // Add a small delay to ensure toast shows before any modal closing
+    setTimeout(() => {
+      onRequestStatement?.();
+    }, 100);
   };
 
   if (!visible) return null;
@@ -84,7 +89,7 @@ export default function TransactionHistoryModal({
           </TouchableOpacity>
         </View>
 
-        {/* Transaction List */}
+        {/* Transaction List - Scrollable */}
         <View style={styles.listContainer}>
           <TransactionList
             transactions={transactions}
@@ -94,11 +99,12 @@ export default function TransactionHistoryModal({
             onRefresh={onRefresh}
             onEndReached={onEndReached}
             hasMoreData={hasMoreData}
+            scrollEnabled={true}
           />
         </View>
 
-        {/* Footer */}
-        <View style={styles.footer}>
+        {/* Fixed Footer */}
+        <View style={styles.fixedFooter}>
           <Button
             title="Request Statement"
             variant="secondary"
@@ -160,10 +166,17 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     flex: 1,
+    minHeight: 0, // This is crucial for FlatList to scroll properly
   },
   footer: {
     padding: 20,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  fixedFooter: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
   },
 }); 
