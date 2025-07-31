@@ -105,7 +105,9 @@ class BankResolutionService {
   /**
    * Super resolve account number across all banks automatically
    * Tests the account number against all available banks and returns the first successful match
+   * DISABLED - Only use normal resolve with bank name and account number
    */
+  /*
   static async superResolveAccount(accountNumber: string): Promise<AccountResolutionResponse> {
     try {
       console.log('🚀 BankResolutionService: Super resolving account:', { accountNumber });
@@ -165,6 +167,7 @@ class BankResolutionService {
       throw new Error('Failed to super resolve account: Unknown error');
     }
   }
+  */
 
   /**
    * Validate account number format
