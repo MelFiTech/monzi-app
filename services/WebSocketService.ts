@@ -1,4 +1,33 @@
-import { EventEmitter } from 'events';
+// Replace Node.js EventEmitter with React Native compatible implementation
+class EventEmitter {
+  private events: { [key: string]: Function[] } = {};
+
+  on(event: string, listener: Function): void {
+    if (!this.events[event]) {
+      this.events[event] = [];
+    }
+    this.events[event].push(listener);
+  }
+
+  off(event: string, listener: Function): void {
+    if (!this.events[event]) return;
+    this.events[event] = this.events[event].filter(l => l !== listener);
+  }
+
+  emit(event: string, ...args: any[]): void {
+    if (!this.events[event]) return;
+    this.events[event].forEach(listener => listener(...args));
+  }
+
+  removeAllListeners(event?: string): void {
+    if (event) {
+      delete this.events[event];
+    } else {
+      this.events = {};
+    }
+  }
+}
+
 import AuthStorageService from './AuthStorageService';
 import { getApiBaseUrl } from '@/constants/config';
 
@@ -71,8 +100,8 @@ class WebSocketService extends EventEmitter {
   private isConnecting = false;
   private isConnected = false;
   private userId: string | null = null;
-  private locationUpdateInterval: NodeJS.Timeout | null = null;
-  private heartbeatInterval: NodeJS.Timeout | null = null;
+  private locationUpdateInterval: number | null = null;
+  private heartbeatInterval: number | null = null;
   private lastLocationUpdate: LocationUpdate | null = null;
 
   private constructor() {
@@ -101,11 +130,11 @@ class WebSocketService extends EventEmitter {
 
       // Get user ID from auth service
       const authService = AuthStorageService.getInstance();
-      const user = await authService.getUser();
-      if (!user?.id) {
+      const authData = await authService.getAuthData();
+      if (!authData?.user?.id) {
         throw new Error('User not authenticated');
       }
-      this.userId = user.id;
+      this.userId = authData.user.id;
 
       // Connect to WebSocket using the same base URL as your existing setup
       const baseUrl = getApiBaseUrl();
@@ -152,13 +181,13 @@ class WebSocketService extends EventEmitter {
         }
       };
 
-      this.socket.onerror = (error) => {
+      this.socket.onerror = (error: any) => {
         console.error('❌ WebSocket error:', error);
         this.emit('error', { type: 'CONNECTION_ERROR', message: 'WebSocket connection error', timestamp: Date.now() });
       };
 
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error connecting to WebSocket:', error);
       this.isConnecting = false;
       this.emit('error', { type: 'CONNECTION_ERROR', message: error.message, timestamp: Date.now() });
