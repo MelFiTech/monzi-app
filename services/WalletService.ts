@@ -181,8 +181,10 @@ class WalletService {
    * Get authentication headers for API requests
    */
   private async getAuthHeaders(): Promise<Record<string, string>> {
-    const authData = await this.authStorageService.getAuthData();
-    const token = authData?.accessToken;
+    const authStorageService = AuthStorageService.getInstance();
+    
+    // Try to refresh token if needed before getting headers
+    const token = await authStorageService.refreshTokenIfNeeded();
     
     if (!token) {
       throw new Error('No authentication token found');
@@ -416,20 +418,40 @@ class WalletService {
         pin: '****'  // Don't log actual PIN
       });
 
-      const response = await fetch(`${this.baseUrl}/wallet/transfer`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(data),
-      });
+      // Add timeout configuration to prevent endless loading
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.warn('⚠️ [WalletService] Transfer request timeout after 30 seconds');
+        controller.abort();
+      }, 30000); // 30 second timeout
 
-      const result = await this.handleResponse<TransferResponse>(response);
-      
-      console.log('✅ Transfer completed:', {
-        reference: result.reference,
-        newBalance: result.newBalance
-      });
+      try {
+        const response = await fetch(`${this.baseUrl}/wallet/transfer`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(data),
+          signal: controller.signal,
+        });
 
-      return result;
+        clearTimeout(timeoutId);
+        const result = await this.handleResponse<TransferResponse>(response);
+        
+        console.log('✅ Transfer completed:', {
+          reference: result.reference,
+          newBalance: result.newBalance
+        });
+
+        return result;
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        
+        // Handle timeout specifically
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Transfer request timed out. Please try again.');
+        }
+        
+        throw fetchError;
+      }
     } catch (error) {
       console.error('Transfer error:', error);
       throw error;

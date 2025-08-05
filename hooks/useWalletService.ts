@@ -180,11 +180,16 @@ export function useSetWalletPin(): UseMutationResult<SetPinResponse, WalletError
   return useMutation({
     mutationFn: (data: SetPinRequest) => walletService.setWalletPin(data),
     onSuccess: () => {
+      console.log('✅ PIN set successfully, invalidating queries');
+      
       // Invalidate wallet-related queries after successful PIN update
       queryClient.invalidateQueries({ queryKey: walletKeys.details() });
+      
+      // Invalidate PIN status cache to reflect the new PIN
+      queryClient.invalidateQueries({ queryKey: walletKeys.pinStatus() });
     },
     onError: (error: WalletError) => {
-      console.error('Set wallet PIN error:', error);
+      console.error('❌ Set wallet PIN error:', error);
     },
   });
 }
@@ -217,9 +222,28 @@ export function useTransferFunds(): UseMutationResult<TransferResponse, WalletEr
       queryClient.invalidateQueries({ queryKey: walletKeys.transactions() });
     },
     onError: (error: WalletError) => {
-      console.error('Transfer error:', error);
+      console.error('❌ Transfer mutation error:', {
+        message: error.message,
+        statusCode: error.statusCode,
+        error: error.error,
+        details: error.details
+      });
+      
+      // Handle specific error types
+      if (error.message?.includes('timeout') || error.message?.includes('Network request failed')) {
+        console.error('🌐 Network timeout or connectivity issue during transfer');
+      } else if (error.message?.includes('PIN') || error.message?.includes('pin')) {
+        console.error('🔑 PIN validation error during transfer');
+      } else if (error.message?.includes('balance') || error.message?.includes('insufficient')) {
+        console.error('💰 Insufficient balance error during transfer');
+      } else if (error.message?.includes('authentication') || error.message?.includes('token') || error.statusCode === 401) {
+        console.error('🔐 Authentication error during transfer - token may be expired');
+      } else {
+        console.error('❓ Unknown transfer error type');
+      }
     },
     retry: false, // Don't retry failed transfers
+    retryDelay: 0, // No delay for retries
   });
 }
 
@@ -478,15 +502,20 @@ export function usePinStatus(): UseQueryResult<PinStatusResponse, WalletError> {
   const walletService = WalletService.getInstance();
   const { hasWalletAccess } = useWalletAccess();
 
+  console.log('🔍 [usePinStatus] Hook called:', {
+    hasWalletAccess,
+    timestamp: new Date().toISOString()
+  });
+
   return useQuery({
     queryKey: walletKeys.pinStatus(),
     queryFn: () => walletService.checkPinStatus(),
     enabled: hasWalletAccess, // Only check if user has wallet access
     retry: 2,
     retryDelay: 1000,
-    staleTime: 5 * 60 * 1000, // 5 minutes - PIN status doesn't change often
-    gcTime: 30 * 60 * 1000, // 30 minutes cache time
-    refetchOnWindowFocus: false,
+    staleTime: 0, // Always fetch fresh data - no caching
+    gcTime: 0, // No cache time - always fresh
+    refetchOnWindowFocus: true, // Refetch on focus
     refetchOnReconnect: true,
     refetchInterval: false,
     networkMode: 'online',

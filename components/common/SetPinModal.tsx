@@ -133,7 +133,7 @@ export default function SetPinModal({
       // Close modal after short delay to show toast
       setTimeout(() => {
         onSuccess();
-      }, 1000);
+      }, 500);
       
     } catch (error: any) {
       console.error('❌ Set PIN failed:', error);

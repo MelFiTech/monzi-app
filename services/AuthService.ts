@@ -114,6 +114,18 @@ export interface AuthError {
   details?: Record<string, any>;
 }
 
+export interface RefreshTokenRequest {
+  access_token: string;
+}
+
+export interface RefreshTokenResponse {
+  success: boolean;
+  message: string;
+  access_token: string;
+  expiresAt: string;
+  user: UserProfile;
+}
+
 class AuthService {
   private static instance: AuthService;
   private baseUrl: string;
@@ -580,6 +592,50 @@ class AuthService {
       if (error instanceof Error) {
         throw {
           error: 'Failed to confirm account deletion',
+          message: error.message,
+          statusCode: 400,
+        } as AuthError;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Refresh access token with extended validity
+   */
+  async refreshToken(accessToken: string): Promise<RefreshTokenResponse> {
+    try {
+      console.log('🔄 Refreshing access token...');
+      
+      const response = await fetch(`${this.baseUrl}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: JSON.stringify({
+          access_token: accessToken,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw {
+          error: 'Failed to refresh token',
+          message: result.message || 'Failed to refresh token',
+          statusCode: response.status,
+          details: result.details,
+        } as AuthError;
+      }
+
+      console.log('✅ Token refreshed successfully');
+      return result;
+    } catch (error) {
+      console.error('❌ Token refresh failed:', error);
+      if (error instanceof Error) {
+        throw {
+          error: 'Failed to refresh token',
           message: error.message,
           statusCode: 400,
         } as AuthError;

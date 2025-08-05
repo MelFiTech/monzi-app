@@ -10,7 +10,7 @@ export const Config = {
     PRODUCTION_URL: 'https://monzi-backend.onrender.com',
 
     // Development URL (ngrok tunnel)
-    DEVELOPMENT_URL: process.env.EXPO_PUBLIC_DEV_API_URL || 'https://1d5e51e75e54.ngrok-free.app',
+    DEVELOPMENT_URL: process.env.EXPO_PUBLIC_DEV_API_URL || 'https://19f8c3ff24da.ngrok-free.app',
 
     // Get the appropriate base URL based on environment
     getBaseUrl(): string {
@@ -29,6 +29,7 @@ export const Config = {
       ACCOUNTS: '/accounts',
       USERS: '/users',
       TRANSACTIONS: '/transactions',
+      WALLET: '/wallet',
     }
   },
 

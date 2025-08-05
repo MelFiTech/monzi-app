@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserProfile } from './AuthService';
+import AuthService from './AuthService';
 
 export interface StoredAuthData {
   accessToken: string;
@@ -419,6 +420,69 @@ class AuthStorageService {
         biometricEnabled: false,
         autoLoginEnabled: true,
       };
+    }
+  }
+
+  /**
+   * Refresh token if it's about to expire
+   */
+  async refreshTokenIfNeeded(): Promise<string | null> {
+    try {
+      const authData = await this.getAuthData();
+      if (!authData) return null;
+      
+      // Check if token is about to expire (5 minute buffer)
+      const expirationTime = authData.loginTimestamp + (authData.expiresIn * 1000);
+      const bufferTime = 5 * 60 * 1000; // 5 minutes
+      const isAboutToExpire = Date.now() > (expirationTime - bufferTime);
+      
+      if (isAboutToExpire) {
+        console.log('🔄 Token is about to expire, refreshing...');
+        return await this.refreshToken();
+      }
+      
+      return authData.accessToken;
+    } catch (error) {
+      console.error('❌ Error checking token refresh:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Refresh the access token using the refresh endpoint
+   */
+  private async refreshToken(): Promise<string | null> {
+    try {
+      const authData = await this.getAuthData();
+      if (!authData) return null;
+      
+      const authService = AuthService.getInstance();
+      const refreshResult = await authService.refreshToken(authData.accessToken);
+      
+      if (refreshResult.success) {
+        // Calculate new expiration time
+        const expiresAt = new Date(refreshResult.expiresAt);
+        const expiresIn = Math.floor((expiresAt.getTime() - Date.now()) / 1000);
+        
+        // Update stored auth data with new token
+        const updatedAuthData: StoredAuthData = {
+          accessToken: refreshResult.access_token,
+          refreshToken: authData.refreshToken, // Keep existing refresh token
+          user: refreshResult.user,
+          expiresIn,
+          loginTimestamp: Date.now(),
+        };
+        
+        await this.storeAuthData(updatedAuthData);
+        console.log('✅ Token refreshed and stored successfully');
+        
+        return refreshResult.access_token;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('❌ Token refresh failed:', error);
+      return null;
     }
   }
 }

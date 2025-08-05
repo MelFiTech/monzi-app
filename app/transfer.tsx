@@ -19,12 +19,13 @@ import RecipientDetailCard from '@/components/common/RecipientDetailCard';
 import AmountPill from '@/components/common/AmountPill';
 import Button from '@/components/common/Button';
 import TransactionPinModal from '@/components/common/TransactionPinModal';
-import { PulsatingGlow } from '@/components/common';
-import { useWalletBalance, useRefreshWallet, useOptimisticBalance, useTransferFunds, useWalletAccessStatus, useCalculateFee } from '@/hooks/useWalletService';
+import { PulsatingGlow, SetPinModal } from '@/components/common';
+import { useWalletBalance, useRefreshWallet, useOptimisticBalance, useTransferFunds, useWalletAccessStatus, useCalculateFee, usePinStatus } from '@/hooks/useWalletService';
 import { useNotificationService } from '@/hooks/useNotificationService';
 import { useQueryClient } from '@tanstack/react-query';
 import BiometricService from '@/services/BiometricService';
 import * as Haptics from 'expo-haptics';
+import { walletKeys } from '@/hooks/useWalletService';
 
 const predefinedAmounts = ['N5,000', 'N10,000', 'N20,000'];
 const MIN_TRANSFER_AMOUNT = 300;
@@ -59,11 +60,23 @@ export default function TransferScreen() {
   const [amount, setAmount] = useState<string>('');
   const [selectedPill, setSelectedPill] = useState<string | null>(null);
   const [showPinModal, setShowPinModal] = useState(false);
+  const [showSetPinModal, setShowSetPinModal] = useState(false);
   const [amountError, setAmountError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Check wallet access status
   const { hasWalletAccess, statusMessage } = useWalletAccessStatus();
+
+  // Check PIN status
+  const { data: pinStatus, isLoading: isPinStatusLoading } = usePinStatus();
+
+  console.log('🔍 [TransferScreen] Component state:', {
+    hasWalletAccess,
+    statusMessage,
+    pinStatus,
+    isPinStatusLoading,
+    timestamp: new Date().toISOString()
+  });
 
   // Fetch wallet balance only if user has access
   const { data: balanceData, isLoading: isBalanceLoading } = useWalletBalance();
@@ -326,8 +339,17 @@ export default function TransferScreen() {
     // Trigger heavy haptic feedback
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
 
+    console.log('🔍 [TransferScreen] Transfer button pressed, checking conditions...');
+    console.log('🔍 [TransferScreen] PIN Status:', {
+      pinStatus,
+      hasPinSet: pinStatus?.hasPinSet,
+      isLoading: isPinStatusLoading,
+      message: pinStatus?.message
+    });
+
     // Check if user has wallet access first
     if (!hasWalletAccess) {
+      console.log('❌ [TransferScreen] No wallet access');
       Alert.alert(
         'Wallet Access Required',
         statusMessage,
@@ -337,6 +359,24 @@ export default function TransferScreen() {
       );
       return;
     }
+
+    console.log('✅ [TransferScreen] Wallet access confirmed');
+
+    // Check PIN status
+    if (pinStatus && !pinStatus.hasPinSet) {
+      console.log('🔒 [TransferScreen] No PIN set - showing SetPinModal');
+      setShowSetPinModal(true);
+      return;
+    }
+
+    // Fallback: If PIN status is not available but user has wallet access, show SetPinModal
+    if (!pinStatus && hasWalletAccess) {
+      console.log('🔒 [TransferScreen] PIN status not available but user has wallet access - showing SetPinModal');
+      setShowSetPinModal(true);
+      return;
+    }
+
+    console.log('✅ [TransferScreen] PIN status check passed, proceeding with transfer validation');
 
     // Validate amount
     if (!amount || isNaN(parsedAmount) || parsedAmount <= 0) {
@@ -360,6 +400,8 @@ export default function TransferScreen() {
 
     // Clear any previous errors
     setAmountError(null);
+
+    console.log('✅ [TransferScreen] All validations passed, proceeding with authentication');
 
     // Try biometric authentication first
     try {
@@ -582,6 +624,22 @@ export default function TransferScreen() {
         fee={isFeeLoading ? undefined : (feeData?.feeAmount?.toString() || '0')}
         feeLoading={isFeeLoading}
         pinError={pinError}
+      />
+
+      {/* Set PIN Modal */}
+      <SetPinModal
+        visible={showSetPinModal}
+        onClose={() => setShowSetPinModal(false)}
+        onSuccess={() => {
+          console.log('✅ [TransferScreen] PIN set successfully, modal closed');
+          setShowSetPinModal(false);
+          
+          // Invalidate PIN status cache to get fresh data for next action
+          queryClient.invalidateQueries({ queryKey: walletKeys.pinStatus() });
+          
+          // Don't immediately retry transfer - let user take new action
+          // The PIN status will be fresh when they press the transfer button again
+        }}
       />
 
 

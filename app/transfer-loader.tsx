@@ -8,14 +8,16 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
-import { useTransferFunds } from '@/hooks/useWalletService';
+import { useTransferFunds, usePinStatus } from '@/hooks/useWalletService';
 import { useGetCurrentLocation } from '@/hooks/useLocationService';
 import CircularLoader from '@/components/common/CircularLoader';
+import AccountService from '@/services/AccountService';
 
 export default function TransferLoaderScreen() {
   const params = useLocalSearchParams();
   const transferFundsMutation = useTransferFunds();
   const getLocationMutation = useGetCurrentLocation();
+  const { data: pinStatus, isLoading: isPinStatusLoading } = usePinStatus();
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Extract transfer details from params
@@ -33,6 +35,18 @@ export default function TransferLoaderScreen() {
   }, []);
 
   const initiateTransfer = async () => {
+    // Set up transfer timeout (30 seconds)
+    const transferTimeout = setTimeout(() => {
+      console.error('❌ [TransferLoader] Transfer timeout after 30 seconds');
+      router.replace({
+        pathname: '/transfer',
+        params: {
+          ...params,
+          transferError: 'Transfer timeout. Please try again.'
+        }
+      });
+    }, 30000);
+
     try {
       console.log('🚀 [TransferLoader] Initiating transfer:', {
         amount,
@@ -42,30 +56,73 @@ export default function TransferLoaderScreen() {
         pin: '****'
       });
 
-      // Capture current location for business payment tracking
-      let locationData = null;
+      // Check PIN status before proceeding
+      if (pinStatus && !pinStatus.hasPinSet) {
+        clearTimeout(transferTimeout);
+        console.error('❌ [TransferLoader] No PIN set - cannot proceed with transfer');
+        router.replace({
+          pathname: '/transfer',
+          params: {
+            ...params,
+            transferError: 'Transaction PIN is required. Please set a PIN first.'
+          }
+        });
+        return;
+      }
+
+      // Check network connectivity before proceeding
+      console.log('🔍 [TransferLoader] Checking network connectivity...');
+      const networkTest = await AccountService.testNetworkConnectivity();
+      
+      if (!networkTest.isReachable) {
+        clearTimeout(transferTimeout);
+        console.error('❌ [TransferLoader] Network connectivity test failed:', networkTest.error);
+        router.replace({
+          pathname: '/transfer',
+          params: {
+            ...params,
+            transferError: 'Network connectivity issue. Please check your connection and try again.'
+          }
+        });
+        return;
+      }
+      
+      console.log('✅ [TransferLoader] Network connectivity confirmed, latency:', networkTest.latency, 'ms');
+
+      // Capture current location for business payment tracking (with timeout)
+      let locationData: { latitude: number; longitude: number } | null = null;
       try {
-        locationData = await getLocationMutation.mutateAsync();
+        // Set up location timeout (5 seconds)
+        const locationTimeout = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Location timeout')), 5000)
+        );
+        
+        locationData = await Promise.race([
+          getLocationMutation.mutateAsync(),
+          locationTimeout
+        ]);
         console.log('📍 [TransferLoader] Location captured:', locationData);
       } catch (locationError) {
-        console.log('⚠️ [TransferLoader] Location capture failed, continuing without location:', locationError);
+        console.log('⚠️ [TransferLoader] Location capture failed or timed out, continuing without location:', locationError);
+        // Continue without location - it's optional
       }
 
       // Debug: Log exact transfer parameters being sent
-      const transferParams = {
+      const transferParams: any = {
         amount,
         accountNumber,
         bankName,
         accountName,
         description: `Transfer to ${accountName}`,
         pin,
-        // Include location data if available
-        ...(locationData && {
-          locationName: accountName, // Use recipient name as location name
-          locationLatitude: locationData.latitude,
-          locationLongitude: locationData.longitude,
-        })
       };
+
+      // Include location data if available
+      if (locationData) {
+        transferParams.locationName = accountName; // Use recipient name as location name
+        transferParams.locationLatitude = locationData.latitude;
+        transferParams.locationLongitude = locationData.longitude;
+      }
       
       console.log('📤 [TransferLoader] Transfer parameters:', {
         ...transferParams,
@@ -73,6 +130,9 @@ export default function TransferLoaderScreen() {
       });
 
       const transferResult = await transferFundsMutation.mutateAsync(transferParams);
+
+      // Clear timeout since transfer completed
+      clearTimeout(transferTimeout);
 
       console.log('✅ [TransferLoader] Transfer successful:', transferResult);
 
@@ -90,6 +150,9 @@ export default function TransferLoaderScreen() {
       });
       
     } catch (error: any) {
+      // Clear timeout since transfer failed
+      clearTimeout(transferTimeout);
+      
       console.error('❌ [TransferLoader] Transfer failed:', error);
       
       // Handle specific error cases
@@ -109,6 +172,24 @@ export default function TransferLoaderScreen() {
           params: {
             ...params,
             transferError: 'Insufficient balance for this transfer.'
+          }
+        });
+      } else if (error?.message?.includes('timeout') || error?.message?.includes('Network request failed')) {
+        // Network/timeout error
+        router.replace({
+          pathname: '/transfer',
+          params: {
+            ...params,
+            transferError: 'Network timeout. Please check your connection and try again.'
+          }
+        });
+      } else if (error?.message?.includes('authentication') || error?.message?.includes('token') || error?.statusCode === 401) {
+        // Authentication error - redirect to login
+        console.error('🔐 Authentication error during transfer:', error);
+        router.replace({
+          pathname: '/login',
+          params: {
+            authError: 'Your session has expired. Please log in again.'
           }
         });
       } else {
