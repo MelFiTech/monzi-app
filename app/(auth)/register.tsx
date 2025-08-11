@@ -271,7 +271,7 @@ export default function RegisterScreen() {
               label="Set Passcode"
               value={formData.passcode}
               onChangeText={(text) => updateField('passcode', text)}
-              placeholder="Set Passcode"
+              placeholder="Set your 6-digit passcode"
               inputType="password"
               error={errors.passcode}
               keyboardType="numeric"

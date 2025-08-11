@@ -132,7 +132,7 @@ export default function LoginScreen() {
                     setPasscode(numbersOnly);
                   }
                 }}
-                placeholder="******"
+                placeholder="Enter your 6-digit passcode"
                 inputType="password"
                 style={styles.authInput}
                 returnKeyType="done"

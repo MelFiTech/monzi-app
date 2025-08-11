@@ -308,8 +308,17 @@ export function usePushNotificationService(
       onWalletFunding(data);
     } else if (data?.type === 'transaction' && onTransaction) {
       onTransaction(data);
+    } else if (
+      (
+        data?.type === 'location' ||
+        data?.type === 'location_payment' ||
+        (Array.isArray((data as any)?.paymentSuggestions) && (data as any)?.paymentSuggestions.length > 0)
+      ) && onLocationPayment
+    ) {
+      // Foreground location payment push
+      onLocationPayment(data);
     }
-  }, [onWalletFunding, onTransaction]);
+  }, [onWalletFunding, onTransaction, onLocationPayment]);
 
   const handleNotificationResponse = useCallback((response: Notifications.NotificationResponse) => {
     const data = response.notification.request.content.data;
@@ -317,14 +326,20 @@ export function usePushNotificationService(
     console.log('📱 Notification tap received:', data);
     
     // Handle location payment notification tap
-    if (data?.type === 'location_payment' || 
-        (data?.accountNumber && data?.bankName && data?.accountName)) {
+    const isLocationPayment =
+      data?.type === 'location' ||
+      data?.type === 'location_payment' ||
+      (data?.accountNumber && data?.bankName && data?.accountName) ||
+      (Array.isArray(data?.paymentSuggestions) && data?.paymentSuggestions.length > 0);
+
+    if (isLocationPayment) {
       
       console.log('📍 Location payment notification tapped:', {
         accountNumber: data.accountNumber,
         bankName: data.bankName,
         accountName: data.accountName,
-        bankCode: data.bankCode
+        bankCode: data.bankCode,
+        hasSuggestions: Array.isArray(data?.paymentSuggestions)
       });
       
       // Navigate to camera screen (main screen) where manual transfer modal is available
@@ -332,19 +347,32 @@ export function usePushNotificationService(
       
       // Store the payment data for the manual transfer modal to use
       // We'll use AsyncStorage to pass data between notification tap and modal
+      // Prefer nested suggestion payload if present; else fallback to top-level fields
+      const firstSuggestion = Array.isArray(data?.paymentSuggestions) && data.paymentSuggestions.length > 0
+        ? data.paymentSuggestions[0]
+        : undefined;
+
       const paymentData = {
-        accountNumber: data.accountNumber,
-        bankName: data.bankName,
-        accountName: data.accountName,
-        bankCode: data.bankCode,
-        frequency: data.frequency,
-        lastTransactionDate: data.lastTransactionDate,
-        source: 'notification_tap'
-      };
+        accountNumber: firstSuggestion?.accountNumber ?? data.accountNumber,
+        bankName: firstSuggestion?.bankName ?? data.bankName,
+        accountName: firstSuggestion?.accountName ?? data.accountName,
+        bankCode: firstSuggestion?.bankCode ?? data.bankCode,
+        frequency: firstSuggestion?.frequency ?? data.frequency,
+        lastTransactionDate: firstSuggestion?.lastTransactionDate ?? data.lastTransactionDate,
+        source: 'notification_tap',
+        // Optional extras
+        locationId: data.locationId,
+        locationName: data.locationName,
+        locationAddress: data.locationAddress,
+        distance: data.distance,
+      } as any;
       
       // Store payment data for manual transfer modal to pick up
       import('@react-native-async-storage/async-storage').then(({ default: AsyncStorage }) => {
-        AsyncStorage.setItem('notification_payment_data', JSON.stringify(paymentData))
+        Promise.all([
+          AsyncStorage.setItem('notification_payment_data', JSON.stringify(paymentData)),
+          AsyncStorage.setItem('should_open_manual_modal', 'true') // Flag to open modal on navigation
+        ])
           .then(() => {
             console.log('💾 Payment data stored for manual transfer modal');
           })

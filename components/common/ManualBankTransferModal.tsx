@@ -133,9 +133,6 @@ export default function ManualBankTransferModal({
         await AsyncStorage.removeItem('notification_payment_data');
         console.log('🧹 Cleared notification payment data');
         
-        // Show success message
-        ToastService.success('Payment details loaded from notification');
-        
         // Exit edit mode since we have pre-filled data
         setIsEditingAccountNumber(false);
         isEditingAccountNumberRef.current = false;

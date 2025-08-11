@@ -40,15 +40,25 @@ export default function TransactionListItem({
 
   const formatTime = (timestamp: Date) => {
     const now = new Date();
-    const diffInHours = Math.abs(now.getTime() - timestamp.getTime()) / (1000 * 60 * 60);
-    
-    if (diffInHours < 24) {
-      const hours = Math.floor(diffInHours);
-      return `${hours}h`;
-    } else {
-      const days = Math.floor(diffInHours / 24);
-      return `${days}d`;
+    const diffMs = Math.abs(now.getTime() - timestamp.getTime());
+    const seconds = Math.floor(diffMs / 1000);
+
+    if (seconds < 60) {
+      return `${seconds}s`;
     }
+
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) {
+      return `${minutes}m`;
+    }
+
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) {
+      return `${hours}h`;
+    }
+
+    const days = Math.floor(hours / 24);
+    return `${days}d`;
   };
 
   const getTransactionIcon = () => {

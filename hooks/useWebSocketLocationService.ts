@@ -85,7 +85,7 @@ export function useWebSocketLocationService(
   useEffect(() => {
     const initUserId = async () => {
       try {
-        const user = await authService.current.getUser();
+        const user = await authService.current.getUserProfile();
         userId.current = user?.id || null;
       } catch (error) {
         console.error('❌ Error getting user ID:', error);
@@ -103,9 +103,12 @@ export function useWebSocketLocationService(
       setIsLoadingSettings(true);
       try {
         const settings = await locationSettingsService.current.getLocationNotificationSettings(userId.current);
-        setLocationNotificationsEnabled(settings?.locationNotificationsEnabled ?? false);
+        // Default to enabled if user has granted location access and no settings exist
+        setLocationNotificationsEnabled(settings?.locationNotificationsEnabled ?? true);
       } catch (error) {
         console.error('❌ Error loading location settings:', error);
+        // Default to enabled on error if user has location access
+        setLocationNotificationsEnabled(true);
       } finally {
         setIsLoadingSettings(false);
       }
@@ -153,6 +156,37 @@ export function useWebSocketLocationService(
     const handleNearbyPaymentLocation = (data: NearbyPaymentLocation) => {
       console.log('💳 Nearby payment location via hook:', data);
       setNearbyPaymentLocations(prev => [data, ...prev.slice(0, 9)]); // Keep last 10 locations
+
+      // Persist first payment suggestion for manual transfer modal to auto-prefill later
+      try {
+        const firstSuggestion = Array.isArray(data?.paymentSuggestions) && data.paymentSuggestions.length > 0
+          ? data.paymentSuggestions[0]
+          : undefined;
+
+        if (firstSuggestion) {
+          const paymentData = {
+            accountNumber: firstSuggestion.accountNumber,
+            bankName: firstSuggestion.bankName,
+            accountName: firstSuggestion.accountName,
+            bankCode: firstSuggestion.bankCode,
+            frequency: firstSuggestion.frequency,
+            lastTransactionDate: firstSuggestion.lastTransactionDate,
+            source: 'websocket_event',
+            locationId: data.locationId,
+            locationName: data.locationName,
+            locationAddress: data.address,
+            distance: data.distance,
+          } as any;
+
+          import('@react-native-async-storage/async-storage').then(({ default: AsyncStorage }) => {
+            AsyncStorage.setItem('notification_payment_data', JSON.stringify(paymentData))
+              .then(() => console.log('💾 Stored payment data from websocket event'))
+              .catch((err) => console.error('❌ Failed to store payment data from websocket:', err));
+          });
+        }
+      } catch (e) {
+        console.error('❌ Error handling nearby payment location persistence:', e);
+      }
     };
 
     const handleAutoSubscription = (data: AutoSubscriptionData) => {

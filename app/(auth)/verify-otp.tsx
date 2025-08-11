@@ -181,6 +181,11 @@ export default function VerifyOTPScreen() {
         <Text style={textStyles.title}>
           Enter code sent{'\n'}to your email
         </Text>
+        {email ? (
+          <Text style={textStyles.emailText}>
+            {email}
+          </Text>
+        ) : null}
 
         <View style={containerStyles.inputContainer}>
           <View style={containerStyles.otpInputWrapper}>
@@ -306,6 +311,13 @@ const textStyles = StyleSheet.create({
     fontFamily: fontFamilies.clashDisplay.bold,
     lineHeight: 32 * 1.2,
     color: '#FFFFFF',
+    textAlign: 'left',
+  },
+  emailText: {
+    marginTop: 8,
+    fontFamily: fontFamilies.sora.semiBold,
+    fontSize: fontSizes.base,
+    color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'left',
   },
   countdownText: {

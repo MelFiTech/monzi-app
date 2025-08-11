@@ -30,6 +30,7 @@ class EventEmitter {
 
 import AuthStorageService from './AuthStorageService';
 import { getApiBaseUrl } from '@/constants/config';
+import { io, Socket } from 'socket.io-client';
 
 export interface LocationUpdate {
   userId: string;
@@ -93,7 +94,7 @@ export interface AutoSubscriptionData {
 
 class WebSocketService extends EventEmitter {
   private static instance: WebSocketService;
-  private socket: WebSocket | null = null;
+  private socket: Socket | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000; // Start with 1 second
@@ -136,57 +137,81 @@ class WebSocketService extends EventEmitter {
       }
       this.userId = authData.user.id;
 
-      // Connect to WebSocket using the same base URL as your existing setup
+      // Connect using Socket.IO like NotificationService
       const baseUrl = getApiBaseUrl();
-      const wsUrl = baseUrl.replace('https://', 'wss://').replace('http://', 'ws://') + '/notifications';
-      this.socket = new WebSocket(wsUrl);
+      const wsUrl = `${baseUrl}/notifications`;
+      const token = authData.accessToken;
 
-      this.socket.onopen = () => {
-        console.log('✅ WebSocket connected successfully');
-        this.isConnected = true;
-        this.isConnecting = false;
-        this.reconnectAttempts = 0;
-        this.reconnectDelay = 1000;
-        
-        // Start heartbeat
-        this.startHeartbeat();
-        
-        // Join user room (triggers auto-subscription if enabled)
-        this.joinUserRoom();
-        
-        this.emit('connected');
-      };
+      this.socket = io(wsUrl, {
+        extraHeaders: {
+          'ngrok-skip-browser-warning': 'true',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+        },
+        auth: {
+          userId: this.userId,
+          ...(token && { token: token }),
+        },
+        transports: ['polling', 'websocket'],
+        autoConnect: true,
+        reconnection: true,
+        reconnectionAttempts: this.maxReconnectAttempts,
+        reconnectionDelay: this.reconnectDelay,
+        timeout: 15000,
+        forceNew: true,
+      });
 
-      this.socket.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          this.handleMessage(data);
-        } catch (error) {
-          console.error('❌ Error parsing WebSocket message:', error);
+      return new Promise((resolve, reject) => {
+        if (!this.socket) {
+          reject(new Error('Failed to create socket connection'));
+          return;
         }
-      };
 
-      this.socket.onclose = (event) => {
-        console.log('🔌 WebSocket connection closed:', event.code, event.reason);
-        this.isConnected = false;
-        this.isConnecting = false;
-        this.stopHeartbeat();
-        this.stopLocationUpdates();
-        
-        this.emit('disconnected', { code: event.code, reason: event.reason });
-        
-        // Attempt to reconnect if not a clean close
-        if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
-          this.scheduleReconnect();
-        }
-      };
+        // Connection successful
+        this.socket.on('connect', () => {
+          console.log('✅ WebSocket connected successfully');
+          this.isConnected = true;
+          this.isConnecting = false;
+          this.reconnectAttempts = 0;
+          this.reconnectDelay = 1000;
+          
+          // Start heartbeat
+          this.startHeartbeat();
+          
+          // Join user room (triggers auto-subscription if enabled)
+          this.joinUserRoom();
+          
+          this.emit('connected');
+          resolve(true);
+        });
 
-      this.socket.onerror = (error: any) => {
-        console.error('❌ WebSocket error:', error);
-        this.emit('error', { type: 'CONNECTION_ERROR', message: 'WebSocket connection error', timestamp: Date.now() });
-      };
+        this.socket.on('connect_error', (error) => {
+          console.error('❌ WebSocket connection error:', error);
+          this.isConnecting = false;
+          this.emit('error', { message: 'WebSocket connection error', timestamp: Date.now(), type: 'CONNECTION_ERROR' });
+          reject(error);
+        });
 
-      return true;
+        this.socket.on('disconnect', (reason) => {
+          console.log(`🔌 WebSocket connection closed: ${reason}`);
+          this.isConnected = false;
+          this.isConnecting = false;
+          this.stopHeartbeat();
+          this.stopLocationUpdates();
+          this.emit('disconnected', { reason });
+          
+          // Socket.IO handles reconnection automatically
+        });
+
+        // Handle custom events
+        this.socket.on('joined_room', (data) => this.handleJoinedRoom(data));
+        this.socket.on('left_room', (data) => this.handleLeftRoom(data));
+        this.socket.on('location:subscribed', (data) => this.handleLocationSubscribed(data));
+        this.socket.on('location:unsubscribed', (data) => this.handleLocationUnsubscribed(data));
+        this.socket.on('location:auto_subscribed', (data) => this.handleAutoSubscription(data));
+        this.socket.on('location:nearby_payment_location', (data) => this.handleNearbyPaymentLocation(data));
+        this.socket.on('location:proximity_result', (data) => this.handleProximityResult(data));
+        this.socket.on('location:error', (data) => this.handleLocationError(data));
+      });
     } catch (error: any) {
       console.error('❌ Error connecting to WebSocket:', error);
       this.isConnecting = false;
@@ -205,7 +230,7 @@ class WebSocketService extends EventEmitter {
     this.stopLocationUpdates();
     
     if (this.socket) {
-      this.socket.close(1000, 'Client disconnecting');
+      this.socket.disconnect();
       this.socket = null;
     }
     
@@ -213,7 +238,7 @@ class WebSocketService extends EventEmitter {
     this.isConnecting = false;
     this.userId = null;
     
-    this.emit('disconnected', { code: 1000, reason: 'Client disconnecting' });
+    this.emit('disconnected', { reason: 'Client disconnecting' });
   }
 
   /**
@@ -350,48 +375,45 @@ class WebSocketService extends EventEmitter {
    * Send message to WebSocket server
    */
   private sendMessage(message: any): void {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-      console.warn('⚠️ Cannot send message: WebSocket not connected');
+    if (!this.socket || !this.isConnected) {
+      console.warn('⚠️ Cannot send message: Socket not connected');
       return;
     }
 
     try {
-      this.socket.send(JSON.stringify(message));
+      // Use Socket.IO emit instead of WebSocket send
+      this.socket.emit(message.event, message.data);
     } catch (error) {
-      console.error('❌ Error sending WebSocket message:', error);
+      console.error('❌ Error sending Socket message:', error);
     }
   }
 
   /**
-   * Handle incoming WebSocket messages
+   * Handle joined room confirmation
    */
-  private handleMessage(data: any): void {
-    console.log('📨 Received WebSocket message:', data);
+  private handleJoinedRoom(data: any): void {
+    console.log('✅ Joined room confirmed:', data);
+  }
 
-    switch (data.event) {
-      case 'location:proximity_result':
-        this.handleProximityResult(data.data);
-        break;
-      
-      case 'location:nearby_payment_location':
-        this.handleNearbyPaymentLocation(data.data);
-        break;
-      
-      case 'location:auto_subscribed':
-        this.handleAutoSubscription(data.data);
-        break;
-      
-      case 'location:error':
-        this.handleLocationError(data.data);
-        break;
-      
-      case 'pong':
-        // Heartbeat response
-        break;
-      
-      default:
-        console.log('📨 Unknown WebSocket event:', data.event);
-    }
+  /**
+   * Handle left room confirmation
+   */
+  private handleLeftRoom(data: any): void {
+    console.log('✅ Left room confirmed:', data);
+  }
+
+  /**
+   * Handle location subscription confirmation
+   */
+  private handleLocationSubscribed(data: any): void {
+    console.log('✅ Location subscription confirmed:', data);
+  }
+
+  /**
+   * Handle location unsubscription confirmation
+   */
+  private handleLocationUnsubscribed(data: any): void {
+    console.log('✅ Location unsubscription confirmed:', data);
   }
 
   /**

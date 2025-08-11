@@ -194,7 +194,7 @@ class LocationSettingsService {
   private getDefaultLocationSettings(userId: string): LocationSettings {
     return {
       userId,
-      locationNotificationsEnabled: false,
+      locationNotificationsEnabled: true, // Default to enabled if user has granted location access
       updateFrequency: 35, // 35 seconds
       proximityRadius: 40, // 40 meters
       lastUpdated: new Date().toISOString(),

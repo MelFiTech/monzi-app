@@ -65,6 +65,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     onTransaction: (data) => {
       console.log('💳 AuthProvider: Transaction notification received:', data);
     },
+    onLocationPayment: (data) => {
+      console.log('📍 AuthProvider: Location payment notification received:', data?.locationName || data);
+    },
   });
 
   useEffect(() => {

@@ -23,6 +23,7 @@ import { useNotificationService } from '@/hooks/useNotificationService';
 import { usePushNotificationService } from '@/hooks/usePushNotificationService';
 import { useWebSocketCacheIntegration } from '@/hooks/useWalletService';
 import { useGetCurrentLocation } from '@/hooks/useLocationService';
+import { useWebSocketLocationService } from '@/hooks/useWebSocketLocationService';
 import { fontFamilies } from '@/constants/fonts';
 import ToastService from '@/services/ToastService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -223,14 +224,36 @@ export default function CameraScreen() {
       onLocationPayment: (data) => {
         console.log('📍 Location payment notification received:', data);
         
-        // Show the manual transfer modal with pre-filled data
-        cameraLogic.setShowManualBankTransferModal(true);
-        
-        // The modal will automatically pick up the payment data from AsyncStorage
-        // and pre-fill the form when it opens
+        // Do NOT auto-open modal on notification receipt
+        // Only open modal when user explicitly taps the notification
+        // The push notification tap handler will open the modal and pre-fill data
       }
     }
   );
+
+  // WebSocket location service for sending location updates to backend
+  const {
+    isConnected: isLocationServiceConnected,
+    isLocationTrackingActive,
+    nearbyPaymentLocations,
+    startLocationTracking,
+    stopLocationTracking,
+  } = useWebSocketLocationService({
+    autoConnect: true,
+    autoStartLocationUpdates: false, // We'll control this manually based on auth state
+    locationUpdateFrequency: 30, // Send updates every 30 seconds
+    proximityRadius: 40, // 40m proximity radius
+  });
+
+  // Log WebSocket location service status for debugging
+  useEffect(() => {
+    console.log('📍 [CameraScreen] WebSocket location service status:', {
+      isConnected: isLocationServiceConnected,
+      isTrackingActive: isLocationTrackingActive,
+      nearbyLocations: nearbyPaymentLocations.length,
+      timestamp: new Date().toISOString(),
+    });
+  }, [isLocationServiceConnected, isLocationTrackingActive, nearbyPaymentLocations.length]);
 
 
   // Request camera permissions on component mount
@@ -239,6 +262,25 @@ export default function CameraScreen() {
       requestPermission();
     }
   }, [permission]);
+
+  // Check for notification tap flag to open manual modal
+  useEffect(() => {
+    const checkForNotificationTap = async () => {
+      try {
+        const shouldOpen = await AsyncStorage.getItem('should_open_manual_modal');
+        if (shouldOpen === 'true') {
+          console.log('📱 Opening manual modal from notification tap');
+          cameraLogic.setShowManualBankTransferModal(true);
+          // Clear the flag
+          await AsyncStorage.removeItem('should_open_manual_modal');
+        }
+      } catch (error) {
+        console.error('❌ Error checking notification tap flag:', error);
+      }
+    };
+
+    checkForNotificationTap();
+  }, []); // Run once on mount
 
   // Helper function to check if location has changed significantly
   const hasLocationChangedSignificantly = (newLocation: { latitude: number; longitude: number }, oldLocation: { latitude: number; longitude: number } | null) => {
@@ -477,6 +519,31 @@ export default function CameraScreen() {
     isLocationWatching
   ]);
 
+  // Start WebSocket location tracking when user is authenticated and verified
+  useEffect(() => {
+    if (
+      backendChecks.isAuthenticated &&
+      backendChecks.kycStatus?.isVerified &&
+      cameraLogic.areAllChecksComplete &&
+      !cameraLogic.isInKYCFlow &&
+      !cameraLogic.showVerificationModal &&
+      isLocationServiceConnected &&
+      !isLocationTrackingActive
+    ) {
+      console.log('📍 [CameraScreen] Starting WebSocket location tracking for backend notifications...');
+      startLocationTracking();
+    }
+  }, [
+    backendChecks.isAuthenticated,
+    backendChecks.kycStatus?.isVerified,
+    cameraLogic.areAllChecksComplete,
+    cameraLogic.isInKYCFlow,
+    cameraLogic.showVerificationModal,
+    isLocationServiceConnected,
+    isLocationTrackingActive,
+    startLocationTracking
+  ]);
+
   // Stop location watching when app goes to background or user is not verified
   useEffect(() => {
     if (
@@ -494,12 +561,34 @@ export default function CameraScreen() {
     cameraLogic.showVerificationModal
   ]);
 
+  // Stop WebSocket location tracking when user is not authenticated or verified
+  useEffect(() => {
+    if (
+      (!backendChecks.isAuthenticated ||
+      !backendChecks.kycStatus?.isVerified ||
+      cameraLogic.isInKYCFlow ||
+      cameraLogic.showVerificationModal) &&
+      isLocationTrackingActive
+    ) {
+      console.log('📍 [CameraScreen] Stopping WebSocket location tracking...');
+      stopLocationTracking();
+    }
+  }, [
+    backendChecks.isAuthenticated,
+    backendChecks.kycStatus?.isVerified,
+    cameraLogic.isInKYCFlow,
+    cameraLogic.showVerificationModal,
+    isLocationTrackingActive,
+    stopLocationTracking
+  ]);
+
   // Cleanup location watching on component unmount
   useEffect(() => {
     return () => {
       stopLocationWatching();
+      stopLocationTracking();
     };
-  }, []);
+  }, [stopLocationTracking]);
 
 
 

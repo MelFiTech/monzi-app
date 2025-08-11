@@ -9,6 +9,7 @@ import {
   Share,
   Alert,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
@@ -313,73 +314,76 @@ export default function TransactionDetailScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      {/* All transaction info in a single container with bg and border radius */}
-      <View style={styles.detailsOuterContainer}>
-        {/* Transaction Summary (amount, date, badge) */}
-        <View style={styles.summaryContainerInDetails}>
-          <Text style={styles.amountText}>
-            {formatAmount(transaction.amount, transaction.currency)}
-          </Text>
-          <Text style={styles.dateText}>
-            {formatDate(transaction.createdAt || new Date().toISOString())}
-          </Text>
-          <View style={[styles.statusPill, { backgroundColor: getStatusColor(transaction.status || 'COMPLETED') }]}>
-            <Text style={styles.statusText}>{getStatusText(transaction.status || 'COMPLETED')}</Text>
+      {/* Scrollable Content */}
+      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        {/* All transaction info in a single container with bg and border radius */}
+        <View style={styles.detailsOuterContainer}>
+          {/* Transaction Summary (amount, date, badge) */}
+          <View style={styles.summaryContainerInDetails}>
+            <Text style={styles.amountText}>
+              {formatAmount(transaction.amount, transaction.currency)}
+            </Text>
+            <Text style={styles.dateText}>
+              {formatDate(transaction.createdAt || new Date().toISOString())}
+            </Text>
+            <View style={[styles.statusPill, { backgroundColor: getStatusColor(transaction.status || 'COMPLETED') }]}>
+              <Text style={styles.statusText}>{getStatusText(transaction.status || 'COMPLETED')}</Text>
+            </View>
+          </View>
+          {/* Transaction Details */}
+          <View style={styles.detailsContainer}>
+                    {/* Show From/To based on transaction type */}
+          {transaction.type === 'DEPOSIT' ? (
+            <>
+              {renderDetailRow('From', transaction.source?.name || getSenderFromDescription(transaction.description))}
+              {renderDetailRow('From Acc. details', transaction.source?.accountNumber 
+                ? `${transaction.source.accountNumber} /${transaction.source.bankName || 'Unknown'}`
+                : 'External transfer'
+              )}
+            </>
+          ) : (
+            <>
+              {renderDetailRow('To', transaction.destination?.name || getRecipientFromDescription(transaction.description))}
+              {renderDetailRow('To Acc. details', transaction.destination?.accountNumber 
+                ? `${transaction.destination.accountNumber} /${transaction.destination.bankName || transaction.destination.provider || 'Unknown'}`
+                : 'External transfer'
+              )}
+            </>
+          )}
+                    {renderDetailRow('Transaction type', getTransactionTypeText(transaction.type))}
+          {renderDetailRow('Description', truncateDescription(transaction.description))}
+          {transaction.fee && (
+            typeof transaction.fee === 'object' && transaction.fee.amount > 0 ? (
+              renderDetailRow('Fee', formatAmount(transaction.fee.amount, transaction.fee.currency))
+            ) : typeof transaction.fee === 'number' && transaction.fee > 0 ? (
+              renderDetailRow('Fee', formatAmount(transaction.fee, 'NGN'))
+            ) : null
+          )}
+          {renderDetailRow('Transaction ID', truncateTransactionId(transaction.reference), true, true, true)}
           </View>
         </View>
-        {/* Transaction Details */}
-        <View style={styles.detailsContainer}>
-                  {/* Show From/To based on transaction type */}
-        {transaction.type === 'DEPOSIT' ? (
-          <>
-            {renderDetailRow('From', transaction.source?.name || getSenderFromDescription(transaction.description))}
-            {renderDetailRow('From Acc. details', transaction.source?.accountNumber 
-              ? `${transaction.source.accountNumber} /${transaction.source.bankName || 'Unknown'}`
-              : 'External transfer'
-            )}
-          </>
-        ) : (
-          <>
-            {renderDetailRow('To', transaction.destination?.name || getRecipientFromDescription(transaction.description))}
-            {renderDetailRow('To Acc. details', transaction.destination?.accountNumber 
-              ? `${transaction.destination.accountNumber} /${transaction.destination.bankName || transaction.destination.provider || 'Unknown'}`
-              : 'External transfer'
-            )}
-          </>
-        )}
-                  {renderDetailRow('Transaction type', getTransactionTypeText(transaction.type))}
-        {renderDetailRow('Description', truncateDescription(transaction.description))}
-        {transaction.fee && (
-          typeof transaction.fee === 'object' && transaction.fee.amount > 0 ? (
-            renderDetailRow('Fee', formatAmount(transaction.fee.amount, transaction.fee.currency))
-          ) : typeof transaction.fee === 'number' && transaction.fee > 0 ? (
-            renderDetailRow('Fee', formatAmount(transaction.fee, 'NGN'))
-          ) : null
-        )}
-        {renderDetailRow('Transaction ID', truncateTransactionId(transaction.reference), true, true, true)}
-        </View>
-      </View>
 
-      {/* Action Buttons */}
-      <View style={styles.actionsOuterContainer}>
-        <View style={styles.actionsContainerCustom}>
-          <TouchableOpacity style={styles.actionButton} onPress={handleShareReceipt}>
-            <View style={styles.actionIcon}>
-              <ShareIcon size={20} color="#FFFFFF" strokeWidth={1.5} />
-            </View>
-            <Text style={styles.actionText}>Share receipt</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.actionDivider} />
-          
-          <TouchableOpacity style={styles.actionButton} onPress={handleReportTransaction}>
-            <View style={styles.actionIcon}>
-              <AlertCircle size={20} color="#FFFFFF" strokeWidth={1.5} />
-            </View>
-            <Text style={styles.actionText}>Report Transaction</Text>
-          </TouchableOpacity>
+        {/* Action Buttons */}
+        <View style={styles.actionsOuterContainer}>
+          <View style={styles.actionsContainerCustom}>
+            <TouchableOpacity style={styles.actionButton} onPress={handleShareReceipt}>
+              <View style={styles.actionIcon}>
+                <ShareIcon size={20} color="#FFFFFF" strokeWidth={1.5} />
+              </View>
+              <Text style={styles.actionText}>Share receipt</Text>
+            </TouchableOpacity>
+            
+            <View style={styles.actionDivider} />
+            
+            <TouchableOpacity style={styles.actionButton} onPress={handleReportTransaction}>
+              <View style={styles.actionIcon}>
+                <AlertCircle size={20} color="#FFFFFF" strokeWidth={1.5} />
+              </View>
+              <Text style={styles.actionText}>Report Transaction</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -413,6 +417,9 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 40,
+  },
+  scrollContainer: {
+    flex: 1,
   },
   // Container for all transaction info (amount, date, badge, details)
   detailsOuterContainer: {
@@ -497,7 +504,6 @@ const styles = StyleSheet.create({
   },
   // Outer container for padding and alignment
   actionsOuterContainer: {
-    marginTop: 'auto',
     paddingHorizontal: 20,
     paddingBottom: 40,
   },
