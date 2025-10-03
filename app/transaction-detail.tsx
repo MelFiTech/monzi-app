@@ -133,6 +133,12 @@ export default function TransactionDetailScreen() {
         return 'Withdrawal';
       case 'TRANSFER':
         return 'Transfer';
+      case 'AIRTIME':
+      case 'AIRTIME_PURCHASE':
+        return 'Airtime Purchase';
+      case 'DATA':
+      case 'DATA_PURCHASE':
+        return 'Data Purchase';
       default:
         return 'Transaction';
     }
@@ -206,6 +212,42 @@ export default function TransactionDetailScreen() {
     return 'Unknown';
   };
 
+  // Get network from transaction metadata
+  const getNetwork = () => {
+    return (transaction.metadata as any)?.network || 'Unknown';
+  };
+
+  // Get phone number from transaction metadata
+  const getPhoneNumber = () => {
+    const phone = (transaction.metadata as any)?.phoneNumber;
+    if (!phone) return 'Unknown';
+    
+    // Normalize to +234 format
+    if (phone.startsWith('0')) {
+      return '+234' + phone.substring(1);
+    } else if (phone.startsWith('234')) {
+      return '+' + phone;
+    } else if (!phone.startsWith('+')) {
+      return '+234' + phone;
+    }
+    return phone;
+  };
+
+  // Get plan name for data/airtime transactions
+  const getPlanName = () => {
+    return (transaction.metadata as any)?.planName || 'Unknown Plan';
+  };
+
+  // Get provider from metadata
+  const getProvider = () => {
+    return (transaction.metadata as any)?.provider || 'Unknown';
+  };
+
+  // Get transaction type from metadata
+  const getMetadataTransactionType = () => {
+    return (transaction.metadata as any)?.transactionType || 'Unknown';
+  };
+
   const handleBackPress = () => {
     router.back();
   };
@@ -228,9 +270,18 @@ export default function TransactionDetailScreen() {
 
   const handleShareReceipt = async () => {
     try {
-      const fromToInfo = transaction.type === 'DEPOSIT' 
-        ? `From: ${transaction.source?.name || getSenderFromDescription(transaction.description)} (${transaction.source?.accountNumber ? `${transaction.source.accountNumber} - ${transaction.source.bankName || 'Unknown'}` : 'External transfer'})`
-        : `To: ${transaction.destination?.name || getRecipientFromDescription(transaction.description)} (${transaction.destination?.accountNumber ? `${transaction.destination.accountNumber} - ${transaction.destination.bankName || transaction.destination.provider || 'Unknown'}` : 'External transfer'})`;
+      let fromToInfo = '';
+      
+      if (transaction.type === 'DEPOSIT') {
+        fromToInfo = `From: ${transaction.source?.name || getSenderFromDescription(transaction.description)} (${transaction.source?.accountNumber ? `${transaction.source.accountNumber} - ${transaction.source.bankName || 'Unknown'}` : 'External transfer'})`;
+      } else if ((transaction.metadata as any)?.transactionType === 'DATA_PURCHASE' || (transaction.metadata as any)?.transactionType === 'AIRTIME_PURCHASE' || (transaction.metadata as any)?.network) {
+        const network = getNetwork();
+        const phoneNumber = getPhoneNumber();
+        const planName = getPlanName();
+        fromToInfo = `Network: ${network}\nPhone: ${phoneNumber}\nPlan: ${planName}`;
+      } else {
+        fromToInfo = `To: ${transaction.destination?.name || getRecipientFromDescription(transaction.description)} (${transaction.destination?.accountNumber ? `${transaction.destination.accountNumber} - ${transaction.destination.bankName || transaction.destination.provider || 'Unknown'}` : 'External transfer'})`;
+      }
       
       const message = `Transaction Receipt\n\nAmount: ${formatAmount(transaction.amount, transaction.currency)}\nDate: ${formatDate(transaction.createdAt || new Date().toISOString())}\nStatus: ${getStatusText(transaction.status || 'COMPLETED')}\n${fromToInfo}\nTransaction ID: ${transaction.reference || 'N/A'}\nDescription: ${truncateDescription(transaction.description)}`;
       
@@ -332,34 +383,40 @@ export default function TransactionDetailScreen() {
           </View>
           {/* Transaction Details */}
           <View style={styles.detailsContainer}>
-                    {/* Show From/To based on transaction type */}
-          {transaction.type === 'DEPOSIT' ? (
-            <>
-              {renderDetailRow('From', transaction.source?.name || getSenderFromDescription(transaction.description))}
-              {renderDetailRow('From Acc. details', transaction.source?.accountNumber 
-                ? `${transaction.source.accountNumber} /${transaction.source.bankName || 'Unknown'}`
-                : 'External transfer'
-              )}
-            </>
-          ) : (
-            <>
-              {renderDetailRow('To', transaction.destination?.name || getRecipientFromDescription(transaction.description))}
-              {renderDetailRow('To Acc. details', transaction.destination?.accountNumber 
-                ? `${transaction.destination.accountNumber} /${transaction.destination.bankName || transaction.destination.provider || 'Unknown'}`
-                : 'External transfer'
-              )}
-            </>
-          )}
-                    {renderDetailRow('Transaction type', getTransactionTypeText(transaction.type))}
-          {renderDetailRow('Description', truncateDescription(transaction.description))}
-          {transaction.fee && (
-            typeof transaction.fee === 'object' && transaction.fee.amount > 0 ? (
-              renderDetailRow('Fee', formatAmount(transaction.fee.amount, transaction.fee.currency))
-            ) : typeof transaction.fee === 'number' && transaction.fee > 0 ? (
-              renderDetailRow('Fee', formatAmount(transaction.fee, 'NGN'))
-            ) : null
-          )}
-          {renderDetailRow('Transaction ID', truncateTransactionId(transaction.reference), true, true, true)}
+            {/* Show details based on transaction type */}
+            {transaction.type === 'DEPOSIT' ? (
+              <>
+                {renderDetailRow('From', transaction.source?.name || getSenderFromDescription(transaction.description))}
+                {renderDetailRow('From Acc. details', transaction.source?.accountNumber 
+                  ? `${transaction.source.accountNumber} /${transaction.source.bankName || 'Unknown'}`
+                  : 'External transfer'
+                )}
+              </>
+            ) : ((transaction.metadata as any)?.transactionType === 'DATA_PURCHASE' || (transaction.metadata as any)?.transactionType === 'AIRTIME_PURCHASE' || (transaction.metadata as any)?.network) ? (
+              <>
+                {renderDetailRow('Network', getNetwork())}
+                {renderDetailRow('Phone Number', getPhoneNumber())}
+                {renderDetailRow('Plan', getPlanName())}
+              </>
+            ) : (
+              <>
+                {renderDetailRow('To', transaction.destination?.name || getRecipientFromDescription(transaction.description))}
+                {renderDetailRow('To Acc. details', transaction.destination?.accountNumber 
+                  ? `${transaction.destination.accountNumber} /${transaction.destination.bankName || transaction.destination.provider || 'Unknown'}`
+                  : 'External transfer'
+                )}
+              </>
+            )}
+            {renderDetailRow('Transaction type', getTransactionTypeText((transaction.metadata as any)?.transactionType || transaction.type))}
+            {!((transaction.metadata as any)?.transactionType === 'DATA_PURCHASE' || (transaction.metadata as any)?.transactionType === 'AIRTIME_PURCHASE' || (transaction.metadata as any)?.network) && renderDetailRow('Description', truncateDescription(transaction.description))}
+            {transaction.fee && (
+              typeof transaction.fee === 'object' && transaction.fee.amount > 0 ? (
+                renderDetailRow('Fee', formatAmount(transaction.fee.amount, transaction.fee.currency))
+              ) : typeof transaction.fee === 'number' && transaction.fee > 0 ? (
+                renderDetailRow('Fee', formatAmount(transaction.fee, 'NGN'))
+              ) : null
+            )}
+            {renderDetailRow('Transaction ID', truncateTransactionId(transaction.reference), true, true, true)}
           </View>
         </View>
 
