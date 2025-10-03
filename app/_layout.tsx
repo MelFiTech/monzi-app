@@ -60,13 +60,13 @@ export default function RootLayout() {
   // Load other fonts
   const [otherLoaded, otherError] = useFonts({
     // Clash Display Local Fonts for headers
-    'ClashDisplay-Regular': require('@/assets/fonts/ClashDisplay-Regular.otf'),
-    'ClashDisplay-Medium': require('@/assets/fonts/ClashDisplay-Medium.otf'),
-    'ClashDisplay-Semibold': require('@/assets/fonts/ClashDisplay-Semibold.otf'),
-    'ClashDisplay-Bold': require('@/assets/fonts/ClashDisplay-Bold.otf'),
+    'ClashDisplay-Regular': require('../assets/fonts/ClashDisplay-Regular.otf'),
+    'ClashDisplay-Medium': require('../assets/fonts/ClashDisplay-Medium.otf'),
+    'ClashDisplay-Semibold': require('../assets/fonts/ClashDisplay-Semibold.otf'),
+    'ClashDisplay-Bold': require('../assets/fonts/ClashDisplay-Bold.otf'),
     
     // Keep existing fonts
-    SpaceMono: require('@/assets/fonts/SpaceMono-Regular.ttf'),
+    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     ...FontAwesome.font,
   });
 
@@ -217,7 +217,7 @@ function GlobalAppPrivacyOverlay() {
             alignItems: 'center',
           }}>
             <Image 
-              source={require('@/assets/splash/splash.png')}
+              source={require('../assets/splash/splash.png')}
               style={{
                 width: '80%',
                 height: '80%',

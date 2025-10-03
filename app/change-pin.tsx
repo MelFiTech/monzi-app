@@ -240,6 +240,7 @@ const styles = StyleSheet.create({
   titleContainer: {
     paddingHorizontal: 24,
     marginBottom: 20,
+    marginTop: -20,
   },
   title: {
     fontSize: fontSizes.xl,

@@ -10,8 +10,8 @@ import {
   Image,
 } from 'react-native';
 import { router } from 'expo-router';
-import { useTheme } from '@/providers/ThemeProvider';
-import { fontFamilies, fontSizes } from '@/constants/fonts';
+import { useTheme } from '../providers/ThemeProvider';
+import { fontFamilies, fontSizes } from '../constants/fonts';
 
 export default function SecurityModal() {
   const { colors } = useTheme();
@@ -89,21 +89,21 @@ export default function SecurityModal() {
         {/* Content */}
         <View style={styles.content}>
           <SecurityOption
-            icon={require('@/assets/icons/security/pin.png')}
+            icon={require('../assets/icons/security/pin.png')}
             title="Change Transaction PIN"
             subtitle="You use this PIN for transactions"
             onPress={handleChangeTransactionPIN}
           />
 
           <SecurityOption
-            icon={require('@/assets/icons/security/lock.png')}
+            icon={require('../assets/icons/security/lock.png')}
             title="Change Passcode"
             subtitle="You use this passcode to log in"
             onPress={handleChangePassword}
           />
 
           <SecurityOption
-            icon={require('@/assets/icons/security/delete.png')}
+            icon={require('../assets/icons/security/delete-account.png')}
             title="Delete Account"
             onPress={handleDeleteAccount}
             isDestructive={true}

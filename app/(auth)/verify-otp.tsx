@@ -170,7 +170,7 @@ export default function VerifyOTPScreen() {
       <View style={containerStyles.header}>
         <TouchableOpacity onPress={handleClose} style={containerStyles.closeButton}>
           <Image 
-            source={require('@/assets/icons/auth/arrow-left.png')}
+            source={require('../../assets/icons/auth/arrow-left.png')}
             style={{width: 24, height: 24, tintColor: '#FFFFFF'}}
           />
         </TouchableOpacity>

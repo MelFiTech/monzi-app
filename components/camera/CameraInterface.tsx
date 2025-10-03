@@ -67,7 +67,7 @@ export default function CameraInterface({
         >
           <View style={styles.splashOverlay}>
             <Image 
-              source={require('@/assets/splash/splash.png')}
+              source={require('../../assets/splash/splash.png')}
               style={styles.splashImage}
               resizeMode="contain"
             />
@@ -101,7 +101,7 @@ export default function CameraInterface({
         >
           <View style={styles.instructionsBubble}>
             <Image 
-              source={require('@/assets/icons/home/scan.png')}
+              source={require('../../assets/icons/home/scan.png')}
               style={styles.scanIcon}
             />
             <Text style={styles.centerInstructionsText}>

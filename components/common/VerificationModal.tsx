@@ -33,7 +33,7 @@ export default function VerificationModal({
   description = "Complete account verification with a selfie and your BVN to start using \n Monzi",
   buttonText = "Verify ID",
   loading = false,
-  icon = require('@/assets/images/verify/shield.png')
+  icon = require('../../assets/images/verify/shield.png')
 }: VerificationModalProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];

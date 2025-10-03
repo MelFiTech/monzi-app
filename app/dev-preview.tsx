@@ -258,7 +258,7 @@ export default function DevPreviewScreen() {
       {/* Keyboard Floating Button - Right Side - For manual bank entry */}
       {backendChecks.isAuthenticated && backendChecks.kycStatus?.isVerified && (
         <FloatingButton
-          icon={<Image source={require('@/assets/icons/home/keyboard.png')} style={{ width: 24, height: 24 }} />}
+          icon={<Image source={require('../assets/icons/home/keyboard.png')} style={{ width: 24, height: 24 }} />}
           onPress={() => {
             console.log('⌨️ [DevPreview] Keyboard button pressed');
             cameraLogic.handleManualBankTransfer();
@@ -285,7 +285,7 @@ export default function DevPreviewScreen() {
         >
           <View style={styles.splashOverlay}>
             <Image 
-              source={require('@/assets/splash/splash.png')}
+              source={require('../assets/splash/splash.png')}
               style={styles.splashImage}
               resizeMode="contain"
             />

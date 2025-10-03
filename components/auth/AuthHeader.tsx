@@ -48,7 +48,7 @@ export function AuthHeader({
           />
         ) : (
           <Image
-            source={require('@/assets/icons/auth/arrow-left.png')}
+            source={require('../../assets/icons/auth/arrow-left.png')}
             style={{
               width: iconSize,
               height: iconSize,
