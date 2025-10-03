@@ -44,7 +44,7 @@ export default function DeleteAccountScreen() {
             <View style={styles.sectionHeader}>
               <View style={styles.iconContainer}>
                 <Image 
-                  source={require('../assets/icons/security/delete.png')}
+                  source={require('../assets/icons/security/delete-account.png')}
                   style={styles.sectionIcon}
                   resizeMode="contain"
                 />
