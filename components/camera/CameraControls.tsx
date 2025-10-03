@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, Image, Dimensions, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ChevronUp, ChevronDown } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { fontFamilies } from '@/constants/fonts';
 import TransactionList from '@/components/common/TransactionList';
 import { Transaction } from '@/components/common/TransactionListItem';
@@ -79,15 +80,49 @@ export default function CameraControls({
     }
   }, [showTransactionHistory]);
 
-  const renderFlashIcon = () => {
-    switch (flashMode) {
-      case 'on':
-        return <Image source={require('@/assets/icons/home/flash-on.png')} style={{ width: 24, height: 24, tintColor: '#FFFFFF' }} />;
-      case 'auto':
-        return <Image source={require('@/assets/icons/home/flash-on.png')} style={{ width: 24, height: 24, tintColor: '#FFFFFF', opacity: 0.5 }} />;
+  const getZoomLabel = () => {
+    switch (zoom) {
+      case 0.1:
+        return '0.9x';
+      case 0.2:
+        return '1x';
+      case 0.3:
+        return '1.1x';
       default:
-        return <Image source={require('@/assets/icons/home/flash-off.png')} style={{ width: 24, height: 24, tintColor: '#FFFFFF' }} />;
+        return '1x';
     }
+  };
+
+  const handleZoomCycle = () => {
+    // Add haptic feedback
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    // Cycle through zoom levels: 0.9x → 1x → 1.1x → 0.9x
+    if (zoom === 0.1) {
+      onZoomChange(0.2);
+    } else if (zoom === 0.2) {
+      onZoomChange(0.3);
+    } else {
+      onZoomChange(0.1);
+    }
+  };
+
+  const handleCapture = () => {
+    // Add heavy haptic feedback for capture
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    onCapture();
+  };
+
+  const handleGallery = () => {
+    // Add haptic feedback
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onOpenGallery();
+  };
+
+  const handleViewHistory = () => {
+    // Add haptic feedback
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onViewHistory();
   };
 
   // Check if capture should be disabled
@@ -98,7 +133,7 @@ export default function CameraControls({
 
   return (
     <>
-      {/* Dark Overlay for Transaction History */}
+      {/* Dark Overlay for Transaction History - Only covers background, not transaction list */}
       <Animated.View
         style={[
           styles.darkOverlay,
@@ -109,7 +144,7 @@ export default function CameraControls({
             }),
           }
         ]}
-        pointerEvents={showTransactionHistory ? 'auto' : 'none'}
+        pointerEvents="none" // Allow touches to pass through to transaction list
       />
 
       {/* Bottom Controls Container */}
@@ -117,8 +152,8 @@ export default function CameraControls({
         colors={['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0.75)']}
         style={[styles.bottomContainer, showTransactionHistory && styles.bottomContainerPushedUp]}
       >
-        {/* Zoom Controls */}
-        <View style={styles.zoomContainer}>
+        {/* Zoom Controls - Commented out */}
+        {/* <View style={styles.zoomContainer}>
           <View style={styles.zoomPill}>
             <TouchableOpacity
               style={[styles.zoomButton, zoom === 0.1 && styles.zoomButtonActive]}
@@ -150,24 +185,24 @@ export default function CameraControls({
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </View> */}
 
         {/* Bottom Controls */}
         <View style={[styles.bottomControls, { opacity: (isConnectionDisabled || showTransactionHistory) ? 0.3 : 1 }]}>
-          {/* Flash Button */}
+          {/* Zoom Button (Circular) */}
           <TouchableOpacity
-            style={styles.flashButton}
-            onPress={onToggleFlash}
+            style={styles.zoomButton}
+            onPress={handleZoomCycle}
             disabled={isConnectionDisabled || showTransactionHistory}
           >
             <View style={styles.controlButton}>
-              {renderFlashIcon()}
+              <Text style={styles.zoomButtonText}>{getZoomLabel()}</Text>
             </View>
           </TouchableOpacity>
 
           {/* Capture Button */}
           <TouchableOpacity
-            onPress={onCapture}
+            onPress={handleCapture}
             disabled={isCaptureDisabled}
             style={[
               styles.captureButton,
@@ -201,7 +236,7 @@ export default function CameraControls({
           {/* Gallery Button */}
           <TouchableOpacity
             style={styles.galleryButton}
-            onPress={onOpenGallery}
+            onPress={handleGallery}
             disabled={isConnectionDisabled || showTransactionHistory}
           >
             <View style={styles.controlButton}>
@@ -213,7 +248,7 @@ export default function CameraControls({
         {/* View History */}
         <TouchableOpacity
           style={styles.viewHistoryButton}
-          onPress={onViewHistory}
+          onPress={handleViewHistory}
           activeOpacity={0.7}
         >
           <View style={styles.viewHistoryContent}>
@@ -229,18 +264,21 @@ export default function CameraControls({
         </TouchableOpacity>
 
         {/* Animated Transaction History - Under View History Button */}
-        <Animated.View style={[
-          styles.transactionHistoryContainer,
-          {
-            height: slideAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0, SCREEN_HEIGHT * 0.60],
-            }),
-            opacity: slideAnim,
-          }
-        ]}>
+        <Animated.View 
+          style={[
+            styles.transactionHistoryContainer,
+            {
+              height: slideAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, SCREEN_HEIGHT * 0.60],
+              }),
+              opacity: slideAnim,
+            }
+          ]}
+          pointerEvents={showTransactionHistory ? 'auto' : 'none'}
+        >
           <LinearGradient
-            colors={['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0.35, 0.75)']}
+            colors={['rgba(0, 0, 0, 0)', 'rgb(0, 0, 0)']}
             style={styles.transactionHistoryGradient}
           >
             <View style={styles.transactionListContainer}>
@@ -248,17 +286,18 @@ export default function CameraControls({
                 transactions={recentTransactions}
                 onTransactionPress={onTransactionPress}
                 loading={loading}
-                refreshing={false}
-                onRefresh={undefined}
-                onEndReached={undefined}
-                hasMoreData={false}
-                scrollEnabled={false}
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                onEndReached={onEndReached}
+                hasMoreData={hasMoreData}
+                scrollEnabled={true}
               />
             </View>
 
             <TouchableOpacity
               style={styles.requestStatementButton}
               onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 ToastService.success('Feature coming soon');
                 onRequestStatement?.();
               }}
@@ -282,42 +321,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'rgb(0, 0, 0)',
-  },
-  zoomContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  zoomPill: {
-    width: 130,
-    height: 50,
-    backgroundColor: 'rgba(26, 26, 26, 0.5)',
-    borderRadius: 100,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-evenly',
-    padding: 4,
-  },
-  zoomButton: {
-    height: 36,
-    width: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 18,
-  },
-  zoomButtonActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  zoomButtonText: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontFamily: fontFamilies.sora.semiBold,
-    fontWeight: '600',
-  },
-  zoomButtonTextActive: {
-    color: '#FFE66C',
-    fontWeight: '700',
+    zIndex: 20, // Behind transaction history but above suggestion strip
   },
   bottomContainer: {
     position: 'absolute',
@@ -326,6 +330,7 @@ const styles = StyleSheet.create({
     right: 0,
     paddingBottom: 40,
     paddingTop: 190,
+    zIndex: 30, // Higher than suggestion strip and banner
   },
   bottomContainerPushedUp: {
     bottom: 0,
@@ -339,8 +344,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 60,
     paddingVertical: 20,
   },
-  flashButton: {
-    padding: 8,
+  zoomButton: {
+    padding: 4,
+    borderRadius: 100,
+    backgroundColor: 'rgba(47, 47, 47, 0.21)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0)',
+  },
+  zoomButtonText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontFamily: fontFamilies.sora.semiBold,
+    fontWeight: '600',
   },
   galleryButton: {
     padding: 8,
@@ -406,6 +421,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginTop: -20, // Changed from 10 to -20 to move transaction list up
     marginBottom: 20,
+    zIndex: 100, // Highest z-index to ensure it's on top
   },
   transactionHistoryGradient: {
     flex: 1,

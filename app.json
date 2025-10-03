@@ -60,7 +60,10 @@
         {
           "cameraPermissionText": "Monzi uses the camera to capture selfies for KYC verification and to scan payment account numbers for quick and accurate money transfers."
         }
-      ]
+      ],
+      "expo-font",
+      "expo-secure-store",
+      "expo-web-browser"
     ],
     "notification": {
       "icon": "./assets/images/icon.png",

@@ -150,11 +150,15 @@ function RootLayoutNav() {
                   <Stack.Screen name="index" options={{ headerShown: false }} />
                   <Stack.Screen name="(auth)" options={{ headerShown: false }} />
                   <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen name="dev-preview" options={{ headerShown: false }} />
                   <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: false }} />
-                  <Stack.Screen name="qr-modal" options={{ presentation: 'modal', headerShown: false }} />
                   <Stack.Screen name="profile" options={{ headerShown: false }} />
                   <Stack.Screen name="transfer" options={{ headerShown: false }} />
                   <Stack.Screen name="transfer-success" options={{ headerShown: false }} />
+        <Stack.Screen name="bill-success" options={{ headerShown: false }} />
+        <Stack.Screen name="airtime-modal" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="data-modal" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="referral-modal" options={{ presentation: 'modal', headerShown: false }} />
                   <Stack.Screen name="transfer-loader" options={{ headerShown: false }} />
                   <Stack.Screen name="transaction-detail" options={{ headerShown: false }} />
                   <Stack.Screen name="(kyc)" options={{ headerShown: false, gestureEnabled: false }} />

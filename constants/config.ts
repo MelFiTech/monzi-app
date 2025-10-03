@@ -9,8 +9,8 @@ export const Config = {
     // Production URL for render.com
     PRODUCTION_URL: 'https://monzi-backend.onrender.com',
 
-    // Development URL (ngrok tunnel)
-    DEVELOPMENT_URL: process.env.EXPO_PUBLIC_DEV_API_URL || 'https://0aeda17d0c59.ngrok-free.app',
+    // Development URL (local IP) - UPDATED
+    DEVELOPMENT_URL: process.env.EXPO_PUBLIC_DEV_API_URL || 'http://172.20.10.4:3000',
 
     // Get the appropriate base URL based on environment
     getBaseUrl(): string {

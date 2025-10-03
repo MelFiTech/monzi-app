@@ -28,7 +28,14 @@ export { default as LocationCapture } from './LocationCapture';
 export { default as LocationSuggestionModal } from './LocationSuggestionModal';
 export { default as LocationFloatingButton } from './LocationFloatingButton';
 export { default as PaymentSuggestionCard } from './PaymentSuggestionCard';
+export { PaymentSuggestionStripCard } from './PaymentSuggestionStripCard';
 export { default as FloatingButton } from './FloatingButton';
+export { SuggestionStrip } from './SuggestionStrip';
+export { Pill } from './Pill';
+export { ActionStrip } from './ActionStrip';
+export { HeaderCard } from './HeaderCard';
+export { Banner } from './Banner';
+export { default as DataPlanDropdown } from './DataPlanDropdown';
 
 export type { Transaction } from './TransactionListItem';
 export type { PaymentSuggestion, LocationMatch } from '@/services/LocationService';

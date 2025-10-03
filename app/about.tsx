@@ -1,4 +1,4 @@
-        import React from 'react';
+        import React, { useEffect, useRef } from 'react';
         import {
         StyleSheet,
         View,
@@ -9,11 +9,66 @@
         TouchableOpacity,
         StatusBar,
         Linking,
+        Animated,
+        Easing,
         } from 'react-native';
         import { router } from 'expo-router';
         import { fontFamilies } from '@/constants/fonts';
 
         export default function AboutScreen() {
+        const pulseAnim = useRef(new Animated.Value(1)).current;
+        const rotateAnim = useRef(new Animated.Value(0)).current;
+        const opacityAnim = useRef(new Animated.Value(0.6)).current;
+
+        useEffect(() => {
+            // Pulse animation
+            const pulse = Animated.sequence([
+                Animated.timing(pulseAnim, {
+                    toValue: 1.2,
+                    duration: 3000,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(pulseAnim, {
+                    toValue: 1,
+                    duration: 3000,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                })
+            ]);
+
+            // Rotation animation
+            const rotate = Animated.loop(
+                Animated.timing(rotateAnim, {
+                    toValue: 1,
+                    duration: 20000,
+                    easing: Easing.linear,
+                    useNativeDriver: true,
+                })
+            );
+
+            // Opacity breathing effect
+            const opacity = Animated.sequence([
+                Animated.timing(opacityAnim, {
+                    toValue: 0.9,
+                    duration: 2500,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(opacityAnim, {
+                    toValue: 0.6,
+                    duration: 2500,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                })
+            ]);
+
+            // Start all animations
+            Animated.loop(pulse).start();
+            rotate.start();
+            Animated.loop(opacity).start();
+        }, []);
+
         const handleBack = () => {
             router.back();
         };
@@ -53,9 +108,20 @@
                 <View style={styles.content}>
                     {/* Logo Section */}
                     <View style={styles.logoContainer}>
-                    <Image
+                    <Animated.Image
                         source={require('@/assets/icons/profile/about/glow.png')}
-                        style={styles.glow}
+                        style={[styles.glow, {
+                            transform: [
+                                { scale: pulseAnim },
+                                { 
+                                    rotate: rotateAnim.interpolate({
+                                        inputRange: [0, 1],
+                                        outputRange: ['0deg', '360deg']
+                                    })
+                                }
+                            ],
+                            opacity: opacityAnim
+                        }]}
                     />
                     </View>
 
@@ -131,11 +197,11 @@
             position: 'relative',
         },
         glow: {
-            width: 580,
-            height: 580,
+            width: 900,
+            height: 900,
             position: 'absolute',
-            marginTop: 250,
-            marginBottom: 100,
+            marginTop: 200,
+            marginBottom: 50,
         },
         textContent: {
             alignItems: 'center',

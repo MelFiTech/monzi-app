@@ -259,7 +259,7 @@ export function CameraHeader({
   });
 
   const handleAddPress = () => {
-    router.push('/qr-modal');
+    router.push('/referral-modal');
   };
 
   const handleModalPress = () => {
@@ -406,7 +406,7 @@ export function CameraHeader({
         <View style={styles.rightSection}>
           <TouchableOpacity style={styles.iconButton} onPress={handleAddPress}>
             <Image 
-              source={require('@/assets/icons/home/qr.png')}
+              source={require('@/assets/icons/home/gift.png')}
               style={{width: 20, height: 24}}
               tintColor="#FFFFFF"
             />
@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
   balanceContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   walletAmount: {
     fontSize: 32,

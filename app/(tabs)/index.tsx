@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -15,14 +15,16 @@ import { router } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/providers/AuthProvider';
 import { CameraHeader } from '@/components/layout';
-import { PulsatingGlow, Transaction, LocationSuggestionModal, LocationFloatingButton, FloatingButton } from '@/components/common';
+import { PulsatingGlow, Transaction, LocationSuggestionModal, LocationFloatingButton, FloatingButton, ActionStrip, Pill, SuggestionStrip, HeaderCard, Banner } from '@/components/common';
+import { FontAwesome } from '@expo/vector-icons';
 import { CameraPermissions, CameraInterface, CameraControls, CameraModals, ExtractionLoader } from '@/components/camera';
 import { useCameraLogic } from '@/hooks/useCameraLogic';
 import { useBackendChecks } from '@/hooks/useBackendChecks';
 import { useNotificationService } from '@/hooks/useNotificationService';
 import { usePushNotificationService } from '@/hooks/usePushNotificationService';
 import { useWebSocketCacheIntegration } from '@/hooks/useWalletService';
-import { useGetCurrentLocation } from '@/hooks/useLocationService';
+import { useGetCurrentLocation, usePreciseLocationSuggestions, useNearbyLocationSuggestions } from '@/hooks/useLocationService';
+import { PaymentSuggestion } from '@/services/LocationService';
 import { useWebSocketLocationService } from '@/hooks/useWebSocketLocationService';
 import { fontFamilies } from '@/constants/fonts';
 import ToastService from '@/services/ToastService';
@@ -43,6 +45,58 @@ export default function CameraScreen() {
   const [isLocationButtonLoading, setIsLocationButtonLoading] = useState(false);
   const getLocationMutation = useGetCurrentLocation();
 
+  // Get precise location suggestions (when business name is provided)
+  const {
+    data: preciseMatch,
+    isLoading: isPreciseLoading,
+    error: preciseError,
+  } = usePreciseLocationSuggestions(
+    currentLocation?.latitude || null,
+    currentLocation?.longitude || null,
+    'Business' // Default business name
+  );
+
+  // Get nearby location suggestions (when no business name is provided)
+  const {
+    data: nearbyLocations,
+    isLoading: isNearbyLoading,
+    error: nearbyError,
+  } = useNearbyLocationSuggestions(
+    currentLocation?.latitude || null,
+    currentLocation?.longitude || null,
+    1000 // 1km radius
+  );
+
+  // Suggestion strip state
+  const [showSuggestions, setShowSuggestions] = useState(true);
+  const [suggestions, setSuggestions] = useState<PaymentSuggestion[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+
+
+  // Action strip state - using useMemo to ensure actions are reactive
+  const actions = useMemo(() => [
+    {
+      id: 'airtime',
+      title: 'Airtime',
+      iconName: 'phone' as keyof typeof FontAwesome.glyphMap,
+      onPress: () => {
+        console.log('🎯 Airtime pressed - Opening airtime modal');
+        router.push('/airtime-modal');
+      },
+      active: false,
+    },
+    {
+      id: 'data',
+      title: 'Data',
+      iconName: 'wifi' as keyof typeof FontAwesome.glyphMap,
+      onPress: () => {
+        console.log('🎯 Data pressed - Opening data modal');
+        router.push('/data-modal');
+      },
+      active: false,
+    }
+  ], []);
+
   // Location watching state
   const [isLocationWatching, setIsLocationWatching] = useState(false);
   const locationWatcherRef = useRef<Location.LocationSubscription | null>(null);
@@ -58,6 +112,27 @@ export default function CameraScreen() {
 
   // Use custom hooks for logic separation
   const cameraLogic = useCameraLogic();
+
+  // Process location suggestions for suggestion strip
+  useEffect(() => {
+    // Extract payment suggestions from locations
+    const preciseSuggestions = preciseMatch?.paymentSuggestions || [];
+    const nearbySuggestions = nearbyLocations?.flatMap(location => location.paymentSuggestions) || [];
+    
+    // Use precise suggestions if available, otherwise use nearby suggestions
+    const allSuggestions = preciseSuggestions.length > 0 ? preciseSuggestions : nearbySuggestions;
+    
+    // Update suggestions state
+    setSuggestions(allSuggestions);
+    setIsLoadingSuggestions(isPreciseLoading || isNearbyLoading);
+    
+    console.log('📍 [CameraScreen] Suggestions updated:', {
+      preciseCount: preciseSuggestions.length,
+      nearbyCount: nearbySuggestions.length,
+      totalCount: allSuggestions.length,
+      isLoading: isPreciseLoading || isNearbyLoading
+    });
+  }, [preciseMatch, nearbyLocations, isPreciseLoading, isNearbyLoading]);
 
   // Initialize backend checks after delay (skip delay for fresh registration)
   useEffect(() => {
@@ -135,6 +210,8 @@ export default function CameraScreen() {
       console.log('❌ Backend checks DISABLED - modal shown or in KYC flow');
     }
   }, [shouldRunBackendChecks, cameraLogic.showVerificationModal, cameraLogic.isInKYCFlow, backendChecksStarted, cameraLogic.isFreshRegistration]);
+
+
 
   const backendChecks = useBackendChecks({
     enabled: shouldRunBackendChecks,
@@ -360,22 +437,18 @@ export default function CameraScreen() {
                 'Unknown'
               );
 
-              // Only show modal if payment details found and modal wasn't dismissed
-              const isModalMinimized = await AsyncStorage.getItem('location_modal_minimized');
-              const wasManuallyDismissed = isModalMinimized === 'true';
-
+              // Update suggestion strip with payment details
               if (preciseMatch && preciseMatch.paymentSuggestions && preciseMatch.paymentSuggestions.length > 0) {
-                setLocationPaymentData(preciseMatch);
+                // Store new location
+                await AsyncStorage.setItem('last_location', JSON.stringify(newLocation));
                 setCurrentLocation(newLocation);
-                
-                if (!wasManuallyDismissed) {
-                  setShowLocationSuggestion(true);
-                  console.log('📍 [CameraScreen] Location change: Payment details found and modal shown');
-                } else {
-                  console.log('📍 [CameraScreen] Location change: Payment details found but modal was dismissed');
-                }
+                setSuggestions(preciseMatch.paymentSuggestions);
+                setShowSuggestions(true);
+                console.log('📍 [CameraScreen] Location change: Payment details found and suggestion strip shown');
               } else {
                 console.log('📍 [CameraScreen] Location change: No payment details available');
+                setSuggestions([]);
+                setShowSuggestions(false);
               }
             } catch (error) {
               console.log('⚠️ [CameraScreen] Location change check failed:', error);
@@ -403,7 +476,7 @@ export default function CameraScreen() {
     }
   };
 
-  // Location suggestion logic - check for location changes on app load
+  // Location suggestion logic - Now works with suggestion strip instead of modal
   useEffect(() => {
     const checkLocationSuggestion = async () => {
       // Check location suggestions immediately after backend checks complete successfully
@@ -412,26 +485,15 @@ export default function CameraScreen() {
       // 2. All backend checks are complete (wallet details check succeeded)
       // 3. Not in KYC flow
       // 4. Not showing verification modal
-      // 5. Not already showing modal
-      // 6. Modal hasn't been manually dismissed by user
       if (
         backendChecks.isAuthenticated &&
         backendChecks.kycStatus?.isVerified &&
         cameraLogic.areAllChecksComplete &&
         !cameraLogic.isInKYCFlow &&
-        !cameraLogic.showVerificationModal &&
-        !showLocationSuggestion
+        !cameraLogic.showVerificationModal
       ) {
-        console.log('📍 [CameraScreen] Backend checks complete, checking location suggestions...');
+        console.log('📍 [CameraScreen] Backend checks complete, checking location suggestions for strip...');
         
-        // Check if user has manually dismissed the modal in this session
-        const isModalMinimized = await AsyncStorage.getItem('location_modal_minimized');
-        const wasManuallyDismissed = isModalMinimized === 'true';
-        
-        if (wasManuallyDismissed) {
-          console.log('📍 [CameraScreen] Modal was manually dismissed in this session, skipping auto-show');
-          return;
-        }
         try {
           // Get current location
           const location = await getLocationMutation.mutateAsync();
@@ -450,7 +512,7 @@ export default function CameraScreen() {
               await AsyncStorage.setItem('last_location', JSON.stringify(location));
               setCurrentLocation(location);
               
-              // Pre-fetch payment details in background
+              // Pre-fetch payment details for suggestion strip
               try {
                 const LocationService = (await import('@/services/LocationService')).default;
                 const locationService = LocationService.getInstance();
@@ -460,23 +522,24 @@ export default function CameraScreen() {
                   'Unknown' // We don't have business name, so use 'Unknown'
                 );
                 
-                // Store payment data for faster modal loading
-                if (preciseMatch && preciseMatch.paymentSuggestions && preciseMatch.paymentSuggestions.length > 0) {
-                  setLocationPaymentData(preciseMatch);
-                  setShowLocationSuggestion(true);
-                  console.log('📍 [CameraScreen] Payment details found and modal shown for:', location);
+                // Update suggestions for strip
+                const preciseSuggestions = preciseMatch?.paymentSuggestions || [];
+                if (preciseSuggestions.length > 0) {
+                  setSuggestions(preciseSuggestions);
+                  setShowSuggestions(true);
+                  console.log('📍 [CameraScreen] Payment details found and suggestion strip shown for:', location);
                 } else {
                   console.log('📍 [CameraScreen] No payment details available for location:', location);
-                  setLocationPaymentData(null);
-                  // Don't show modal if no payment details
+                  setSuggestions([]);
+                  setShowSuggestions(false);
                 }
               } catch (apiError) {
                 console.log('⚠️ [CameraScreen] Failed to check payment details:', apiError);
-                setLocationPaymentData(null);
-                // Don't show modal if API call fails
+                setSuggestions([]);
+                setShowSuggestions(false);
               }
             } else {
-              console.log('📍 [CameraScreen] Same location detected, not showing suggestion');
+              console.log('📍 [CameraScreen] Same location detected, not updating suggestions');
             }
           }
         } catch (error) {
@@ -493,11 +556,11 @@ export default function CameraScreen() {
     backendChecks.kycStatus?.isVerified,
     cameraLogic.areAllChecksComplete,
     cameraLogic.isInKYCFlow,
-    cameraLogic.showVerificationModal,
-    showLocationSuggestion
+    cameraLogic.showVerificationModal
   ]);
 
   // Start location watching when backend checks complete and user is verified
+  // Now works with suggestion strip instead of modal
   useEffect(() => {
     if (
       backendChecks.isAuthenticated &&
@@ -507,7 +570,7 @@ export default function CameraScreen() {
       !cameraLogic.showVerificationModal &&
       !isLocationWatching
     ) {
-      console.log('📍 [CameraScreen] Backend checks complete, starting location watching...');
+      console.log('📍 [CameraScreen] Backend checks complete, starting location watching for suggestion strip...');
       startLocationWatching();
     }
   }, [
@@ -545,6 +608,7 @@ export default function CameraScreen() {
   ]);
 
   // Stop location watching when app goes to background or user is not verified
+  // Now works with suggestion strip instead of modal
   useEffect(() => {
     if (
       !backendChecks.isAuthenticated ||
@@ -583,6 +647,7 @@ export default function CameraScreen() {
   ]);
 
   // Cleanup location watching on component unmount
+  // Now works with suggestion strip instead of modal
   useEffect(() => {
     return () => {
       stopLocationWatching();
@@ -604,21 +669,46 @@ export default function CameraScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header - Hide when transaction history is open */}
-      {!cameraLogic.showTransactionHistory && <CameraHeader />}
-
-      {/* Camera Interface - Always show but blur when app is in background */}
-      <CameraInterface
+      {/* Header Card with Camera Interface */}
+      <HeaderCard
+        actions={actions}
+        // Camera interface props
         cameraRef={cameraLogic.cameraRef}
         cameraType={cameraLogic.cameraType}
-        flashMode={cameraLogic.flashMode}
         zoom={cameraLogic.zoom}
+        flashMode={cameraLogic.flashMode}
         zoomAnimation={cameraLogic.zoomAnimation}
         showInstructions={cameraLogic.showInstructions}
         instructionAnimation={cameraLogic.instructionAnimation}
+        isCapturing={cameraLogic.isCapturing}
         isProcessing={cameraLogic.isProcessing}
         dimViewfinderRings={cameraLogic.showTransactionHistory}
         isAppInBackground={cameraLogic.isAppInBackground}
+        onZoomChange={cameraLogic.handleZoomChange}
+        onToggleFlash={cameraLogic.toggleFlash}
+        onCapture={cameraLogic.handleCapture}
+        onOpenGallery={cameraLogic.openGallery}
+        onViewHistory={cameraLogic.handleViewHistory}
+        isConnectionDisabled={!cameraLogic.areAllChecksComplete || !backendChecks.isAuthenticated || !backendChecks.kycStatus?.isVerified}
+        showTransactionHistory={cameraLogic.showTransactionHistory}
+        transactions={cameraLogic.transactionsData.transactions}
+        onTransactionPress={(transaction: Transaction) => {
+          console.log('Transaction pressed:', transaction);
+          router.push({
+            pathname: '/transaction-detail',
+            params: {
+              id: transaction.id,
+            }
+          });
+        }}
+        loading={cameraLogic.transactionsData.loading}
+        refreshing={cameraLogic.transactionsData.refreshing}
+        onRefresh={cameraLogic.transactionsData.onRefresh}
+        onEndReached={cameraLogic.transactionsData.onEndReached}
+        hasMoreData={cameraLogic.transactionsData.hasMoreData}
+        onRequestStatement={() => {
+          console.log('Request statement');
+        }}
       />
 
       {/* Location Floating Button - Always visible for authenticated and verified users */}
@@ -629,35 +719,66 @@ export default function CameraScreen() {
             console.log('📍 [CameraScreen] Location button pressed');
             
             try {
-              // Clear minimized flag when user manually opens modal
-              await AsyncStorage.removeItem('location_modal_minimized');
+              // Show loading indicator immediately when button is pressed
+              setIsLocationButtonLoading(true);
+              
+              // We want to drive the Suggestion Strip, not the modal
+              setShowSuggestions(false);
               
               // Check if we have cached location data first
               const storedLocation = await AsyncStorage.getItem('last_location');
               const storedLocationData = storedLocation ? JSON.parse(storedLocation) : null;
-              
+
+              const ensureSuggestionsFromLocation = async (loc: { latitude: number; longitude: number }) => {
+                try {
+                  // Directly fetch precise suggestions for immediate UX feedback
+                  const LocationService = (await import('@/services/LocationService')).default;
+                  const locationService = LocationService.getInstance();
+                  const preciseMatch = await locationService.getPreciseLocationSuggestions(
+                    loc.latitude,
+                    loc.longitude,
+                    'Unknown'
+                  );
+
+                  const preciseSuggestions = preciseMatch?.paymentSuggestions || [];
+                  if (preciseSuggestions.length > 0) {
+                    // Populate suggestion strip and show it
+                    setSuggestions(preciseSuggestions);
+                    setShowSuggestions(true);
+                  } else {
+                    // No details for this location: brief toast and ensure banner is visible
+                    ToastService.show('No details available for this location', 'info');
+                    setSuggestions([]);
+                    setShowSuggestions(false);
+                  }
+                } catch (e) {
+                  console.log('⚠️ [CameraScreen] Failed to load suggestions for location:', e);
+                  ToastService.show('No details available for this location', 'info');
+                  setSuggestions([]);
+                  setShowSuggestions(false);
+                }
+              };
+
               if (storedLocationData) {
                 console.log('📍 [CameraScreen] Using cached location data');
                 setCurrentLocation(storedLocationData);
-                setLocationPaymentData(null); // Let modal handle the API call
-                setShowLocationSuggestion(true);
+                await ensureSuggestionsFromLocation(storedLocationData);
               } else {
                 // No cached data, need to get fresh location
                 console.log('📍 [CameraScreen] Getting fresh location data');
-                setIsLocationButtonLoading(true);
-                
                 const location = await getLocationMutation.mutateAsync();
                 if (location) {
                   setCurrentLocation(location);
-                  setLocationPaymentData(null); // Let modal handle the API call
-                  setShowLocationSuggestion(true);
+                  await ensureSuggestionsFromLocation(location);
                 } else {
                   ToastService.show('Unable to get your location', 'error');
+                  setShowSuggestions(false);
                 }
               }
             } catch (error) {
               console.log('Error getting location:', error);
               ToastService.show('Failed to get location', 'error');
+              setShowSuggestions(false);
             } finally {
               setIsLocationButtonLoading(false);
             }
@@ -737,6 +858,44 @@ export default function CameraScreen() {
         ]}
         pointerEvents="none"
       />
+
+      {/* Suggestion Strip - Hide when transaction history is open */}
+      {!cameraLogic.showTransactionHistory && (
+        <SuggestionStrip
+          suggestions={suggestions}
+          onSuggestionPress={(suggestion) => {
+            console.log('📍 [CameraScreen] Suggestion strip suggestion selected:', suggestion);
+            setShowSuggestions(false);
+            
+            // Navigate to transfer screen with pre-filled business details
+            router.push({
+              pathname: '/transfer',
+              params: {
+                bankName: suggestion.bankName,
+                accountNumber: suggestion.accountNumber,
+                accountHolderName: suggestion.accountName,
+                transferSource: 'suggestion_strip', // Track that this came from suggestion strip
+              }
+            });
+          }}
+          onClose={() => setShowSuggestions(false)}
+          visible={showSuggestions}
+          isLoading={isLoadingSuggestions}
+        />
+      )}
+
+      {/* Banner - Hide when transaction history is open or show when suggestions are not visible */}
+      {!cameraLogic.showTransactionHistory && (
+        <Banner
+          title="Refer & Earn🎉"
+          subtitle="Refer your friends and get rewarded"
+          onPress={() => console.log('Banner pressed')}
+          onClose={() => console.log('Banner closed')}
+          visible={!showSuggestions || suggestions.length === 0}
+          backgroundColor="#FFE66C"
+          textColor="#000000"
+        />
+      )}
 
       {/* Camera Controls - Show when not capturing/processing/extracting */}
       {!cameraLogic.isCapturing && !cameraLogic.isProcessing && !cameraLogic.showExtractionLoader && (
@@ -834,6 +993,7 @@ export default function CameraScreen() {
 
 
       
+
 
 
 

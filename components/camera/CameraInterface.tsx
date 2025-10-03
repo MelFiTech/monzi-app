@@ -3,6 +3,8 @@ import { View, StyleSheet, Animated, Image, Text, Dimensions, AppState } from 'r
 import { CameraView } from 'expo-camera';
 import { BlurView } from 'expo-blur';
 import { fontFamilies } from '@/constants/fonts';
+import { SuggestionStrip } from '@/components/common';
+import { PaymentSuggestion } from '@/services/LocationService';
 
 const { width } = Dimensions.get('window');
 
@@ -17,6 +19,11 @@ interface CameraInterfaceProps {
   isProcessing: boolean;
   dimViewfinderRings?: boolean;
   isAppInBackground?: boolean;
+  // Suggestion strip props
+  suggestions?: PaymentSuggestion[];
+  onSuggestionPress?: (suggestion: PaymentSuggestion) => void;
+  showSuggestions?: boolean;
+  onCloseSuggestions?: () => void;
 }
 
 export default function CameraInterface({
@@ -30,6 +37,11 @@ export default function CameraInterface({
   isProcessing,
   dimViewfinderRings = false,
   isAppInBackground = false,
+  // Suggestion strip props
+  suggestions = [],
+  onSuggestionPress,
+  showSuggestions = false,
+  onCloseSuggestions,
 }: CameraInterfaceProps) {
   const ringOpacity = dimViewfinderRings ? 0.1 : 1;
   return (
@@ -70,8 +82,8 @@ export default function CameraInterface({
 
       {/* Dark Overlay with Circular Cutout */}
       <View style={styles.overlay}>
-        {/* Circular Viewfinder */}
-        <View style={styles.viewfinderContainer}>
+        {/* Circular Viewfinder - Commented out */}
+        {/* <View style={styles.viewfinderContainer}>
           { !dimViewfinderRings && (
             <View style={styles.viewfinder}>
               <View style={styles.viewfinderRing} />
@@ -79,11 +91,11 @@ export default function CameraInterface({
               <View style={styles.viewfinderRing3} />
             </View>
           )}
-        </View>
+        </View> */}
       </View>
 
       {/* Instructions in Center - Show conditionally */}
-      {showInstructions && !isProcessing && (
+      {/* {showInstructions && !isProcessing && (
         <Animated.View 
           style={[styles.centerInstructionsContainer, { opacity: instructionAnimation }]}
         >
@@ -97,7 +109,17 @@ export default function CameraInterface({
             </Text>
           </View>
         </Animated.View>
-      )}
+      )} */}
+
+      {/* Suggestion Strip - moved up by wrapping in a View with a bottom offset */}
+      <View style={styles.suggestionStripWrapper}>
+        <SuggestionStrip
+          suggestions={suggestions}
+          onSuggestionPress={onSuggestionPress || (() => {})}
+          onClose={onCloseSuggestions}
+          visible={showSuggestions && !isProcessing}
+        />
+      </View>
     </>
   );
 }
@@ -216,5 +238,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: '#000000',
     zIndex: 999,
+  },
+  suggestionStripWrapper: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 100, // moved up from default (was 140 in SuggestionStrip), adjust as needed
+    zIndex: 60, // Higher than HeaderCard to ensure visibility
   },
 }); 

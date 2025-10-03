@@ -1,6 +1,6 @@
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Asset } from 'expo-asset';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 interface OptimizationOptions {
   maxWidth?: number;

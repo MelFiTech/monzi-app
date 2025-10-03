@@ -516,7 +516,7 @@ export default function TransferScreen() {
           <View style={styles.amountSection}>
             <View style={styles.amountRow}>
               <View style={styles.amountInputContainer}>
-                <Text style={styles.amountPrefix}>N</Text>
+                <Text style={styles.amountPrefix}>₦</Text>
                 <TextInput
                   style={styles.amountInput}
                   value={amount}
@@ -698,8 +698,9 @@ const styles = StyleSheet.create({
     color: '#10B981',
   },
   amountSection: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     marginBottom: 24,
+    marginTop: 24,
   },
   amountRow: {
     flexDirection: 'row',
@@ -712,14 +713,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   amountPrefix: {
-    fontSize: 18,
-    fontFamily: fontFamilies.sora.regular,
+    fontSize: 24,
+    fontFamily: fontFamilies.clashDisplay.bold,
     color: '#FFE66C',
     marginRight: 8,
   },
   amountInput: {
-    fontSize: 18,
-    fontFamily: fontFamilies.sora.medium,
+    fontSize: 24,
+    fontFamily: fontFamilies.sora.bold,
     color: '#FFE66C',
     flex: 1,
     padding: 0,

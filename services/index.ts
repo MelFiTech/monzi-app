@@ -22,6 +22,7 @@ export { default as NotificationService } from './NotificationService';
 export { default as PushNotificationService } from './PushNotificationService';
 export { default as ScanTrackingService } from './ScanTrackingService';
 export { default as LocationService } from './LocationService';
+export { default as BillsService } from './BillsService';
 export type { Message, UserData, AuthFlowStep } from './ChatService';
 export type { ExtractedBankData } from './GeminiService';
 
@@ -83,4 +84,5 @@ export type {
   PushTokenRegistration
 } from './PushNotificationService';
 export type { ScanUsage, ScanLimit } from './ScanTrackingService';
-export type { PaymentSuggestion, LocationMatch, LocationData, PreciseLocationResponse, NearbyLocationResponse } from './LocationService'; 
+export type { PaymentSuggestion, LocationMatch, LocationData, PreciseLocationResponse, NearbyLocationResponse } from './LocationService';
+export type { Service, DataPlan, AirtimePurchaseRequest, DataPurchaseRequest, PurchaseResponse, ApiResponse } from './BillsService'; 

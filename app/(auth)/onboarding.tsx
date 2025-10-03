@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, ImageBackground, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, ImageBackground, useWindowDimensions, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { fontFamilies } from '@/constants/fonts';
 import { useTheme } from '@/providers/ThemeProvider';
 import { Button } from '@/components/common';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -25,6 +26,10 @@ export default function OnboardingScreen() {
 
   };
 
+  const handleDevPreview = () => {
+    router.push('/dev-preview');
+  };
+
   // Calculate responsive font size and line height
   const titleFontSize = Math.min(height * 0.055, 45); // Cap at original 44
   const titleLineHeight = titleFontSize + 2; // Ensure line height is slightly larger than font size
@@ -35,6 +40,16 @@ export default function OnboardingScreen() {
       style={[styles.container, { backgroundColor: '#000000' }]}
       resizeMode="cover"
     >
+      {/* Dev Button - Top Right */}
+      <TouchableOpacity 
+        style={styles.devButton}
+        onPress={handleDevPreview}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="code-slash" size={20} color="#FFE66C" />
+        <Text style={styles.devButtonText}>DEV</Text>
+      </TouchableOpacity>
+
       <View style={[styles.content, { paddingTop: height * 0.65 }]}>
         <Text style={[
           styles.title, 
@@ -122,5 +137,24 @@ const styles = StyleSheet.create({
     color: '#FFE66C',
     fontFamily: fontFamilies.sora.semiBold,
     letterSpacing: -0.3,
+  },
+  devButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    zIndex: 1000,
+  },
+  devButtonText: {
+    color: '#FFE66C',
+    fontSize: 12,
+    fontFamily: fontFamilies.sora.semiBold,
+    letterSpacing: 0.5,
   }
 });
