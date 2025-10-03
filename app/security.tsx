@@ -103,7 +103,7 @@ export default function SecurityModal() {
           />
 
           <SecurityOption
-            icon={require('../assets/icons/security/trash-icon.png')}
+            icon={require('../assets/trash-icon.png')}
             title="Delete Account"
             onPress={handleDeleteAccount}
             isDestructive={true}
