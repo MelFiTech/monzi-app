@@ -9,8 +9,8 @@ import { updateLastActivity } from '@/hooks/useInactivityService';
 import { BiometricService } from '@/services';
 import { useLogout, useProfile } from '@/hooks/useAuthService';
 
-const AVATAR_MALE = require('@/assets/icons/profile/male.png');
-const AVATAR_FEMALE = require('@/assets/icons/profile/female.png');
+const AVATAR_MALE = require('../../assets/icons/profile/male.png');
+const AVATAR_FEMALE = require('../../assets/icons/profile/female.png');
 
 const PasscodeLockScreen = () => {
   const [userName, setUserName] = useState('');
@@ -122,10 +122,10 @@ const PasscodeLockScreen = () => {
       {/* Top icons */}
       <View style={styles.topRow}>
         <TouchableOpacity>
-          <Image source={require('@/assets/icons/profile/whatsapp.png')} style={styles.topIcon} />
+          <Image source={require('../../assets/icons/profile/whatsapp.png')} style={styles.topIcon} />
         </TouchableOpacity>
         <TouchableOpacity onPress={handleLogout}>
-          <Image source={require('@/assets/icons/auth/logout.png')} style={styles.topIcon} />
+          <Image source={require('../../assets/icons/auth/logout.png')} style={styles.topIcon} />
         </TouchableOpacity>
       </View>
       {/* Avatar */}
@@ -157,9 +157,9 @@ const PasscodeLockScreen = () => {
             }}
           >
             {key === 'face' ? (
-              <Image source={require('@/assets/icons/profile/face-id.png')} style={styles.faceIcon} />
+              <Image source={require('../../assets/icons/profile/face-id.png')} style={styles.faceIcon} />
             ) : key === 'back' ? (
-              <Image source={require('@/assets/icons/home/send/backspace.png')} style={styles.backIcon} />
+              <Image source={require('../../assets/icons/home/send/backspace.png')} style={styles.backIcon} />
             ) : (
               <Text style={styles.keyText}>{key}</Text>
             )}

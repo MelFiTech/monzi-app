@@ -48,7 +48,7 @@ export default function PulsatingGlow({
         ]}
       >
         <Image
-          source={require('@/assets/images/glow.png')}
+          source={require('../../assets/images/glow.png')}
           style={[styles.glowImage, { width: size, height: size }]}
           resizeMode="contain"
         />

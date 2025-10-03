@@ -1,89 +1,266 @@
-# EAS Ignore File
-# Files and directories listed here will be excluded from EAS builds
+# ============================================
+# EAS Ignore File - Optimized for Build Speed
+# ============================================
 
+# ----------------
 # Documentation
+# ----------------
 *.md
 README*
 CHANGELOG*
 LICENSE*
 CONTRIBUTING*
+AUTHORS*
+CONTRIBUTORS*
+CODE_OF_CONDUCT*
+SECURITY*
+SUPPORT*
 docs/
 documentation/
+.github/
+.gitlab/
 
-# Logs and temporary files
+# Implementation and guide files
+*_GUIDE.md
+*_IMPLEMENTATION*.md
+*_TEST_RESULTS.md
+*_VERIFICATION.md
+*_SUMMARY.md
+*_OPTIMIZATION*.md
+TODO.md
+SETUP_GUIDE.md
+
+# ----------------
+# Development Scripts
+# ----------------
+fetch-banks.js
+load-all-banks.js
+test-*.js
+test-*.ts
+*-test.js
+*-test.ts
+
+# ----------------
+# Testing
+# ----------------
+__tests__/
+**/__tests__/**
+**/*.test.*
+**/*.spec.*
+*.test.js
+*.test.ts
+*.test.tsx
+*.spec.js
+*.spec.ts
+*.spec.tsx
+jest.config.*
+jest.setup.*
+.jest/
+coverage/
+.nyc_output/
+e2e/
+cypress/
+playwright/
+*.snap
+
+# ----------------
+# Logs
+# ----------------
 *.log
 logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+lerna-debug.log*
 
-# Development and testing
+# ----------------
+# Environment Files
+# ----------------
 .env.local
 .env.development
+.env.development.local
 .env.test
-__tests__/
-**/__tests__/**
-**/*.test.*
-**/*.spec.*
-jest.config.*
-coverage/
-.nyc_output/
+.env.test.local
+.env.example
+.env.sample
 
-# IDE and editor files
+# ----------------
+# IDE & Editor Files
+# ----------------
 .vscode/
 .idea/
+.fleet/
+.eclipse/
+.settings/
 *.swp
 *.swo
+*.swn
 *~
-.DS_Store
-Thumbs.db
+*.bak
+.project
+.classpath
+.c9/
+*.launch
+.sublime-*
+*.code-workspace
 
-# Git related
+# ----------------
+# OS Files
+# ----------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ----------------
+# Git
+# ----------------
 .git/
 .gitignore
 .gitattributes
+.gitmodules
+.gitkeep
+.mailmap
 
-# Node modules (already handled by EAS but good to be explicit)
+# ----------------
+# Node & Package Managers
+# ----------------
 node_modules/
+.npm/
+.npmrc
+package-lock.json
+.pnpm-debug.log*
+.pnpm-lock.yaml
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp
+.pnp.js
+.pnp.*
 
-# Build artifacts and cache
+# ----------------
+# Build Artifacts & Cache
+# ----------------
 .expo/
+.expo-shared/
 .next/
 dist/
 build/
+out/
 .cache/
+.parcel-cache/
 .tmp/
 .temp/
+tmp/
+temp/
+web-build/
+.metro-health-check*
+.rollup.cache/
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
 
-# Platform specific
+# ----------------
+# Platform Specific
+# ----------------
 .android/
 .ios/
+android/app/build/
+ios/Pods/
+ios/build/
 
-# Development tools
+# ----------------
+# TypeScript
+# ----------------
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# ----------------
+# Linting & Formatting
+# ----------------
 .prettierrc*
+.prettierignore
 .eslintrc*
 .eslintignore
-.babelrc*
-babel.config.dev.js
+.eslintcache
+.stylelintrc*
+.stylelintignore
 
-# Package manager artifacts
-package-lock.json
-yarn-error.log
-.pnpm-lock.yaml
-
-# Environment and config files not needed in builds
-.env.example
-docker-compose.yml
-Dockerfile*
-
+# ----------------
 # Storybook
+# ----------------
 .storybook/
 storybook-static/
+.out/
+.storybook-out/
 
+# ----------------
+# Docker
+# ----------------
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# ----------------
+# CI/CD (if not needed)
+# ----------------
+.travis.yml
+.circleci/
+.github/workflows/
+.gitlab-ci.yml
+azure-pipelines.yml
+bitbucket-pipelines.yml
+.drone.yml
+
+# ----------------
 # Miscellaneous
+# ----------------
 *.tgz
 *.tar.gz
-.npmrc
-.yarnrc
-.editorconfig 
+*.zip
+*.rar
+*.7z
+.editorconfig
+.nvmrc
+.node-version
+.ruby-version
+.python-version
+browserslist
+.browserslistrc
+renovate.json
+.renovaterc*
+.huskyrc*
+.husky/
+.commitlintrc*
+.lintstagedrc*
+.markdownlint*
+.stylelintrc*
+
+# ----------------
+# Data Files (if not needed in build)
+# ----------------
+# banks-data.json  # Uncomment if this is only for development
+
+# ----------------
+# Source Maps (optional)
+# ----------------
+# **/*.map
+# **/*.map.js
+
+# ----------------
+# Development Only Components/Files
+# ----------------
+*.dev.*
+*.development.*
+dev-*
+location-test.tsx
+test-push.tsx
+dev-preview.tsx

@@ -184,7 +184,7 @@ export default function ProfileScreen() {
     <>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <ImageBackground
-        source={require('@/assets/images/profile-bg.png')}
+        source={require('../assets/images/profile-bg.png')}
         style={styles.container}
         resizeMode="cover"
       >
@@ -198,8 +198,8 @@ export default function ProfileScreen() {
                 <Image
                   source={
                     user?.gender === 'FEMALE'
-                      ? require('@/assets/icons/profile/female.png')
-                      : require('@/assets/icons/profile/male.png')
+                      ? require('../assets/icons/profile/female.png')
+                      : require('../assets/icons/profile/male.png')
                   }
                   style={styles.avatarImage}
                 />
@@ -218,7 +218,7 @@ export default function ProfileScreen() {
                           <ProfileMenuItem
               title="Biometrics"
               subtitle={biometricAvailable ? "Transact faster" : "Not available on this device"}
-              icon={require('@/assets/icons/profile/face-id.png')}
+              icon={require('../assets/icons/profile/face-id.png')}
               variant="toggle"
               toggleValue={biometricEnabled}
               onToggle={handleBiometricToggle}
@@ -228,7 +228,7 @@ export default function ProfileScreen() {
               <ProfileMenuItem
                 title="Security & Privacy"
                 subtitle="Passcode & transaction pin"
-                icon={require('@/assets/icons/profile/shield.png')}
+                icon={require('../assets/icons/profile/shield.png')}
                 variant="default"
                 onPress={handleSecurityPress}
               />
@@ -236,7 +236,7 @@ export default function ProfileScreen() {
               <ProfileMenuItem
                 title="About Monzi"
                 subtitle="Learn more about Monzi"
-                icon={require('@/assets/icons/profile/monzo.png')}
+                icon={require('../assets/icons/profile/monzo.png')}
                 variant="default"
                 onPress={handleAboutPress}
                 isMonzoIcon={true}
@@ -248,14 +248,14 @@ export default function ProfileScreen() {
               <ProfileMenuItem
                 title="Support"
                 subtitle="Talk to us"
-                icon={require('@/assets/icons/profile/whatsapp.png')}
+                icon={require('../assets/icons/profile/whatsapp.png')}
                 variant="default"
                 onPress={handleSupportPress}
               />
 
               <ProfileMenuItem
                 title="Sign Out"
-                icon={require('@/assets/icons/profile/logout.png')}
+                icon={require('../assets/icons/profile/logout.png')}
                 variant="default"
                 onPress={handleSignOut}
               />

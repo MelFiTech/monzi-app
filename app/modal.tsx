@@ -109,7 +109,7 @@ export default function ModalScreen() {
 
   return (
     <ImageBackground
-      source={require('@/assets/images/about/about-bg.png')}
+      source={require('../assets/images/about/about-bg.png')}
       style={styles.container}
       resizeMode="cover"
     >
@@ -127,7 +127,7 @@ export default function ModalScreen() {
           {/* Logo Section */}
           <View style={styles.logoContainer}>
             <Animated.Image
-              source={require('@/assets/icons/profile/about/glow.png')}
+              source={require('../assets/icons/profile/about/glow.png')}
               style={[
                 styles.glow,
                 {

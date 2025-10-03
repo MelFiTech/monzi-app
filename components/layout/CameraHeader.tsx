@@ -323,7 +323,7 @@ export function CameraHeader({
             <TouchableOpacity style={styles.iconButton} onPress={handleModalPress}>
               <View style={[styles.profileAvatar, {  backgroundColor: 'rgba(0, 0, 0, 0.28)' }]}>
                 <Image 
-                  source={require('@/assets/icons/home/monzi.png')}
+                  source={require('../../assets/icons/home/monzi.png')}
                   style={{width: 24, height: 24}}
                 />
               </View>
@@ -406,7 +406,7 @@ export function CameraHeader({
         <View style={styles.rightSection}>
           <TouchableOpacity style={styles.iconButton} onPress={handleAddPress}>
             <Image 
-              source={require('@/assets/icons/home/gift.png')}
+              source={require('../../assets/icons/home/gift.png')}
               style={{width: 20, height: 24}}
               tintColor="#FFFFFF"
             />

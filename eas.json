@@ -7,6 +7,7 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "node": "22.12.0",
       "env": {
         "EXPO_PUBLIC_ENV": "development"
       },
@@ -14,6 +15,7 @@
     },
     "preview": {
       "distribution": "internal",
+      "node": "22.12.0",
       "env": {
         "EXPO_PUBLIC_ENV": "preview"
       },
@@ -21,7 +23,7 @@
     },
     "production": {
       "autoIncrement": true,
-      "node": "20.18.1",
+      "node": "22.12.0",
       "cache": {
         "disabled": true
       },

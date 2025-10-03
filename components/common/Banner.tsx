@@ -46,9 +46,7 @@ export const Banner: React.FC<BannerProps> = ({
               onPress={onClose}
               style={styles.closeButton}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Text style={styles.closeIcon}>✕</Text>
-            </TouchableOpacity>
+            />
           )}
         </View>
       </View>

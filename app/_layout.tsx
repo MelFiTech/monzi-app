@@ -217,7 +217,7 @@ function GlobalAppPrivacyOverlay() {
             alignItems: 'center',
           }}>
             <Image 
-              source={require('@/assets/splash/splash.png')}
+              source={require('../assets/splash/splash.png')}
               style={{
                 width: '80%',
                 height: '80%',
