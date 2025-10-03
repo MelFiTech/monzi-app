@@ -74,7 +74,7 @@ export default function ProfileMenuItem({
 
     return (
       <Image
-        source={require('../../assets/icons/profile/chevron-right.png')}
+        source={require('@/assets/icons/profile/chevron-right.png')}
         style={styles.chevronIcon}
       />
     );

@@ -2,6 +2,12 @@
 # EAS Ignore File - Optimized for Build Speed
 # ============================================
 
+# IMPORTANT: Always include these critical directories
+# They should NEVER be ignored
+# !assets/
+# !app/
+# !components/
+
 # ----------------
 # Documentation
 # ----------------

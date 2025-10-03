@@ -234,7 +234,7 @@ export default function SplashScreenComponent() {
       <StatusBar barStyle="dark-content" backgroundColor="#FFE66C" />
       
       <Image 
-        source={require('../../assets/splash/splash.png')}
+        source={require('@/assets/splash/splash.png')}
         style={styles.splashImage}
         resizeMode="cover"
       />

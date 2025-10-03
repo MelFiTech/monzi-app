@@ -240,7 +240,7 @@ export default function CameraControls({
             disabled={isConnectionDisabled || showTransactionHistory}
           >
             <View style={styles.controlButton}>
-              <Image source={require('../../assets/icons/home/gallery.png')} style={styles.actionIcon} />
+              <Image source={require('@/assets/icons/home/gallery.png')} style={styles.actionIcon} />
             </View>
           </TouchableOpacity>
         </View>

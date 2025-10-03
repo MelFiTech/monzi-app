@@ -92,7 +92,7 @@
             <>
             <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
             <ImageBackground
-                source={require('../assets/icons/profile/about/about-bg.png')}
+                source={require('@/assets/icons/profile/about/about-bg.png')}
                 style={styles.container}
                 resizeMode="cover"
             >
@@ -109,7 +109,7 @@
                     {/* Logo Section */}
                     <View style={styles.logoContainer}>
                     <Animated.Image
-                        source={require('../assets/icons/profile/about/glow.png')}
+                        source={require('@/assets/icons/profile/about/glow.png')}
                         style={[styles.glow, {
                             transform: [
                                 { scale: pulseAnim },

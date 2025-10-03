@@ -75,7 +75,7 @@ export default function BVNSuccessScreen() {
       <View style={styles.content}>
         <View style={styles.successSection}>
           <Image 
-            source={require('../../assets/images/verify/check.png')} 
+            source={require('@/assets/images/verify/check.png')} 
             style={styles.checkIcon}
             resizeMode="contain"
           />

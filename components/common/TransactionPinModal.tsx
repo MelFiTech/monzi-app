@@ -362,7 +362,7 @@ export default function TransactionPinModal({
           disabled={isLoading}
         >
           <Image
-            source={require('../../assets/icons/profile/face-id.png')}
+            source={require('@/assets/icons/profile/face-id.png')}
             style={[
               styles.biometricOnlyIcon,
               { opacity: isLoading ? 0.5 : 1 }

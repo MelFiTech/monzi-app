@@ -36,7 +36,7 @@ export default function OnboardingScreen() {
 
   return (
     <ImageBackground 
-      source={require('../../assets/images/onboarding/intro-bg.png')}
+      source={require('@/assets/images/onboarding/intro-bg.png')}
       style={[styles.container, { backgroundColor: '#000000' }]}
       resizeMode="cover"
     >

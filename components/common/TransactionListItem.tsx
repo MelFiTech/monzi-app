@@ -63,8 +63,8 @@ export default function TransactionListItem({
 
   const getTransactionIcon = () => {
     return transaction.type === 'incoming' 
-      ? require('../../assets/icons/history/credit-arrow.png')
-      : require('../../assets/icons/history/debit-arrow.png');
+      ? require('@/assets/icons/history/credit-arrow.png')
+      : require('@/assets/icons/history/debit-arrow.png');
   };
 
   const getAmountColor = () => {

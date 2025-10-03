@@ -20,7 +20,7 @@ export default function RecipientDetailCard({
     <View style={styles.card}>
       <View style={styles.iconContainer}>
         <Image 
-          source={require('../../assets/icons/home/bank.png')}
+          source={require('@/assets/icons/home/bank.png')}
           style={styles.bankImage}
         />
       </View>

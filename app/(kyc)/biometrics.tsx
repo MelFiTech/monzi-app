@@ -47,7 +47,7 @@ export default function BiometricsScreen() {
       <View style={styles.content}>
         <View style={styles.iconContainer}>
           <Image 
-            source={require('../../assets/images/verify/face-dark.png')}
+            source={require('@/assets/images/verify/face-dark.png')}
             style={styles.faceIcon}
             resizeMode="contain"
           />

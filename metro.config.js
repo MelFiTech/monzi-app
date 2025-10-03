@@ -9,18 +9,9 @@ config.resolver = {
   extraNodeModules: {
     '@': path.resolve(__dirname),
   },
+  // Ensure we watch the assets folder
+  watchFolders: [path.resolve(__dirname)],
 };
-
-// Ensure asset extensions are properly handled
-config.resolver.assetExts = [
-  ...config.resolver.assetExts,
-  'png',
-  'jpg',
-  'jpeg',
-  'gif',
-  'webp',
-  'svg',
-];
 
 module.exports = config;
 
