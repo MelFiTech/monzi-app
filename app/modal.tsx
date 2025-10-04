@@ -160,7 +160,7 @@ export default function ModalScreen() {
         </View>
 
         {/* Bottom Links */}
-        <View style={styles.bottomLinks}>
+        {/* <View style={styles.bottomLinks}>
           <TouchableOpacity onPress={handlePrivacyPolicy}>
             <Text style={styles.linkText}>Privacy Policy</Text>
           </TouchableOpacity>
@@ -170,7 +170,7 @@ export default function ModalScreen() {
           <TouchableOpacity onPress={handleReviewApp}>
             <Text style={styles.linkText}>Review the app</Text>
           </TouchableOpacity>
-        </View>
+        </View> */}
       </View>
     </ImageBackground>
   );

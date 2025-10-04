@@ -96,6 +96,13 @@ class BillsService {
       });
 
       if (!response.ok) {
+        // Handle authentication errors
+        if (response.status === 401) {
+          const AuthErrorHandler = (await import('./AuthErrorHandler')).default;
+          const authErrorHandler = AuthErrorHandler.getInstance();
+          await authErrorHandler.handleApiResponse(response, 'BillsService.purchaseAirtime');
+          throw new Error('Authentication token expired');
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
@@ -116,6 +123,13 @@ class BillsService {
       });
 
       if (!response.ok) {
+        // Handle authentication errors
+        if (response.status === 401) {
+          const AuthErrorHandler = (await import('./AuthErrorHandler')).default;
+          const authErrorHandler = AuthErrorHandler.getInstance();
+          await authErrorHandler.handleApiResponse(response, 'BillsService.purchaseData');
+          throw new Error('Authentication token expired');
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 

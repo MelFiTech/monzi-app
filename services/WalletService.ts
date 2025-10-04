@@ -202,6 +202,14 @@ class WalletService {
    */
   private async handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
+      // Handle authentication errors
+      if (response.status === 401) {
+        const AuthErrorHandler = (await import('./AuthErrorHandler')).default;
+        const authErrorHandler = AuthErrorHandler.getInstance();
+        await authErrorHandler.handleApiResponse(response, 'WalletService');
+        throw new Error('Authentication token expired');
+      }
+
       let errorData: any = {};
       
       try {

@@ -173,9 +173,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
         await unregisterPushNotifications();
       }
       
+      // Disconnect WebSocket and NotificationService
+      try {
+        const WebSocketServiceModule = await import('@/services/WebSocketService');
+        const NotificationServiceModule = await import('@/services/NotificationService');
+        
+        const webSocketService = WebSocketServiceModule.WebSocketService.getInstance();
+        const notificationService = NotificationServiceModule.default.getInstance();
+        
+        webSocketService.disconnect();
+        notificationService.disconnect();
+        console.log('✅ WebSocket and NotificationService disconnected');
+      } catch (error) {
+        console.log('⚠️ Error disconnecting services:', error);
+      }
+      
       // Clear stored auth data using the correct instance method
       const authStorageService = AuthStorageService.getInstance();
       await authStorageService.clearAuthData();
+      
+      // Clear additional storage items
+      await Promise.all([
+        AsyncStorage.removeItem('requireReauth'),
+        AsyncStorage.removeItem('last_activity'),
+        AsyncStorage.removeItem('fresh_registration'),
+        AsyncStorage.removeItem('modal_dismissed_by_user'),
+      ]);
       
       console.log('✅ Logout successful - all session data cleared');
     } catch (error) {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ImageBackground, useWindowDimensions, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
+import Constants from 'expo-constants';
 import { fontFamilies } from '@/constants/fonts';
 import { useTheme } from '@/providers/ThemeProvider';
 import { Button } from '@/components/common';
@@ -10,6 +11,9 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const { height } = useWindowDimensions();
+  
+  // Check if we're in development mode
+  const isDevelopment = __DEV__ || Constants.expoConfig?.extra?.development === true;
 
   const handleContinue = () => {
     router.push('/(auth)/register');
@@ -27,7 +31,7 @@ export default function OnboardingScreen() {
   };
 
   const handleDevPreview = () => {
-    router.push('/dev-preview');
+    router.push('/passcode-lock');
   };
 
   // Calculate responsive font size and line height
@@ -40,15 +44,17 @@ export default function OnboardingScreen() {
       style={[styles.container, { backgroundColor: '#000000' }]}
       resizeMode="cover"
     >
-      {/* Dev Button - Top Right */}
-      <TouchableOpacity 
-        style={styles.devButton}
-        onPress={handleDevPreview}
-        activeOpacity={0.7}
-      >
-        <Ionicons name="code-slash" size={20} color="#FFE66C" />
-        <Text style={styles.devButtonText}>DEV</Text>
-      </TouchableOpacity>
+      {/* Dev Button - Top Right (Development Only) */}
+      {isDevelopment && (
+        <TouchableOpacity 
+          style={styles.devButton}
+          onPress={handleDevPreview}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="code-slash" size={20} color="#FFE66C" />
+          <Text style={styles.devButtonText}>DEV</Text>
+        </TouchableOpacity>
+      )}
 
       <View style={[styles.content, { paddingTop: height * 0.65 }]}>
         <Text style={[

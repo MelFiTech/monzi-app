@@ -85,4 +85,6 @@ export type {
 } from './PushNotificationService';
 export type { ScanUsage, ScanLimit } from './ScanTrackingService';
 export type { PaymentSuggestion, LocationMatch, LocationData, PreciseLocationResponse, NearbyLocationResponse } from './LocationService';
+export { default as AuthErrorHandler } from './AuthErrorHandler';
+export { default as RoutingErrorHandler } from './RoutingErrorHandler';
 export type { Service, DataPlan, AirtimePurchaseRequest, DataPurchaseRequest, PurchaseResponse, ApiResponse } from './BillsService'; 

@@ -17,6 +17,7 @@ import { CustomThemeProvider } from '@/providers/ThemeProvider';
 import { AuthProvider } from '@/providers/AuthProvider';
 import ToastProvider from '@/providers/ToastProvider';
 import { AppStateProvider, useAppState } from '@/providers/AppStateProvider';
+import { RoutingErrorHandler } from '@/services';
 import {
   useFonts as useSoraFonts,
   Sora_300Light,
@@ -33,15 +34,23 @@ import '@/services/BackgroundLocationTask';
 // Import NativeWind styles (temporarily disabled)
 // import '../global.css';
 
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
-
 export const unstable_settings = {
   // Start with index (auth state checker)
   initialRouteName: 'index',
 };
+
+// Custom error boundary for better error handling in production
+export function ErrorBoundary({ error }: { error: Error }) {
+  console.error('App Error Boundary:', error);
+  
+  // Handle routing errors specifically
+  if (error.message.includes('screen') || error.message.includes('route')) {
+    const routingErrorHandler = RoutingErrorHandler.getInstance();
+    routingErrorHandler.handleRoutingError(error);
+  }
+  
+  return null; // Let the app handle the error gracefully
+}
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();

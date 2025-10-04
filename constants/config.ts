@@ -10,7 +10,7 @@ export const Config = {
     PRODUCTION_URL: 'https://monzi-backend.onrender.com',
 
     // Development URL (local IP) - UPDATED
-    DEVELOPMENT_URL: process.env.EXPO_PUBLIC_DEV_API_URL || 'http://172.20.10.4:3000',
+    DEVELOPMENT_URL: process.env.EXPO_PUBLIC_DEV_API_URL || 'http://172.20.10.4:3000', //'http://105.117.3.240:3000',
 
     // Get the appropriate base URL based on environment
     getBaseUrl(): string {
@@ -51,6 +51,16 @@ export const Config = {
 
   getCurrentEnvironment(): 'development' | 'production' {
     return this.isProduction() ? 'production' : 'development';
+  },
+
+  // Production-specific settings
+  PRODUCTION: {
+    // Enable error recovery in production
+    enableErrorRecovery: true,
+    // Fallback route for routing errors
+    fallbackRoute: '/',
+    // Enable routing debug logs in production
+    enableRoutingLogs: false,
   }
 };
 

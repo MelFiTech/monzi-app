@@ -144,7 +144,7 @@
                 </View>
 
                 {/* Bottom Links */}
-                <View style={styles.bottomLinks}>
+                {/* <View style={styles.bottomLinks}>
                     <TouchableOpacity onPress={handlePrivacyPolicy}>
                         <Text style={styles.linkText}>Privacy Policy</Text>
                     </TouchableOpacity>
@@ -154,7 +154,7 @@
                     <TouchableOpacity onPress={handleReviewApp}>
                         <Text style={styles.linkText}>Review the app</Text>
                     </TouchableOpacity>
-                </View>
+                </View> */}
                 </SafeAreaView>
             </ImageBackground>
             </>
@@ -238,7 +238,7 @@
             fontFamily: fontFamilies.sora.bold,
             color: '#959595',
         },
-        bottomLinks: {
+        /* bottomLinks: {
             flexDirection: 'row',
             justifyContent: 'center',
             alignItems: 'center',
@@ -256,5 +256,5 @@
             height: 40,
             backgroundColor: 'rgba(255, 255, 255, 0.13)',
             marginHorizontal: 20,
-        },
+        }, */
         }); 
