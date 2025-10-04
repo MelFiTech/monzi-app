@@ -156,8 +156,8 @@ function RootLayoutNav() {
                   <Stack.Screen name="transfer" options={{ headerShown: false }} />
                   <Stack.Screen name="transfer-success" options={{ headerShown: false }} />
         <Stack.Screen name="bill-success" options={{ headerShown: false }} />
-        <Stack.Screen name="airtime-modal" options={{ presentation: 'modal', headerShown: false }} />
-        <Stack.Screen name="data-modal" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="airtime-modal" options={{ headerShown: false }} />
+        <Stack.Screen name="data-modal" options={{ headerShown: false }} />
         <Stack.Screen name="referral-modal" options={{ presentation: 'modal', headerShown: false }} />
                   <Stack.Screen name="transfer-loader" options={{ headerShown: false }} />
                   <Stack.Screen name="transaction-detail" options={{ headerShown: false }} />

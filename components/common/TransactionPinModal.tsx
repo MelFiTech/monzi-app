@@ -40,7 +40,7 @@ export default function TransactionPinModal({
   accountNumber,
   bankName,
   amount,
-  fee = '10.00',
+  fee = '0.00',
   feeLoading = false,
   pinError,
 }: TransactionPinModalProps) {

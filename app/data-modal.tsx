@@ -20,6 +20,7 @@ import { fontFamilies } from '@/constants/fonts';
 import Button from '@/components/common/Button';
 import PhoneNumberInput from '@/components/auth/PhoneNumberInput';
 import DataPlanDropdown from '@/components/common/DataPlanDropdown';
+import TransactionPinModal from '@/components/common/TransactionPinModal';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { BillsService, DataPlan as ApiDataPlan, DataPurchaseRequest } from '@/services';
@@ -59,6 +60,8 @@ export default function DataModalScreen() {
   const [availablePlans, setAvailablePlans] = useState<DataPlan[]>([]);
   const [showPlanDropdown, setShowPlanDropdown] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinError, setPinError] = useState<string | null>(null);
   const [errors, setErrors] = useState<{
     phoneNumber?: string;
     network?: string;
@@ -168,18 +171,31 @@ export default function DataModalScreen() {
     }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setShowPinModal(true);
+  };
+
+  const handlePinConfirm = async (pin: string) => {
+    if (!authToken || !selectedPlan) {
+      setShowPinModal(false);
+      return;
+    }
+
     setIsProcessing(true);
+    setPinError(null);
     
     try {
       const request: DataPurchaseRequest = {
         phoneNumber: rawPhoneNumber,
         bundleId: selectedPlan.bundle_id,
-        amount: parseInt(selectedPlan.amount)
+        amount: parseInt(selectedPlan.amount),
+        pin: pin,
+        network: selectedNetwork!.code
       };
 
       const response = await BillsService.purchaseData(request, authToken);
       
       if (response.success) {
+        setShowPinModal(false);
         // Navigate to bill success screen
         router.push({
           pathname: '/bill-success',
@@ -193,14 +209,20 @@ export default function DataModalScreen() {
           }
         });
       } else {
-        ToastService.error('Data purchase failed');
+        setPinError('Data purchase failed. Please try again.');
         setIsProcessing(false);
       }
     } catch (error) {
       console.error('Data purchase error:', error);
-      ToastService.error('Failed to purchase data. Please try again.');
+      setPinError('Failed to purchase data. Please try again.');
       setIsProcessing(false);
     }
+  };
+
+  const handlePinModalClose = () => {
+    setShowPinModal(false);
+    setPinError(null);
+    setIsProcessing(false);
   };
 
   const handleNetworkSelect = (network: Network) => {
@@ -353,6 +375,18 @@ export default function DataModalScreen() {
           />
         </View>
       </View>
+
+      {/* Transaction Pin Modal */}
+      <TransactionPinModal
+        visible={showPinModal}
+        onClose={handlePinModalClose}
+        onConfirm={handlePinConfirm}
+        recipientName={`${selectedNetwork?.name} Data`}
+        accountNumber={rawPhoneNumber}
+        bankName="Data Purchase"
+        amount={selectedPlan?.amount || '0'}
+        pinError={pinError || undefined}
+      />
     </SafeAreaView>
   );
 }

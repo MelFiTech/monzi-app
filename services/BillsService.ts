@@ -16,12 +16,16 @@ export interface DataPlan {
 export interface AirtimePurchaseRequest {
   phoneNumber: string;
   amount: number;
+  network: string;
+  pin: string;
 }
 
 export interface DataPurchaseRequest {
   phoneNumber: string;
   bundleId: string;
   amount: number;
+  pin: string;
+  network: string;
 }
 
 export interface PurchaseResponse {

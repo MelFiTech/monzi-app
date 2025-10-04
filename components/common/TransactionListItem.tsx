@@ -71,6 +71,72 @@ export default function TransactionListItem({
     return transaction.type === 'incoming' ? '#6CB1FF' : '#FFFFFF';
   };
 
+  const getTransactionDisplayText = () => {
+    // Check for specific transaction types first
+    const description = transaction.description?.toLowerCase() || '';
+    
+    // Airtime transactions
+    if (description.includes('airtime') || description.includes('phone') || description.includes('mobile')) {
+      return 'Airtime';
+    }
+    
+    // Data transactions
+    if (description.includes('data') || description.includes('internet') || description.includes('bundle')) {
+      return 'Data';
+    }
+    
+    // Bill payments
+    if (description.includes('bill') || description.includes('payment') || description.includes('utility')) {
+      return 'Bill Payment';
+    }
+    
+    // For incoming transactions, show sender info
+    if (transaction.type === 'incoming') {
+      // If we have sender name and it's not "External Account", use it
+      if (transaction.source && !transaction.source.toLowerCase().includes('external')) {
+        return transaction.source;
+      }
+      // Otherwise, try to extract meaningful info from description
+      if (transaction.description) {
+        // Look for patterns like "Transfer from John Doe" or "Deposit from..."
+        const fromMatch = transaction.description.match(/from\s+([^,]+)/i);
+        if (fromMatch) {
+          return fromMatch[1].trim();
+        }
+        // Look for patterns like "John Doe - Transfer"
+        const nameMatch = transaction.description.match(/^([^-]+)\s*-\s*/);
+        if (nameMatch) {
+          return nameMatch[1].trim();
+        }
+      }
+      return 'Transfer';
+    }
+    
+    // For outgoing transactions, show recipient info
+    if (transaction.type === 'outgoing') {
+      // If we have recipient name and it's not "External Account", use it
+      if (transaction.recipient && !transaction.recipient.toLowerCase().includes('external')) {
+        return transaction.recipient;
+      }
+      // Otherwise, try to extract meaningful info from description
+      if (transaction.description) {
+        // Look for patterns like "Transfer to John Doe" or "Payment to..."
+        const toMatch = transaction.description.match(/to\s+([^,]+)/i);
+        if (toMatch) {
+          return toMatch[1].trim();
+        }
+        // Look for patterns like "John Doe - Transfer"
+        const nameMatch = transaction.description.match(/^([^-]+)\s*-\s*/);
+        if (nameMatch) {
+          return nameMatch[1].trim();
+        }
+      }
+      return 'Transfer';
+    }
+    
+    return 'Transaction';
+  };
+
   return (
     <TouchableOpacity
       style={styles.container}
@@ -92,7 +158,7 @@ export default function TransactionListItem({
           {formatAmount(transaction.amount, transaction.currency)}
         </Text>
         <Text style={styles.details} numberOfLines={1} ellipsizeMode="tail">
-          {formatTime(transaction.timestamp)} • {transaction.recipient || transaction.source} • {transaction.description}
+          {formatTime(transaction.timestamp)} • {getTransactionDisplayText()} • {transaction.description}
         </Text>
       </View>
       

@@ -19,6 +19,7 @@ import * as Haptics from 'expo-haptics';
 import { fontFamilies } from '@/constants/fonts';
 import Button from '@/components/common/Button';
 import PhoneNumberInput from '@/components/auth/PhoneNumberInput';
+import TransactionPinModal from '@/components/common/TransactionPinModal';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { BillsService, AirtimePurchaseRequest } from '@/services';
@@ -52,6 +53,8 @@ export default function AirtimeModalScreen() {
   const [selectedPill, setSelectedPill] = useState<string | null>(null);
   const [showCustomAmount, setShowCustomAmount] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinError, setPinError] = useState<string | null>(null);
   const [errors, setErrors] = useState<{
     phoneNumber?: string;
     network?: string;
@@ -148,17 +151,30 @@ export default function AirtimeModalScreen() {
     }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setShowPinModal(true);
+  };
+
+  const handlePinConfirm = async (pin: string) => {
+    if (!authToken) {
+      setShowPinModal(false);
+      return;
+    }
+
     setIsProcessing(true);
+    setPinError(null);
     
     try {
       const request: AirtimePurchaseRequest = {
         phoneNumber: rawPhoneNumber,
-        amount: parseInt(amount.replace(/[^0-9]/g, ''))
+        amount: parseInt(amount.replace(/[^0-9]/g, '')),
+        network: selectedNetwork!.code,
+        pin: pin
       };
 
       const response = await BillsService.purchaseAirtime(request, authToken);
       
       if (response.success) {
+        setShowPinModal(false);
         // Navigate to bill success screen
         router.push({
           pathname: '/bill-success',
@@ -171,14 +187,20 @@ export default function AirtimeModalScreen() {
           }
         });
       } else {
-        ToastService.error('Airtime purchase failed');
+        setPinError('Airtime purchase failed. Please try again.');
         setIsProcessing(false);
       }
     } catch (error) {
       console.error('Airtime purchase error:', error);
-      ToastService.error('Failed to purchase airtime. Please try again.');
+      setPinError('Failed to purchase airtime. Please try again.');
       setIsProcessing(false);
     }
+  };
+
+  const handlePinModalClose = () => {
+    setShowPinModal(false);
+    setPinError(null);
+    setIsProcessing(false);
   };
 
   const handleAmountPillPress = (value: string) => {
@@ -378,6 +400,18 @@ export default function AirtimeModalScreen() {
           />
         </View>
       </View>
+
+      {/* Transaction Pin Modal */}
+      <TransactionPinModal
+        visible={showPinModal}
+        onClose={handlePinModalClose}
+        onConfirm={handlePinConfirm}
+        recipientName={`${selectedNetwork?.name} Airtime`}
+        accountNumber={rawPhoneNumber}
+        bankName="Airtime Purchase"
+        amount={amount.replace(/[^0-9.]/g, '')}
+        pinError={pinError || undefined}
+      />
     </SafeAreaView>
   );
 }
