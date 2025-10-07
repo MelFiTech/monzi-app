@@ -101,7 +101,7 @@ export default function ProfileScreen() {
   };
 
   const handleSecurityPress = () => {
-    router.push('/security');
+    router.push('/security-new');
   };
 
   const handleAboutPress = () => {

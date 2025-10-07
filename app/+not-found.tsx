@@ -1,38 +1,63 @@
-import { Link, Stack, router } from 'expo-router';
-import { StyleSheet, TouchableOpacity } from 'react-native';
-import { useEffect } from 'react';
-import { Text, View } from '@/components/common/Themed';
-import { fontFamilies } from '@/constants/fonts';
+import { Stack, router } from 'expo-router';
+import { StyleSheet, TouchableOpacity, SafeAreaView, StatusBar, View, Text } from 'react-native';
+import { useEffect, useState } from 'react';
+import { fontFamilies, fontSizes } from '@/constants/fonts';
 
 export default function NotFoundScreen() {
-  // Auto-redirect to home after a short delay
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      router.replace('/');
-    }, 3000);
+  const [countdown, setCountdown] = useState(3);
 
-    return () => clearTimeout(timer);
+  // Auto-redirect to home after countdown
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          router.replace('/');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
   }, []);
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Oops!' }} />
-      <View style={styles.container}>
-        <Text style={styles.title}>Screen not found</Text>
-        <Text style={styles.subtitle}>
-          The screen you're looking for doesn't exist or failed to load.
-        </Text>
-        <Text style={styles.autoRedirect}>
-          Redirecting to home screen in 3 seconds...
-        </Text>
+      <StatusBar barStyle="light-content" backgroundColor="#000000" />
+      <Stack.Screen options={{ headerShown: false }} />
+      <SafeAreaView style={styles.container}>
+        <View style={styles.content}>
+          {/* Emoji Icon */}
+          <View style={styles.iconContainer}>
+            <Text style={styles.emoji}>🤔</Text>
+          </View>
 
-        <TouchableOpacity 
-          style={styles.button}
-          onPress={() => router.replace('/')}
-        >
-          <Text style={styles.buttonText}>Go to Home Screen</Text>
-        </TouchableOpacity>
-      </View>
+          {/* Title */}
+          <Text style={styles.title}>Page Not Found</Text>
+          
+          {/* Subtitle */}
+          <Text style={styles.subtitle}>
+            The screen you're looking for doesn't exist or failed to load.
+          </Text>
+
+          {/* Countdown */}
+          <View style={styles.countdownContainer}>
+            <Text style={styles.countdownText}>
+              Redirecting in {countdown}s...
+            </Text>
+          </View>
+
+          {/* Button */}
+          <TouchableOpacity 
+            style={styles.button}
+            onPress={() => router.replace('/')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.buttonText}>Go to Home</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     </>
   );
 }
@@ -40,42 +65,67 @@ export default function NotFoundScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000000',
+  },
+  content: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
-    backgroundColor: '#FFE66C',
+    paddingHorizontal: 24,
+  },
+  iconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255, 230, 108, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 32,
+  },
+  emoji: {
+    fontSize: 64,
   },
   title: {
-    fontSize: 24,
-    fontFamily: fontFamilies.sora.bold,
-    color: '#000000',
+    fontSize: fontSizes['3xl'],
+    fontFamily: fontFamilies.clashDisplay.bold,
+    color: '#FFFFFF',
     marginBottom: 16,
     textAlign: 'center',
+    fontWeight: '700',
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: fontSizes.base,
     fontFamily: fontFamilies.sora.regular,
-    color: '#000000',
-    marginBottom: 24,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  autoRedirect: {
-    fontSize: 14,
-    fontFamily: fontFamilies.sora.medium,
-    color: '#666666',
+    color: 'rgba(255, 255, 255, 0.6)',
     marginBottom: 32,
     textAlign: 'center',
+    lineHeight: 24,
+    maxWidth: 320,
+  },
+  countdownContainer: {
+    backgroundColor: 'rgba(255, 230, 108, 0.1)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+    marginBottom: 40,
+  },
+  countdownText: {
+    fontSize: fontSizes.sm,
+    fontFamily: fontFamilies.sora.medium,
+    color: '#FFE66C',
   },
   button: {
-    backgroundColor: '#000000',
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 8,
+    backgroundColor: '#FFE66C',
+    paddingHorizontal: 48,
+    paddingVertical: 18,
+    borderRadius: 65,
+    minWidth: 200,
   },
   buttonText: {
-    fontSize: 16,
-    fontFamily: fontFamilies.sora.medium,
-    color: '#FFFFFF',
+    fontSize: fontSizes.base,
+    fontFamily: fontFamilies.sora.semiBold,
+    color: '#000000',
+    textAlign: 'center',
+    fontWeight: '600',
   },
 });

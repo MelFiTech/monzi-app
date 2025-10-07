@@ -33,7 +33,7 @@ export const Pill: React.FC<PillProps> = ({
         disabled={disabled}
         activeOpacity={0.7}
         style={styles.touchable}
-        hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} // Increase touch area by 15px on all sides
+        hitSlop={{ top: 25, bottom: 25, left: 25, right: 25 }} // Increase touch area by 25px on all sides
       >
         <View
           style={[
@@ -79,14 +79,14 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 8, // Increased vertical spacing for easier tapping
-    paddingHorizontal: 4, // Add horizontal padding for better touch area
+    marginVertical: 12, // Increased vertical spacing for easier tapping
+    paddingHorizontal: 8, // Add horizontal padding for better touch area
   },
   touchable: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 4, // Add vertical padding to increase touch area
-    paddingHorizontal: 4, // Add horizontal padding to increase touch area
+    paddingVertical: 8, // Add vertical padding to increase touch area
+    paddingHorizontal: 8, // Add horizontal padding to increase touch area
   },
   pill: {
     backgroundColor: 'rgba(0, 0, 0, 0.11)',

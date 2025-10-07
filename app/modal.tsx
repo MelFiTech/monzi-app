@@ -176,6 +176,8 @@ export default function ModalScreen() {
   );
 }
 
+export const options = { presentation: 'modal', headerShown: false };
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,

@@ -155,33 +155,37 @@ function RootLayoutNav() {
           <CustomThemeProvider>
             <ToastProvider>
               <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-                <Stack>
-                  <Stack.Screen name="index" options={{ headerShown: false }} />
-                  <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                  <Stack.Screen name="dev-preview" options={{ headerShown: false }} />
-                  <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: false }} />
+                <Stack screenOptions={{ headerShown: false }}>
+                  {/* Explicit route declarations for typed routes + production builds */}
+                  {/* Profile & Settings */}
                   <Stack.Screen name="profile" options={{ headerShown: false }} />
-                  <Stack.Screen name="transfer" options={{ headerShown: false }} />
-                  <Stack.Screen name="transfer-success" options={{ headerShown: false }} />
-        <Stack.Screen name="bill-success" options={{ headerShown: false }} />
-        <Stack.Screen name="airtime-modal" options={{ headerShown: false }} />
-        <Stack.Screen name="data-modal" options={{ headerShown: false }} />
-        <Stack.Screen name="referral-modal" options={{ presentation: 'modal', headerShown: false }} />
-                  <Stack.Screen name="transfer-loader" options={{ headerShown: false }} />
-                  <Stack.Screen name="transaction-detail" options={{ headerShown: false }} />
-                  <Stack.Screen name="(kyc)" options={{ headerShown: false, gestureEnabled: false }} />
-                  <Stack.Screen name="security" options={{ presentation: 'modal', headerShown: false }} />
+                  <Stack.Screen name="security" options={{ headerShown: false }} />
+                  <Stack.Screen name="security-new" options={{ headerShown: false }} />
                   <Stack.Screen name="change-pin" options={{ headerShown: false }} />
                   <Stack.Screen name="forgot-pin" options={{ headerShown: false }} />
                   <Stack.Screen name="reset-pin" options={{ headerShown: false }} />
                   <Stack.Screen name="change-passcode" options={{ headerShown: false }} />
                   <Stack.Screen name="forgot-passcode" options={{ headerShown: false }} />
+                  <Stack.Screen name="reset-passcode" options={{ headerShown: false }} />
                   <Stack.Screen name="delete-account" options={{ headerShown: false }} />
                   <Stack.Screen name="delete-reason" options={{ headerShown: false }} />
                   <Stack.Screen name="delete-otp" options={{ headerShown: false }} />
                   <Stack.Screen name="delete-success" options={{ headerShown: false }} />
-
+                  
+                  {/* Transfers & Transactions */}
+                  <Stack.Screen name="transfer" options={{ headerShown: false }} />
+                  <Stack.Screen name="transfer-loader" options={{ headerShown: false }} />
+                  <Stack.Screen name="transfer-success" options={{ headerShown: false }} />
+                  <Stack.Screen name="transaction-detail" options={{ headerShown: false }} />
+                  
+                  {/* Bills & Services */}
+                  <Stack.Screen name="airtime-modal" options={{ headerShown: false }} />
+                  <Stack.Screen name="data-modal" options={{ headerShown: false }} />
+                  <Stack.Screen name="bill-success" options={{ headerShown: false }} />
+                  
+                  {/* Modals */}
+                  <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: false }} />
+                  <Stack.Screen name="referral-modal" options={{ presentation: 'modal', headerShown: false }} />
                 </Stack>
 
                 {/* Global App Privacy Overlay */}

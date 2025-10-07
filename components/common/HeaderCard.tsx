@@ -126,9 +126,9 @@ const styles = StyleSheet.create({
 
   actionStrip: {
     position: 'absolute',
-    bottom: 40, // Move further down to ensure it's well outside HeaderCard bounds
-    right: -10, // Position on the right side
-    zIndex: 60, // Higher z-index to ensure visibility above other elements
+    bottom: 60, // Move further down to ensure it's well outside HeaderCard bounds
+    right: -20, // Position on the right side
+    zIndex: 100, // Higher z-index to ensure visibility above other elements
     paddingVertical: 10,
     alignItems: 'center', // Center the action strip content
     justifyContent: 'center', // Center the action strip content

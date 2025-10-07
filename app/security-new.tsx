@@ -8,14 +8,13 @@ import {
   StatusBar,
   Alert,
   Image,
-  ImageBackground,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/providers/ThemeProvider';
 import { fontFamilies, fontSizes } from '@/constants/fonts';
 import { AuthHeader } from '@/components/auth';
 
-export default function SecurityModal() {
+export default function SecurityNewScreen() {
   const { colors } = useTheme();
 
   const handleClose = () => {
@@ -23,7 +22,6 @@ export default function SecurityModal() {
       router.back();
     } catch (error) {
       console.error('Error navigating back from security screen:', error);
-      // Fallback navigation
       router.replace('/(tabs)');
     }
   };
@@ -62,7 +60,7 @@ export default function SecurityModal() {
     onPress, 
     isDestructive = false 
   }: {
-    icon: any; // Image source
+    icon: any;
     title: string;
     subtitle?: string;
     onPress: () => void;
@@ -112,44 +110,38 @@ export default function SecurityModal() {
 
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      <ImageBackground
-        source={require('../assets/images/profile-bg.png')}
-        style={styles.container}
-        resizeMode="cover"
-      >
-        <SafeAreaView style={styles.safeArea}>
-          {/* Header */}
-          <AuthHeader variant="back" onBack={handleClose} />
-          <View style={styles.titleContainer}>
-            <Text style={styles.title}>Security</Text>
-          </View>
+      <StatusBar barStyle="light-content" backgroundColor="#000000" />
+      <SafeAreaView style={styles.container}>
+        {/* Header */}
+        <AuthHeader variant="back" onBack={handleClose} />
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>Security</Text>
+        </View>
 
-          {/* Content */}
-          <View style={styles.content}>
-            <SecurityOption
-              icon={require('../assets/icons/security/pin.png')}
-              title="Change Transaction PIN"
-              subtitle="You use this PIN for transactions"
-              onPress={handleChangeTransactionPIN}
-            />
+        {/* Content */}
+        <View style={styles.content}>
+          <SecurityOption
+            icon={require('../assets/icons/security/pin.png')}
+            title="Change Transaction PIN"
+            subtitle="You use this PIN for transactions"
+            onPress={handleChangeTransactionPIN}
+          />
 
-            <SecurityOption
-              icon={require('../assets/icons/security/lock.png')}
-              title="Change Passcode"
-              subtitle="You use this passcode to log in"
-              onPress={handleChangePassword}
-            />
+          <SecurityOption
+            icon={require('../assets/icons/security/lock.png')}
+            title="Change Passcode"
+            subtitle="You use this passcode to log in"
+            onPress={handleChangePassword}
+          />
 
-            <SecurityOption
-              icon={require('../assets/icons/security/trash-icon.png')}
-              title="Delete Account"
-              onPress={handleDeleteAccount}
-              isDestructive={true}
-            />
-          </View>
-        </SafeAreaView>
-      </ImageBackground>
+          <SecurityOption
+            icon={require('../assets/icons/security/trash-icon.png')}
+            title="Delete Account"
+            onPress={handleDeleteAccount}
+            isDestructive={true}
+          />
+        </View>
+      </SafeAreaView>
     </>
   );
 }
@@ -159,21 +151,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
-  safeArea: {
-    flex: 1,
-  },
-  header: {
-    alignItems: 'flex-start',
-    paddingTop: 12,
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-  },
-  closeButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
+  titleContainer: {
+    paddingHorizontal: 24,
+    marginBottom: 12,
   },
   title: {
     fontSize: fontSizes['2xl'],
@@ -186,10 +166,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
     paddingTop: 40,
-  },
-  titleContainer: {
-    paddingHorizontal: 24,
-    marginBottom: 12,
   },
   optionContainer: {
     marginBottom: 8,
@@ -250,3 +226,4 @@ const styles = StyleSheet.create({
     fontWeight: '300',
   },
 });
+
