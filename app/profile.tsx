@@ -14,7 +14,8 @@ import { router } from 'expo-router';
 import { useTheme } from '@/providers/ThemeProvider';
 import { fontFamilies } from '@/constants/fonts';
 import { useAuth } from '@/hooks/useAuthService';
-import { ProfileMenuItem, ProfileHeader, SecurityModal } from '@/components/profile';
+import { ProfileMenuItem, ProfileHeader } from '@/components/profile';
+import SecurityModal from '@/components/profile/SecurityModal';
 
 export default function ProfileScreen() {
   const { colors } = useTheme();
