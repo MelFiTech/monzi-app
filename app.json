@@ -2,6 +2,7 @@
   "expo": {
     "name": "Monzi",
     "slug": "monzi",
+    "owner": "60minute",
     "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
