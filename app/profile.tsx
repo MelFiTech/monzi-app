@@ -14,13 +14,14 @@ import { router } from 'expo-router';
 import { useTheme } from '@/providers/ThemeProvider';
 import { fontFamilies } from '@/constants/fonts';
 import { useAuth } from '@/hooks/useAuthService';
-import { ProfileMenuItem, ProfileHeader } from '@/components/profile';
+import { ProfileMenuItem, ProfileHeader, SecurityModal } from '@/components/profile';
 
 export default function ProfileScreen() {
   const { colors } = useTheme();
   const { user, logout, authStatus, biometricSettings } = useAuth();
   const [biometricEnabled, setBiometricEnabled] = useState(authStatus?.biometricEnabled || false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [showSecurityModal, setShowSecurityModal] = useState(false);
 
   const handleClose = () => {
     router.back();
@@ -101,7 +102,7 @@ export default function ProfileScreen() {
   };
 
   const handleSecurityPress = () => {
-    router.push('/security-new');
+    setShowSecurityModal(true);
   };
 
   const handleAboutPress = () => {
@@ -263,6 +264,12 @@ export default function ProfileScreen() {
           </View>
         </SafeAreaView>
       </ImageBackground>
+
+      {/* Security Modal */}
+      <SecurityModal 
+        visible={showSecurityModal}
+        onClose={() => setShowSecurityModal(false)}
+      />
     </>
   );
 }
